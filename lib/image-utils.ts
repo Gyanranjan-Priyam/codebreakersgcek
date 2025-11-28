@@ -54,7 +54,7 @@ export const createImageFallbackChain = (imageKey: string): string[] => {
   if (!imageKey) return [];
   
   const baseUrls = [
-    'https://registration.t3.storage.dev',
+    'https://codebreakers.t3.storage.dev',
     'https://registration.s3.amazonaws.com'
   ];
   

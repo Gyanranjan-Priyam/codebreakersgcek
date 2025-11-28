@@ -25,8 +25,8 @@ export function UserProfileImageUpload({ currentImageKey, userName }: UserProfil
     const bucketName = process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES;
     let url;
     if (bucketName) {
-      // Use the correct S3 URL format - registration.t3.storage.dev
-      url = `https://registration.t3.storage.dev/${imageKey}`;
+      // Use the correct S3 URL format - codebreakers.t3.storage.dev
+      url = `https://codebreakers.t3.storage.dev/${imageKey}`;
     } else {
       // Fallback for local development or if S3 isn't configured
       url = `/uploads/profiles/${imageKey}`;

@@ -56,7 +56,7 @@ export default async function UserDashboard() {
   // Get profile image URL - prioritize profileImageKey from S3
   const getProfileImageUrl = () => {
     if (user.profileImageKey) {
-      return `https://registration.t3.storage.dev/${user.profileImageKey}`;
+      return `https://codebreakers.t3.storage.dev/${user.profileImageKey}`;
     }
     return user.image || "";
   };

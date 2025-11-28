@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'registration.t3.storage.dev',
+        hostname: 'codebreakers.t3.storage.dev',
         port: '',
         pathname: '/**',
       },

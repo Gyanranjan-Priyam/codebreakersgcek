@@ -246,7 +246,7 @@ export function MultipleUploader({
     };
 
     const getFileUrl = (key: string) => {
-        return `https://registration.t3.storage.dev/${key}`;
+        return `https://codebreakers.t3.storage.dev/${key}`;
     };
 
     const canUploadMore = (value.length + uploadingFiles.length) < maxFiles;

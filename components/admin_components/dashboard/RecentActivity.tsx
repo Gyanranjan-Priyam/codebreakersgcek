@@ -52,7 +52,7 @@ export function RecentEvents({ events }: RecentEventsProps) {
         if (key.startsWith('http://') || key.startsWith('https://')) {
             return key;
         }
-        return `https://registration.t3.storage.dev/${key}`;
+        return `https://codebreakers.t3.storage.dev/${key}`;
     };
 
     return (

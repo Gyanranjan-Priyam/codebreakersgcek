@@ -81,8 +81,8 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
 
   // Get profile image URL
   const getImageUrl = (imageKey: string) => {
-    // Use the correct S3 URL format - registration.t3.storage.dev
-    return `https://registration.t3.storage.dev/${imageKey}`;
+    // Use the correct S3 URL format - codebreakers.t3.storage.dev
+    return `https://codebreakers.t3.storage.dev/${imageKey}`;
   };
 
   const profileImageUrl = member.profileImageKey 

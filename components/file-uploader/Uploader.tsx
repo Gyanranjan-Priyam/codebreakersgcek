@@ -152,7 +152,7 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
     };
 
     const getFileUrl = (key: string) => {
-        return `https://registration.t3.storage.dev/${key}`;
+        return `https://codebreakers.t3.storage.dev/${key}`;
     };
 
     // Show uploading state with progress

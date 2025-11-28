@@ -41,7 +41,7 @@ const ImageGallery = ({
       return key;
     }
     // Otherwise, construct the full URL
-    return `https://registration.t3.storage.dev/${key}`;
+    return `https://codebreakers.t3.storage.dev/${key}`;
   };
 
   // Auto-play functionality
