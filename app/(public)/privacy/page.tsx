@@ -293,8 +293,8 @@ export default function PrivacyPage() {
               </p>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Mail className="w-4 h-4" />
-                <a href="mailto:CodeBreakers.gcekbhawanipatna@gmail.com" className="hover:text-primary transition-colors">
-                  CodeBreakers.gcekbhawanipatna@gmail.com
+                <a href="mailto:codebreakersgcek@gmail.com" className="hover:text-primary transition-colors">
+                  codebreakersgcek@gmail.com
                 </a>
               </div>
             </div>
