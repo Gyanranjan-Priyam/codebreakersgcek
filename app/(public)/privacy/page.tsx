@@ -18,7 +18,7 @@ export default function PrivacyPage() {
             <p>Last Updated: November 16, 2025</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
-            <Badge variant="secondary">Event: INSPRANO Techfest</Badge>
+            <Badge variant="secondary">Event: CodeBreakers Techfest</Badge>
             <Badge variant="outline">Institution: Government College of Engineering Kalahandi, Bhawanipatna</Badge>
           </div>
         </div>
@@ -34,10 +34,10 @@ export default function PrivacyPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p>
-                INSPRANO ("we", "our", or "us") is the official technological festival of Government College of Engineering Kalahandi, Bhawanipatna. This Privacy Policy explains how we collect, use, store, and protect personal data of participants, volunteers, organizers, sponsors, and visitors who use our online platforms or register for the event.
+                CodeBreakers ("we", "our", or "us") is the official technological festival of Government College of Engineering Kalahandi, Bhawanipatna. This Privacy Policy explains how we collect, use, store, and protect personal data of participants, volunteers, organizers, sponsors, and visitors who use our online platforms or register for the event.
               </p>
               <p>
-                By accessing or using any INSPRANO-related website, application, registration system, or communication channel, you consent to the practices described in this policy.
+                By accessing or using any CodeBreakers-related website, application, registration system, or communication channel, you consent to the practices described in this policy.
               </p>
             </CardContent>
           </Card>
@@ -110,7 +110,7 @@ export default function PrivacyPage() {
                 <li>Issuing certificates, awards, or participation benefits</li>
                 <li>Safety, security, and access control within fest premises</li>
                 <li>Improving website, app, and overall event experience</li>
-                <li>Promoting INSPRANO through photos or videos on media platforms</li>
+                <li>Promoting CodeBreakers through photos or videos on media platforms</li>
               </ul>
             </CardContent>
           </Card>
@@ -200,7 +200,7 @@ export default function PrivacyPage() {
               <CardTitle>7. Media, Photography & Consent</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p>By participating in INSPRANO, you acknowledge and consent that:</p>
+              <p>By participating in CodeBreakers, you acknowledge and consent that:</p>
               <ul className="list-disc pl-6 space-y-1">
                 <li>Photos, videos, and event recordings may include your image.</li>
                 <li>These media may be used in promotional, digital, or printed materials.</li>
@@ -231,7 +231,7 @@ export default function PrivacyPage() {
               <CardTitle>9. Third-Party Links</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>INSPRANO platforms may contain links to external websites/apps. We are not responsible for the privacy practices or content of third-party platforms.</p>
+              <p>CodeBreakers platforms may contain links to external websites/apps. We are not responsible for the privacy practices or content of third-party platforms.</p>
             </CardContent>
           </Card>
 
@@ -258,7 +258,7 @@ export default function PrivacyPage() {
               <CardTitle>11. Children's Privacy</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>INSPRANO does not knowingly collect data from individuals below 16 years of age, unless submitting through a legal guardian or institutional authorization.</p>
+              <p>CodeBreakers does not knowingly collect data from individuals below 16 years of age, unless submitting through a legal guardian or institutional authorization.</p>
             </CardContent>
           </Card>
 
@@ -268,7 +268,7 @@ export default function PrivacyPage() {
               <CardTitle>12. Changes to This Policy</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>We may update this Privacy Policy at any time. Changes will be posted with a revised "Last Updated" date. Continued use of INSPRANO platforms implies acceptance of the updated policy.</p>
+              <p>We may update this Privacy Policy at any time. Changes will be posted with a revised "Last Updated" date. Continued use of CodeBreakers platforms implies acceptance of the updated policy.</p>
             </CardContent>
           </Card>
 
@@ -284,14 +284,14 @@ export default function PrivacyPage() {
               <p>For questions, concerns, or data-related requests, contact:</p>
               
               <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                <div className="font-semibold">INSPRANO Organizing Committee</div>
+                <div className="font-semibold">CodeBreakers Organizing Committee</div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="w-4 h-4" />
                   <span>Government College of Engineering Kalahandi, Bhawanipatna</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="w-4 h-4" />
-                  <span>Email: insprano.gcekbhawanipatna@gmail.com</span>
+                  <span>Email: CodeBreakers.gcekbhawanipatna@gmail.com</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Phone className="w-4 h-4" />
@@ -310,7 +310,7 @@ export default function PrivacyPage() {
             </CardHeader>
             <CardContent>
               <p className="font-medium">
-                By accessing the INSPRANO platform or registering for events, you acknowledge that you have read, understood, and agreed to this Privacy Policy.
+                By accessing the CodeBreakers platform or registering for events, you acknowledge that you have read, understood, and agreed to this Privacy Policy.
               </p>
             </CardContent>
           </Card>

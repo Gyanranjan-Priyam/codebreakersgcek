@@ -353,7 +353,7 @@ You can view and manage your support tickets here: ${process.env.NEXT_PUBLIC_APP
 
 Best regards,
 ${session.user.name || 'Support Team'}
-INSPRANO | GCEK Support Team
+CodeBreakers | GCEK Support Team
 
 ---
 This is an automated message from our support system. Please do not reply directly to this email.
@@ -471,7 +471,7 @@ You can view your support tickets here: ${process.env.NEXT_PUBLIC_APP_URL}/dashb
 Thank you for using our support service!
 
 Best regards,
-INSPRANO | GCEK Support Team
+CodeBreakers | GCEK Support Team
         `;
 
         await sendEmail({

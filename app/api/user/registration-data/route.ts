@@ -16,28 +16,11 @@ export async function GET() {
       );
     }
 
-    // First try to get data from user profile
+    // Get data from user profile
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
         name: true,
-        email: true,
-        mobileNumber: true,
-        whatsappNumber: true,
-        aadhaarNumber: true,
-        state: true,
-        district: true,
-        collegeName: true,
-        collegeAddress: true,
-      },
-    });
-
-    // Also get the most recent participation to use as fallback data
-    const recentParticipation = await prisma.participation.findFirst({
-      where: { userId: session.user.id },
-      orderBy: { registeredAt: 'desc' },
-      select: {
-        fullName: true,
         email: true,
         mobileNumber: true,
         whatsappNumber: true,
@@ -56,30 +39,20 @@ export async function GET() {
       );
     }
 
-    // Merge data with priority: user profile > recent participation > empty string
+    // Return user data
     const registrationData = {
-      fullName: user.name || recentParticipation?.fullName || "",
-      email: user.email || recentParticipation?.email || "",
-      mobileNumber: user.mobileNumber || recentParticipation?.mobileNumber || "",
-      whatsappNumber: user.whatsappNumber || recentParticipation?.whatsappNumber || "",
-      aadhaarNumber: user.aadhaarNumber || recentParticipation?.aadhaarNumber || "",
-      state: user.state || recentParticipation?.state || "",
-      district: user.district || recentParticipation?.district || "",
-      collegeName: user.collegeName || recentParticipation?.collegeName || "",
-      collegeAddress: user.collegeAddress || recentParticipation?.collegeAddress || "",
+      fullName: user.name || "",
+      email: user.email || "",
+      mobileNumber: user.mobileNumber || "",
+      whatsappNumber: user.whatsappNumber || "",
+      aadhaarNumber: user.aadhaarNumber || "",
+      state: user.state || "",
+      district: user.district || "",
+      collegeName: user.collegeName || "",
+      collegeAddress: user.collegeAddress || "",
     };
 
-    // Add metadata about data sources for debugging/analytics
-    const metadata = {
-      hasProfileData: !!(user.name || user.mobileNumber || user.aadhaarNumber || user.state || user.collegeName),
-      hasParticipationData: !!recentParticipation,
-      lastParticipationDate: recentParticipation ? new Date().toISOString() : null,
-    };
-
-    return NextResponse.json({
-      ...registrationData,
-      _metadata: metadata
-    });
+    return NextResponse.json(registrationData);
   } catch (error) {
     console.error("Failed to fetch registration data:", error);
     return NextResponse.json(

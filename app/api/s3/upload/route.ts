@@ -6,7 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { S3 } from "@/lib/s3Client";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import arcjet, { fixedWindow } from "@/lib/arcjet";
-import { requireAdminAPI } from "@/app/data/admin/require-admin-api";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 
 export const fileUploadSchema = z.object({
@@ -28,10 +29,13 @@ export const fileUploadSchema = z.object({
 
 export async function POST(request: Request) {
 
-        const session = await requireAdminAPI();
+        // Check if user is authenticated (not necessarily admin)
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
 
-        if (!session) {
-            return NextResponse.json({ error: "Unauthorized. Admin access required." }, { status: 401 });
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
         }
 
     try {

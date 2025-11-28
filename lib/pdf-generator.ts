@@ -133,7 +133,7 @@ export async function generateRegistrationPDF(details: RegistrationDetails): Pro
   
   // Add contact information
   yPosition += 8;
-  pdf.text('For support: support@insprano.gcek.edu.in | Website: www.insprano.gcek.edu.in', 105, yPosition, { align: 'center' });
+  pdf.text('For support: support@CodeBreakers.gcek.edu.in | Website: www.CodeBreakers.gcek.edu.in', 105, yPosition, { align: 'center' });
   
   // Convert to buffer
   const pdfOutput = pdf.output('arraybuffer');
@@ -311,7 +311,7 @@ export async function generateRegistrationHTML(details: RegistrationDetails): Pr
       
       <div class="footer">
         <p>This is an automatically generated document. Please keep it for your records.</p>
-        <p>For support: support@insprano.gcek.edu.in | Website: www.insprano.gcek.edu.in</p>
+        <p>For support: support@CodeBreakers.gcek.edu.in | Website: www.CodeBreakers.gcek.edu.in</p>
       </div>
     </body>
     </html>

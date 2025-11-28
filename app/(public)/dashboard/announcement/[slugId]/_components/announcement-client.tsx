@@ -33,13 +33,6 @@ interface AnnouncementData {
   updatedAt: string;
   attachmentKeys: string[];
   imageKeys: string[];
-  relatedEvent?: {
-    id: string;
-    title: string;
-    slugId: string;
-    description: string;
-    date: string;
-  };
   createdBy: string;
 }
 
@@ -225,40 +218,6 @@ export function AnnouncementClient({ announcement }: { announcement: Announcemen
               </div>
             </CardContent>
           </Card>
-
-          {/* Related Event */}
-          {announcement.relatedEvent && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                  Related Event
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-sm sm:text-base text-foreground">
-                    {announcement.relatedEvent.title}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    {announcement.relatedEvent.description}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>
-                      {format(new Date(announcement.relatedEvent.date), 'PPP')}
-                    </span>
-                  </div>
-                  <Link href={`/dashboard/events/${announcement.relatedEvent.slugId}`}>
-                    <Button size="sm" variant="outline" className="text-xs sm:text-sm">
-                      <span className="hidden sm:inline">View Event Details</span>
-                      <span className="sm:hidden">View Event</span>
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Sidebar */}

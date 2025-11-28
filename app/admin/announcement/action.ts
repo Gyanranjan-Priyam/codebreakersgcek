@@ -9,19 +9,14 @@ import { sendAnnouncementNotification } from "@/lib/mailer";
 import { getFileFromS3 } from "@/lib/s3Client";
 
 // Helper function to generate announcement slugId
-function generateAnnouncementSlugId(category: string, eventTitle?: string): string {
+function generateAnnouncementSlugId(category: string): string {
   // Generate random number (4 digits)
   const randomNum = Math.floor(1000 + Math.random() * 9000);
   
   // Format category (remove underscores, take first 3 chars)
   const categoryCode = category.replace(/_/g, '').substring(0, 3).toUpperCase();
   
-  // Format event (take first 3 chars of event title if exists, otherwise use 'GEN')
-  const eventCode = eventTitle 
-    ? eventTitle.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase()
-    : 'GEN';
-  
-  return `INSP-ANC-${categoryCode}-${eventCode}-${randomNum}`;
+  return `INSP-ANC-${categoryCode}-GEN-${randomNum}`;
 }
 
 interface CreateAnnouncementResult {
@@ -82,18 +77,8 @@ export async function createAnnouncement(data: AnnouncementSchemaType): Promise<
     // Validate the input data
     const validatedData = announcementSchema.parse(data);
     
-    // Get related event title if event is selected
-    let eventTitle: string | undefined;
-    if (validatedData.relatedEventId) {
-      const relatedEvent = await prisma.event.findUnique({
-        where: { id: validatedData.relatedEventId },
-        select: { title: true }
-      });
-      eventTitle = relatedEvent?.title;
-    }
-    
     // Generate unique slugId
-    const slugId = generateAnnouncementSlugId(validatedData.category, eventTitle);
+    const slugId = generateAnnouncementSlugId(validatedData.category);
 
     // Create the announcement
     const announcement = await prisma.announcement.create({
@@ -103,7 +88,6 @@ export async function createAnnouncement(data: AnnouncementSchemaType): Promise<
         description: validatedData.description,
         category: validatedData.category,
         priority: validatedData.priority,
-        relatedEventId: validatedData.relatedEventId,
         attachmentKeys: validatedData.attachmentKeys,
         imageKeys: validatedData.imageKeys,
         audience: validatedData.audience,
@@ -117,16 +101,6 @@ export async function createAnnouncement(data: AnnouncementSchemaType): Promise<
         recurrenceInterval: validatedData.recurrenceInterval,
         createdBy: session.user.id,
         lastRecurrenceRun: validatedData.isRecurring ? validatedData.publishDate : null,
-      },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-            date: true,
-          },
-        },
       },
     });
 
@@ -202,10 +176,6 @@ export async function createAnnouncement(data: AnnouncementSchemaType): Promise<
             priority: validatedData.priority,
             publishDate: validatedData.publishDate.toLocaleDateString(),
             expiryDate: validatedData.expiryDate?.toLocaleDateString(),
-            relatedEvent: announcement.relatedEvent ? {
-              title: announcement.relatedEvent.title,
-              date: announcement.relatedEvent.date.toLocaleDateString(),
-            } : undefined,
             attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
           });
 
@@ -300,7 +270,6 @@ export async function updateAnnouncement(id: string, data: AnnouncementSchemaTyp
         description: validatedData.description,
         category: validatedData.category,
         priority: validatedData.priority,
-        relatedEventId: validatedData.relatedEventId,
         attachmentKeys: validatedData.attachmentKeys,
         imageKeys: validatedData.imageKeys,
         audience: validatedData.audience,
@@ -312,16 +281,6 @@ export async function updateAnnouncement(id: string, data: AnnouncementSchemaTyp
         isRecurring: validatedData.isRecurring,
         recurrenceType: validatedData.recurrenceType,
         recurrenceInterval: validatedData.recurrenceInterval,
-      },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            date: true,
-            slugId: true,
-          },
-        },
       },
     });
 
@@ -399,10 +358,6 @@ export async function updateAnnouncement(id: string, data: AnnouncementSchemaTyp
             priority: validatedData.priority,
             publishDate: validatedData.publishDate.toLocaleDateString(),
             expiryDate: validatedData.expiryDate?.toLocaleDateString(),
-            relatedEvent: announcement.relatedEvent ? {
-              title: announcement.relatedEvent.title,
-              date: announcement.relatedEvent.date.toLocaleDateString(),
-            } : undefined,
             attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
             isUpdate: true,
           });
@@ -531,13 +486,6 @@ export async function getAnnouncements() {
         attachmentKeys: true,
         imageKeys: true,
         createdAt: true,
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-          },
-        },
       },
       orderBy: [
         { isPinned: "desc" },
@@ -560,15 +508,6 @@ export async function getAnnouncementById(id: string) {
       where: {
         id,
         isDeleted: false,
-      },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-          },
-        },
       },
     });
 
@@ -609,15 +548,6 @@ export async function getAnnouncementBySlugId(slugId: string) {
         slugId,
         isDeleted: false,
       },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-          },
-        },
-      },
     });
 
     return announcement;
@@ -651,15 +581,6 @@ export async function getPublicAnnouncements() {
           in: ["PUBLIC"],
         },
       },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-          },
-        },
-      },
       orderBy: [
         { isPinned: "desc" },
         { priority: "desc" },
@@ -690,15 +611,6 @@ export async function getBannerAnnouncements() {
         ],
         showInHomeBanner: true,
       },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-          },
-        },
-      },
       orderBy: [
         { priority: "desc" },
         { createdAt: "desc" },
@@ -715,22 +627,26 @@ export async function getBannerAnnouncements() {
 
 export async function getEventsForAnnouncements() {
   try {
-    const events = await prisma.event.findMany({
+    const events = await prisma.eventPoint.findMany({
+      orderBy: {
+        eventDate: 'desc',
+      },
       select: {
         id: true,
         title: true,
-        date: true,
-        slugId: true,
-      },
-      orderBy: {
-        date: "asc",
-      },
+        eventDate: true,
+      }
     });
 
-    return events;
+    return events.map(event => ({
+      id: event.id,
+      title: event.title,
+      date: event.eventDate,
+      slugId: event.id, // Using id as slugId since EventPoint doesn't have a separate slug
+    }));
   } catch (error) {
     console.error("Error fetching events for announcements:", error);
-    // Return empty array as fallback when database is unavailable
     return [];
   }
 }
+

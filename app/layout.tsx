@@ -1,27 +1,21 @@
 import type { Metadata } from "next";
-import { Grenze, Nova_Square } from "next/font/google";
+import { Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 
 
-
-const novaSquare = Nova_Square({
-  variable: "--font-nova-square",
+const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
-  weight: "400",});
-
-const grenze = Grenze({
-  variable: "--font-grenze",
-  subsets: ["latin"],
-  weight: "400",
-});
+  weight: ["400", "500", "700"],
+  variable: "--font-source-code-pro", 
+})
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | INSPRANO 2025",
-    default: "INSPRANO 2025 - Registration Portal"
+    template: "%s | CodeBreakers",
+    default: "CodeBreakers - Registration Portal"
   },
-  description: "Official registration portal for INSPRANO 2025, Government College of Engineering Kalahandi",
+  description: "Official registration portal for CodeBreakers, Government College of Engineering Kalahandi",
   icons: {
     icon: [
       { url: "/assets/logo.png", sizes: "32x32", type: "image/png" },
@@ -40,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={` ${novaSquare.variable} ${grenze.variable} antialiased`}
+        className={` ${sourceCodePro.variable} antialiased`}
       >
         {children}
         <Toaster position="top-center" richColors closeButton />

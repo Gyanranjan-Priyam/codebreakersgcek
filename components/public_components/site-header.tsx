@@ -46,15 +46,8 @@ export function SiteHeader() {
       }
       return "Admin Dashboard";
     } else if (segments.includes("dashboard")) {
-      if (segments.includes("accommodations")) {
-        if (segments.includes("edit")) {
-          return "Edit Accommodation Booking";
-        }
-        return "Accommodation Booking";
-      } else if (segments.includes("events")) {
+      if (segments.includes("events")) {
         return "Events";
-      } else if (segments.includes("participate")) {
-        return "Event Participation";
       } else if (segments.includes("teams")) {
         return "Team Management";
       } else if (segments.includes("settings")) {
@@ -80,8 +73,6 @@ export function SiteHeader() {
     
     const mainPages = [
       "/dashboard",
-      "/dashboard/accommodations",
-      "/dashboard/participate",
       "/dashboard/events",
       "/dashboard/teams",
       "/dashboard/settings",

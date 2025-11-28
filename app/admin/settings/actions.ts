@@ -23,6 +23,24 @@ const profileUpdateSchema = z.object({
     // Basic UPI ID validation: should contain @ and be in format like user@bank
     return /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(val);
   }, "Please enter a valid UPI ID (e.g., user@paytm, user@ybl)"),
+  username: z.string().optional(),
+  firstName: z.string().optional(),
+  middleName: z.string().optional(),
+  lastName: z.string().optional(),
+  aadhaarNumber: z.string().optional(),
+  registration: z.string().optional(),
+  rollNumber: z.string().optional(),
+  branch: z.string().optional(),
+  admissionYear: z.string().optional(),
+  collegeName: z.string().optional(),
+  collegeAddress: z.string().optional(),
+  address: z.string().optional(),
+  postOffice: z.string().optional(),
+  policeStation: z.string().optional(),
+  block: z.string().optional(),
+  pinCode: z.string().optional(),
+  state: z.string().optional(),
+  district: z.string().optional(),
 });
 
 export interface ProfileUpdateData {
@@ -31,6 +49,24 @@ export interface ProfileUpdateData {
   mobileNumber?: string;
   whatsappNumber?: string;
   upiId?: string;
+  username?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  aadhaarNumber?: string;
+  registration?: string;
+  rollNumber?: string;
+  branch?: string;
+  admissionYear?: string;
+  collegeName?: string;
+  collegeAddress?: string;
+  address?: string;
+  postOffice?: string;
+  policeStation?: string;
+  block?: string;
+  pinCode?: string;
+  state?: string;
+  district?: string;
 }
 
 export async function getCurrentUserProfile() {
@@ -59,6 +95,24 @@ export async function getCurrentUserProfile() {
         role: true,
         createdAt: true,
         updatedAt: true,
+        username: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        aadhaarNumber: true,
+        registration: true,
+        rollNumber: true,
+        branch: true,
+        admissionYear: true,
+        collegeName: true,
+        collegeAddress: true,
+        address: true,
+        postOffice: true,
+        policeStation: true,
+        block: true,
+        pinCode: true,
+        state: true,
+        district: true,
       },
     });
 
@@ -124,6 +178,23 @@ export async function updateUserProfile(data: ProfileUpdateData) {
       }
     }
 
+    // Check if username is being changed and if it's already taken by another user
+    if (validatedData.username) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          username: validatedData.username,
+          id: { not: session.user.id },
+        },
+      });
+
+      if (existingUser) {
+        return {
+          status: "error" as const,
+          message: "Username is already taken by another user",
+        };
+      }
+    }
+
     // Update user profile
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
@@ -133,6 +204,24 @@ export async function updateUserProfile(data: ProfileUpdateData) {
         mobileNumber: validatedData.mobileNumber || null,
         whatsappNumber: validatedData.whatsappNumber || null,
         upiId: validatedData.upiId || null,
+        username: validatedData.username || null,
+        firstName: validatedData.firstName || null,
+        middleName: validatedData.middleName || null,
+        lastName: validatedData.lastName || null,
+        aadhaarNumber: validatedData.aadhaarNumber || null,
+        registration: validatedData.registration || null,
+        rollNumber: validatedData.rollNumber || null,
+        branch: validatedData.branch || null,
+        admissionYear: validatedData.admissionYear || null,
+        collegeName: validatedData.collegeName || null,
+        collegeAddress: validatedData.collegeAddress || null,
+        address: validatedData.address || null,
+        postOffice: validatedData.postOffice || null,
+        policeStation: validatedData.policeStation || null,
+        block: validatedData.block || null,
+        pinCode: validatedData.pinCode || null,
+        state: validatedData.state || null,
+        district: validatedData.district || null,
         updatedAt: new Date(),
       },
       select: {
@@ -144,6 +233,24 @@ export async function updateUserProfile(data: ProfileUpdateData) {
         profileImageKey: true,
         upiId: true,
         updatedAt: true,
+        username: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        aadhaarNumber: true,
+        registration: true,
+        rollNumber: true,
+        branch: true,
+        admissionYear: true,
+        collegeName: true,
+        collegeAddress: true,
+        address: true,
+        postOffice: true,
+        policeStation: true,
+        block: true,
+        pinCode: true,
+        state: true,
+        district: true,
       },
     });
 

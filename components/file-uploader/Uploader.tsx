@@ -16,9 +16,10 @@ interface SimpleUploaderProps {
     onChange?: (value: string) => void;
     fileTypeAccepted: "image" | "pdf";
     disabled?: boolean;
+    maxSize?: number; // in bytes
 }
 
-export function Uploader({ value, onChange, fileTypeAccepted, disabled = false }: SimpleUploaderProps) {
+export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, maxSize = 10 * 1024 * 1024 }: SimpleUploaderProps) {
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -104,21 +105,24 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false }
         if (rejectedFiles.length > 0) {
             const errors = rejectedFiles[0].errors;
             if (errors.some((e: any) => e.code === 'file-invalid-type')) {
-                toast.error(`Please upload a valid ${fileTypeAccepted === 'image' ? 'image (JPG/PNG)' : 'PDF'} file`);
+                toast.error(`Please upload a valid ${fileTypeAccepted === 'image' ? 'image (JPG/PNG/WebP)' : 'PDF'} file`);
             } else if (errors.some((e: any) => e.code === 'file-too-large')) {
-                toast.error('File is too large. Maximum size is 10MB');
+                const maxSizeMB = Math.round(maxSize / 1024 / 1024);
+                const maxSizeKB = Math.round(maxSize / 1024);
+                const sizeText = maxSizeMB >= 1 ? `${maxSizeMB}MB` : `${maxSizeKB}KB`;
+                toast.error(`File is too large. Maximum size is ${sizeText}`);
             }
         }
-    }, [fileTypeAccepted]);
+    }, [fileTypeAccepted, maxSize]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         onDropRejected,
         accept: fileTypeAccepted === 'image' 
-            ? { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'] }
+            ? { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'image/webp': ['.webp'] }
             : { 'application/pdf': ['.pdf'] },
         maxFiles: 1,
-        maxSize: 10 * 1024 * 1024, // 10MB
+        maxSize: maxSize,
         disabled: disabled || uploading,
     });
 
@@ -275,8 +279,8 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false }
                         </p>
                         <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                             {fileTypeAccepted === 'image' 
-                                ? 'Supports JPG, PNG (max 10MB)' 
-                                : 'Supports PDF (max 10MB)'
+                                ? `Supports JPG, PNG, WebP (max ${maxSize >= 1024 * 1024 ? Math.round(maxSize / 1024 / 1024) + 'MB' : Math.round(maxSize / 1024) + 'KB'})` 
+                                : `Supports PDF (max ${maxSize >= 1024 * 1024 ? Math.round(maxSize / 1024 / 1024) + 'MB' : Math.round(maxSize / 1024) + 'KB'})`
                             }
                         </p>
                     </div>

@@ -2,233 +2,197 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "./require-admin";
-import { ParticipationStatus } from "@prisma/client";
 
 export async function getDashboardStats() {
     await requireAdmin();
     
     try {
-        // Get total counts
-        const [totalEvents, totalUsers, totalParticipations, totalTeams] = await Promise.all([
-            prisma.event.count(),
-            prisma.user.count(),
-            prisma.participation.count(),
-            prisma.team.count()
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        const monthStart = new Date(currentYear, currentMonth, 1);
+        const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+
+        // Get user stats
+        const [
+            totalUsers,
+            verifiedUsers,
+            bannedUsers,
+            newUsersThisMonth,
+        ] = await Promise.all([
+            prisma.user.count({ where: { role: { not: "admin" } } }),
+            prisma.user.count({ where: { emailVerified: true, role: { not: "admin" } } }),
+            prisma.user.count({ where: { banned: true, role: { not: "admin" } } }),
+            prisma.user.count({ 
+                where: { 
+                    createdAt: { gte: monthStart, lte: monthEnd },
+                    role: { not: "admin" }
+                } 
+            }),
         ]);
 
-        // Get participation status breakdown
-        const participationStats = await prisma.participation.groupBy({
-            by: ['status'],
-            _count: {
-                id: true
+        // Get announcements stats
+        const [totalAnnouncements, activeAnnouncements] = await Promise.all([
+            prisma.announcement.count({ where: { isDeleted: false } }),
+            prisma.announcement.count({ 
+                where: { 
+                    isDeleted: false,
+                    createdAt: { gte: monthStart, lte: monthEnd }
+                } 
+            }),
+        ]);
+
+        // Get quizzes stats
+        const [totalQuizzes, activeQuizzes, totalQuizAttempts] = await Promise.all([
+            prisma.quiz.count(),
+            prisma.quiz.count({ 
+                where: { 
+                    isActive: true,
+                    OR: [
+                        { endDateTime: null },
+                        { endDateTime: { gte: currentDate } }
+                    ]
+                } 
+            }),
+            prisma.quizAttempt.count({ where: { completedAt: { not: null } } }),
+        ]);
+
+        // Get support tickets stats
+        const [totalTickets, openTickets, resolvedTickets] = await Promise.all([
+            prisma.supportTicket.count(),
+            prisma.supportTicket.count({ 
+                where: { 
+                    status: { in: ['OPEN', 'IN_PROGRESS'] }
+                } 
+            }),
+            prisma.supportTicket.count({ 
+                where: { 
+                    status: 'RESOLVED',
+                    resolvedAt: { gte: monthStart, lte: monthEnd }
+                } 
+            }),
+        ]);
+
+        // Get events and attendance stats
+        const [totalEvents, upcomingEvents, totalAttendance] = await Promise.all([
+            prisma.eventPoint.count(),
+            prisma.eventPoint.count({ 
+                where: { 
+                    eventDate: { gte: currentDate }
+                } 
+            }),
+            prisma.attendance.count({ where: { status: 'present' } }),
+        ]);
+
+        // Get tasks stats
+        const [totalTasks, pendingTasks, approvedSubmissions] = await Promise.all([
+            prisma.task.count(),
+            prisma.task.count({ 
+                where: { 
+                    dueDate: { gte: currentDate }
+                } 
+            }),
+            prisma.taskSubmission.count({ 
+                where: { 
+                    status: 'approved',
+                    evaluatedAt: { gte: monthStart, lte: monthEnd }
+                } 
+            }),
+        ]);
+
+        // Calculate total points distributed
+        const [attendancePoints, taskPoints, eventPoints, quizPoints] = await Promise.all([
+            prisma.attendance.aggregate({
+                _sum: { points: true },
+                where: { status: 'present' }
+            }),
+            prisma.taskSubmission.aggregate({
+                _sum: { pointsAwarded: true },
+                where: { status: 'approved' }
+            }),
+            prisma.eventParticipation.aggregate({
+                _sum: { pointsAwarded: true },
+                where: { status: 'approved' }
+            }),
+            prisma.quizAttempt.aggregate({
+                _sum: { pointsEarned: true },
+                where: { completedAt: { not: null } }
+            }),
+        ]);
+
+        const totalPointsDistributed = 
+            (attendancePoints._sum.points || 0) +
+            (taskPoints._sum.pointsAwarded || 0) +
+            (eventPoints._sum.pointsAwarded || 0) +
+            (quizPoints._sum.pointsEarned || 0);
+
+        // Get recent activities
+        const recentUsers = await prisma.user.findMany({
+            where: { role: { not: "admin" } },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+            select: {
+                name: true,
+                email: true,
+                createdAt: true,
+                emailVerified: true,
             }
         });
 
-        // Get recent registrations (last 30 days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const recentRegistrations = await prisma.participation.count({
-            where: {
-                registeredAt: {
-                    gte: thirtyDaysAgo
-                }
-            }
-        });
-
-        // Get revenue stats
-        const confirmedParticipations = await prisma.participation.findMany({
-            where: {
-                status: ParticipationStatus.CONFIRMED
-            },
-            include: {
-                event: {
-                    select: {
-                        price: true
-                    }
-                }
-            }
-        });
-
-        const totalRevenue = confirmedParticipations.reduce((sum, participation) => {
-            return sum + (participation.event.price || 0);
-        }, 0);
-
-        // Get pending payments
-        const pendingPayments = await prisma.participation.count({
-            where: {
-                status: ParticipationStatus.PAYMENT_SUBMITTED
+        const recentTickets = await prisma.supportTicket.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+            select: {
+                id: true,
+                ticketNumber: true,
+                subject: true,
+                status: true,
+                priority: true,
+                createdAt: true,
+                name: true,
             }
         });
 
         return {
-            totalEvents,
+            // User stats
             totalUsers,
-            totalParticipations,
-            totalTeams,
-            recentRegistrations,
-            totalRevenue,
-            pendingPayments,
-            participationStats: participationStats.reduce((acc, stat) => {
-                acc[stat.status] = stat._count.id;
-                return acc;
-            }, {} as Record<string, number>)
+            verifiedUsers,
+            bannedUsers,
+            newUsersThisMonth,
+            
+            // Announcements
+            totalAnnouncements,
+            activeAnnouncements,
+            
+            // Quizzes
+            totalQuizzes,
+            activeQuizzes,
+            totalQuizAttempts,
+            
+            // Support
+            totalTickets,
+            openTickets,
+            resolvedTickets,
+            
+            // Events & Attendance
+            totalEvents,
+            upcomingEvents,
+            totalAttendance,
+            
+            // Tasks
+            totalTasks,
+            pendingTasks,
+            approvedSubmissions,
+            
+            // Points
+            totalPointsDistributed,
+            
+            // Recent activities
+            recentUsers,
+            recentTickets,
         };
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
         throw new Error('Failed to fetch dashboard stats');
-    }
-}
-
-export async function getRecentEvents(limit: number = 5) {
-    await requireAdmin();
-    
-    try {
-        const events = await prisma.event.findMany({
-            take: limit,
-            orderBy: {
-                createdAt: 'desc'
-            },
-            include: {
-                _count: {
-                    select: {
-                        participations: true
-                    }
-                }
-            }
-        });
-        
-        return events;
-    } catch (error) {
-        console.error('Error fetching recent events:', error);
-        throw new Error('Failed to fetch recent events');
-    }
-}
-
-export async function getRecentParticipations(limit: number = 10) {
-    await requireAdmin();
-    
-    try {
-        const participations = await prisma.participation.findMany({
-            take: limit,
-            orderBy: {
-                registeredAt: 'desc'
-            },
-            include: {
-                user: {
-                    select: {
-                        name: true,
-                        email: true,
-                        image: true
-                    }
-                },
-                event: {
-                    select: {
-                        title: true,
-                        slugId: true
-                    }
-                }
-            }
-        });
-        
-        return participations;
-    } catch (error) {
-        console.error('Error fetching recent participations:', error);
-        throw new Error('Failed to fetch recent participations');
-    }
-}
-
-export async function getEventStats() {
-    await requireAdmin();
-    
-    try {
-        // Get events with participation counts
-        const events = await prisma.event.findMany({
-            include: {
-                _count: {
-                    select: {
-                        participations: true,
-                        teams: true
-                    }
-                }
-            },
-            orderBy: {
-                createdAt: 'desc'
-            }
-        });
-
-        // Calculate event analytics
-        const eventAnalytics = events.map(event => {
-            const participationCount = event._count.participations;
-            const teamCount = event._count.teams;
-            const revenue = participationCount * event.price;
-            
-            return {
-                id: event.id,
-                title: event.title,
-                slugId: event.slugId,
-                category: event.category,
-                date: event.date,
-                price: event.price,
-                participationCount,
-                teamCount,
-                revenue,
-                createdAt: event.createdAt
-            };
-        });
-
-        return eventAnalytics;
-    } catch (error) {
-        console.error('Error fetching event stats:', error);
-        throw new Error('Failed to fetch event stats');
-    }
-}
-
-export async function getMonthlyStats() {
-    await requireAdmin();
-    
-    try {
-        // Get monthly registration data for the last 6 months
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-        const monthlyData = await prisma.participation.findMany({
-            where: {
-                registeredAt: {
-                    gte: sixMonthsAgo
-                }
-            },
-            include: {
-                event: {
-                    select: {
-                        price: true
-                    }
-                }
-            }
-        });
-
-        // Group by month
-        const monthlyStats = monthlyData.reduce((acc, participation) => {
-            const date = new Date(participation.registeredAt);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            
-            if (!acc[monthKey]) {
-                acc[monthKey] = {
-                    month: monthKey,
-                    registrations: 0,
-                    revenue: 0
-                };
-            }
-            
-            acc[monthKey].registrations += 1;
-            acc[monthKey].revenue += participation.event.price || 0;
-            
-            return acc;
-        }, {} as Record<string, { month: string; registrations: number; revenue: number }>);
-
-        return Object.values(monthlyStats).sort((a, b) => a.month.localeCompare(b.month));
-    } catch (error) {
-        console.error('Error fetching monthly stats:', error);
-        throw new Error('Failed to fetch monthly stats');
     }
 }

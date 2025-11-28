@@ -50,7 +50,7 @@ export const PromotionalMessageWithIcons: React.FC<PromotionalMessageProps> = ({
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-center gap-2 text-lg font-bold text-red-500">
         <PromotionalIcons.fire className="text-red-500" />
-        <span>INSPRANO 2025 – The Ultimate Robotics & Tech Challenge!</span>
+        <span>CodeBreakers 2025 – The Ultimate Robotics & Tech Challenge!</span>
         <PromotionalIcons.fire className="text-red-500" />
       </div>
       
@@ -122,15 +122,15 @@ export const PromotionalMessageWithIcons: React.FC<PromotionalMessageProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <PromotionalIcons.link className="text-gray-600 flex-shrink-0" />
-          <span><strong>Visit:</strong> <a href="https://insprano.netlify.app/events" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://insprano.netlify.app/events</a></span>
+          <span><strong>Visit:</strong> <a href="https://CodeBreakers.netlify.app/events" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://CodeBreakers.netlify.app/events</a></span>
         </div>
         <div className="flex items-center gap-2">
           <PromotionalIcons.link className="text-gray-600 flex-shrink-0" />
-          <span><strong>Registration:</strong> <a href="https://registration-insprano.vercel.app" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://registration-insprano.vercel.app</a></span>
+          <span><strong>Registration:</strong> <a href="https://registration-CodeBreakers.vercel.app" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://registration-CodeBreakers.vercel.app</a></span>
         </div>
         <div className="flex items-center gap-2">
           <PromotionalIcons.camera className="text-pink-600 flex-shrink-0" />
-          <span><strong>Instagram:</strong> <a href="https://www.instagram.com/gcek.insprano" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">@gcek.insprano</a></span>
+          <span><strong>Instagram:</strong> <a href="https://www.instagram.com/gcek.CodeBreakers" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">@gcek.CodeBreakers</a></span>
         </div>
       </div>
 

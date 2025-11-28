@@ -3,15 +3,17 @@
 import * as React from "react"
 import {
   Calendar,
-  Home,
   LayoutDashboard,
   FileText,
   Settings,
   Megaphone,
+  Brain,
   Ticket,
-  DollarSign,
-  User,
+  FolderGit,
   Users,
+  ChartColumnIncreasing,
+  Trophy,
+  UserX
 } from "lucide-react"
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main"
@@ -47,29 +49,34 @@ const data = {
       icon: LayoutDashboard,
     },
     {
-      title: "Events",
-      url: "/admin/events",
-      icon: Calendar,
-    },
-    {
-      title: "Accommodations",
-      url: "/admin/accommodations",
-      icon: Home,
-    },
-    {
-      title: "Participants",
-      url: "/admin/participants",
-      icon: User,
-    },
-    {
-      title: "Teams",
-      url: "/admin/team",
+      title: "Members",
+      url: "/admin/members",
       icon: Users,
     },
     {
-      title: "Payments",
-      url: "/admin/payments",
-      icon: DollarSign,
+      title: "Incomplete Profiles",
+      url: "/admin/incomplete-profiles",
+      icon: UserX,
+    },
+    {
+      title: "Quizzes",
+      url: "/admin/quizzes",
+      icon: Brain,
+    },
+    {
+      title: "Leaderboard",
+      url: "/admin/leaderboard",
+      icon: ChartColumnIncreasing,
+    },
+    {
+      title: "Points Management",
+      url: "/admin/points",
+      icon: Trophy,
+    },
+    {
+      title: "Project Submissions",
+      url: "/admin/projects",
+      icon: FolderGit,
     },
     {
       title: "Reports",
@@ -118,16 +125,16 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             >
               <Link href="/admin">
                 <div className="flex items-center">
-                  <span className="text-xl font-bold inline-flex items-center hover:text-amber-400">
+                  <span className="text-[1.1rem] font-bold inline-flex items-center hover:text-amber-400">
                     <Image
                     src="/assets/logo.png"
-                    alt="Insprano Logo"
-                    width={40}
-                    height={40}
+                    alt="CodeBreakers Logo"
+                    width={32}
+                    height={32}
                     className="inline-block mr-2 mb-1"
                     priority
                   />
-                    INSPRANO | GCEK
+                    CodeBreakers | GCEK
                   </span>
                 </div>
               </Link>

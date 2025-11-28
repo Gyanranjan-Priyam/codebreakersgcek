@@ -19,7 +19,8 @@ async function createAdminUser() {
         name: 'Test Admin',
         email: 'admin@test.com',
         emailVerified: true,
-        role: 'admin'
+        role: 'admin',
+        profileComplete: true, // Admins don't need to complete onboarding
       }
     });
 

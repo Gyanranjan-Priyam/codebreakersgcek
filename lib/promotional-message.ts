@@ -1,4 +1,4 @@
-// INSPRANO 2025 promotional message template
+// CodeBreakers 2025 promotional message template
 // This file contains the standardized promotional content for all social sharing platforms
 // Update this file to modify the message across all sharing methods
 
@@ -24,7 +24,7 @@ export const REACT_ICONS_MAP = {
 // import { PromotionalMessageWithIcons, IconComponents } from "@/components/ui/promotional-message-with-icons";
 
 export const createPromotionalMessage = (eventUrl: string): string => {
-  return `🔥 INSPRANO 2025 – The Ultimate Robotics & Tech Challenge! 🔥
+  return `🔥 CodeBreakers 2025 – The Ultimate Robotics & Tech Challenge! 🔥
 ⚙ Gear up for GCEK Bhawanipatna's premier techfest! Build, program, and compete with your bots, or showcase your coding skills in a 14-hour hackathon, all for a total prize pool of ₹93,000 💰
 
 ✨ Competitions Include:
@@ -42,9 +42,9 @@ export const createPromotionalMessage = (eventUrl: string): string => {
 
 🔗 Event Page: ${eventUrl}
 
-🔗 Visit here: https://insprano.netlify.app/events
-🔗 For Registration Visit: https://registration-insprano.vercel.app
-📸 Instagram: https://www.instagram.com/gcek.insprano?igsh=MWdlMXFsdXh1OHZ6Mg==
+🔗 Visit here: https://CodeBreakers.netlify.app/events
+🔗 For Registration Visit: https://registration-CodeBreakers.vercel.app
+📸 Instagram: https://www.instagram.com/gcek.CodeBreakers?igsh=MWdlMXFsdXh1OHZ6Mg==
 
 Rulebook: https://drive.google.com/drive/folders/1sFeMzhfXp_6N6Ghe96mhLu4LC1sOYfBm?usp=sharing
 For queries contact:
@@ -61,19 +61,19 @@ Best regards`;
 };
 
 // Subject line for email sharing
-export const EMAIL_SUBJECT = "🔥 INSPRANO 2025 – The Ultimate Robotics & Tech Challenge! 🔥";
+export const EMAIL_SUBJECT = "🔥 CodeBreakers 2025 – The Ultimate Robotics & Tech Challenge! 🔥";
 
 // Configuration object for easy updates
-export const INSPRANO_CONFIG = {
-  eventName: "INSPRANO 2025",
+export const CodeBreakers_CONFIG = {
+  eventName: "CodeBreakers 2025",
   tagline: "The Ultimate Robotics & Tech Challenge!",
   institution: "GCEK Bhawanipatna",
   prizePool: "₹93,000",
   dates: "17th -18th October 2025",
   venue: "Government College of Engineering, Kalahandi, Bhawanipatna",
-  mainWebsite: "https://insprano.netlify.app/events",
-  registrationSite: "https://registration-insprano.vercel.app",
-  instagram: "https://www.instagram.com/gcek.insprano?igsh=MWdlMXFsdXh1OHZ6Mg==",
+  mainWebsite: "https://CodeBreakers.netlify.app/events",
+  registrationSite: "https://registration-CodeBreakers.vercel.app",
+  instagram: "https://www.instagram.com/gcek.CodeBreakers?igsh=MWdlMXFsdXh1OHZ6Mg==",
   rulebook: "https://drive.google.com/drive/folders/1sFeMzhfXp_6N6Ghe96mhLu4LC1sOYfBm?usp=sharing",
   contactNumbers: [
     "+91 8480112440",

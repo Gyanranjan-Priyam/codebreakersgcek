@@ -117,7 +117,7 @@ const generateVerificationEmailHTML = (verificationCode: string) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INSPRANO Email Verification</title>
+    <title>CodeBreakers Email Verification</title>
     <style>
         * {
             margin: 0;
@@ -145,11 +145,10 @@ const generateVerificationEmailHTML = (verificationCode: string) => {
             padding: 40px 20px 20px;
         }
         
-        .insprano-logo {
-            width: 48px;
-            height: 48px;
+        .CodeBreakers-logo {
+            max-width: 200px;
+            height: auto;
             margin-bottom: 24px;
-            fill: #24292f;
         }
         
         .header h1 {
@@ -233,16 +232,13 @@ const generateVerificationEmailHTML = (verificationCode: string) => {
 <body>
     <div class="container">
         <div class="header">
-            <svg class="insprano-logo" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L2 7v10c0 5.55 3.84 9.74 9 11 5.16-1.26 9-5.45 9-11V7l-10-5z"/>
-                <path d="M9 12l2 2 4-4"/>
-            </svg>
-            <h1>Please verify your identity for <strong>INSPRANO</strong></h1>
+            <img src="https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png" alt="CodeBreakers Logo" class="CodeBreakers-logo" />
+            <h1>Please verify your identity for <strong>CodeBreakers</strong></h1>
         </div>
         
         <div class="content">
             <div class="code-box">
-                <p class="code-label">Here is your INSPRANO verification code:</p>
+                <p class="code-label">Here is your CodeBreakers verification code:</p>
                 <div class="verification-code">${verificationCode}</div>
                 <p class="info-text">This code is valid for <strong>10 minutes</strong> and can only be used once.</p>
                 <p class="info-text"><span class="warning">Please don't share this code with anyone:</span> we'll never ask for it on the phone or via email.</p>
@@ -250,17 +246,17 @@ const generateVerificationEmailHTML = (verificationCode: string) => {
             
             <div class="signature">
                 <p>Thanks,</p>
-                <p>The INSPRANO Team</p>
+                <p>The CodeBreakers Team</p>
             </div>
         </div>
         
         <div class="disclaimer">
-            <p>You're receiving this email because a verification code was requested for your INSPRANO account. If this wasn't you, please ignore this email.</p>
+            <p>You're receiving this email because a verification code was requested for your CodeBreakers account. If this wasn't you, please ignore this email.</p>
         </div>
     </div>
     
     <div class="footer">
-        <p>INSPRANO 2025 <span class="footer-divider">·</span> Government College of Engineering Kalahandi <span class="footer-divider">·</span> Bhawanipatna, Odisha</p>
+        <p>CodeBreakers 2025 <span class="footer-divider">·</span> Government College of Engineering Kalahandi <span class="footer-divider">·</span> Bhawanipatna, Odisha</p>
     </div>
 </body>
 </html>`;
@@ -626,10 +622,9 @@ const generateAnnouncementEmailHTML = ({
         }
         
         .announcement-icon {
-            width: 48px;
-            height: 48px;
+            max-width: 200px;
+            height: auto;
             margin-bottom: 16px;
-            fill: #24292f;
         }
         
         .header h1 {
@@ -797,10 +792,8 @@ const generateAnnouncementEmailHTML = ({
 <body>
     <div class="container">
         <div class="header">
-            <svg class="announcement-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
-            <h1>INSPRANO ${isUpdate ? '- 🔁 Updated Announcement' : '- 🔈 New Announcement'}</h1>
+            <img src="https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png" alt="CodeBreakers Logo" class="announcement-icon" />
+            <h1>CodeBreakers ${isUpdate ? '- 🔁 Updated Announcement' : '- 🔈 New Announcement'}</h1>
             <div class="badges">
                 <span class="badge ${priority.toLowerCase() === 'urgent' ? 'urgent' : priority.toLowerCase() === 'important' ? 'important' : ''}">${priority} Priority</span>
                 <span class="badge">${category.replace('_', ' ')}</span>
@@ -864,17 +857,17 @@ const generateAnnouncementEmailHTML = ({
             
             <div class="signature">
                 <p>Stay updated with all the latest announcements and information. If you have any questions, please contact our support team at <strong>${env.GMAIL_USER}</strong>.</p>
-                <p style="margin-top: 16px;">Thanks,<br>The INSPRANO Team</p>
+                <p style="margin-top: 16px;">Thanks,<br>The CodeBreakers Team</p>
             </div>
         </div>
         
         <div class="footer">
-            <p>You're receiving this email because you're subscribed to INSPRANO announcements. If this wasn't intended for you, please ignore this email.</p>
+            <p>You're receiving this email because you're subscribed to CodeBreakers announcements. If this wasn't intended for you, please ignore this email.</p>
         </div>
     </div>
     
     <div class="footer-info">
-        <p>INSPRANO 2025 <span class="footer-divider">·</span> Government College of Engineering Kalahandi <span class="footer-divider">·</span> Bhawanipatna, Odisha</p>
+        <p>CodeBreakers 2025 <span class="footer-divider">·</span> Government College of Engineering Kalahandi <span class="footer-divider">·</span> Bhawanipatna, Odisha</p>
     </div>
 </body>
 </html>`;
@@ -1115,7 +1108,7 @@ const generatePaymentConfirmationEmailHTML = ({
               <p style="margin: 0 0 10px; font-size: 14px; color: #666666;">Need help? Contact us at 
                 <a href="mailto:${env.GMAIL_USER}" style="color: #059669; text-decoration: none;">${env.GMAIL_USER}</a>
               </p>
-              <p style="margin: 0; font-size: 12px; color: #999999;">© 2025 ${env.GMAIL_FROM_NAME || 'INSPRANO 2025, GCEK'}. All rights reserved.</p>
+              <p style="margin: 0; font-size: 12px; color: #999999;">© 2025 ${env.GMAIL_FROM_NAME || 'CodeBreakers 2025, GCEK'}. All rights reserved.</p>
             </td>
           </tr>
         </table>

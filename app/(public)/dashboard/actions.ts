@@ -3,44 +3,24 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
-import { syncUserProfileFromTeamMemberData } from "./teams/actions";
 
 export interface DashboardStats {
-  totalRegistrations: number;
-  pendingPayments: number;
-  confirmedEvents: number;
-  totalSpent: number;
-  teamsJoined: number;
-  teamsLeading: number;
-}
-
-export interface UserParticipation {
-  id: string;
-  status: string;
-  registeredAt: Date;
-  paymentSubmittedAt: Date | null;
-  paymentVerifiedAt: Date | null;
-  paymentAmount: number | null;
-  transactionId: string | null;
-  event: {
-    id: string;
-    title: string;
-    slugId: string;
-    category: string;
-    date: Date;
-    venue: string;
-    price: number;
-  };
+  totalPoints: number;
+  pendingTasks: number;
+  activeQuizzes: number;
+  upcomingEvents: number;
+  openTickets: number;
+  totalAnnouncements: number;
 }
 
 export interface RecentActivity {
   id: string;
-  type: 'registration' | 'payment_submitted' | 'payment_verified' | 'team_joined' | 'team_created';
+  type: 'announcement' | 'task' | 'event' | 'quiz' | 'ticket';
   title: string;
   description: string;
   date: Date;
-  eventTitle?: string;
-  teamName?: string;
+  status?: string;
+  points?: number;
 }
 
 export async function getUserDashboardData() {
@@ -56,205 +36,212 @@ export async function getUserDashboardData() {
       };
     }
 
-    // Sync user profile with team member data if available (only if user has an email)
-    if (session.user.email) {
-      try {
-        await syncUserProfileFromTeamMemberData(session.user.email, session.user.id);
-      } catch (error) {
-        // Don't fail the dashboard load if sync fails, just log the error
-        console.error("Failed to sync user profile from team member data:", error);
-      }
-    }
+    const userId = session.user.id;
 
-    // Get user participations with event details
-    const participations = await prisma.participation.findMany({
-      where: { userId: session.user.id },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-            category: true,
-            date: true,
-            venue: true,
-            price: true,
-          },
-        },
-      },
-      orderBy: { registeredAt: 'desc' },
-    });
-
-    // Get user's participation IDs first
-    const userParticipationIds = participations.map(p => p.id);
-
-    // Get team memberships using participation IDs
-    const teamMemberships = await prisma.teamMember.findMany({
-      where: { 
-        participantId: { 
-          in: userParticipationIds 
-        } 
-      },
-      include: {
-        team: {
-          include: {
-            event: {
-              select: {
-                id: true,
-                title: true,
-                category: true,
-                date: true,
-              },
-            },
-            leader: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
-            },
-            members: {
-              include: {
-                participant: {
-                  select: {
-                    fullName: true,
-                    email: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      orderBy: { joinedAt: 'desc' },
-    });
-
-    // Get team leaderships using participation IDs
-    const teamLeaderships = await prisma.team.findMany({
-      where: { 
-        leaderId: {
-          in: userParticipationIds
+    // Parallel data fetching for performance
+    const [
+      announcements,
+      attendancePoints,
+      taskSubmissions,
+      eventParticipations,
+      quizAttempts,
+      pendingTasksCount,
+      activeQuizzesCount,
+      upcomingEventsCount,
+      openTicketsCount,
+      recentTickets
+    ] = await Promise.all([
+      // 1. Announcements
+      prisma.announcement.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        where: { isDeleted: false }
+      }),
+      // 2. Attendance Points
+      prisma.attendance.aggregate({
+        where: { userId, status: 'present' },
+        _sum: { points: true }
+      }),
+      // 3. Task Submissions (Points & Recent)
+      prisma.taskSubmission.findMany({
+        where: { userId },
+        include: { task: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 5
+      }),
+      // 4. Event Participations (Points & Recent)
+      prisma.eventParticipation.findMany({
+        where: { userId },
+        include: { event: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 5
+      }),
+      // 5. Quiz Attempts (Points & Recent)
+      prisma.quizAttempt.findMany({
+        where: { userId },
+        include: { quiz: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 5
+      }),
+      // 6. Pending Tasks Count
+      prisma.task.count({
+        where: {
+          dueDate: { gte: new Date() },
+          submissions: { none: { userId } }
         }
-      },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            category: true,
-            date: true,
-          },
-        },
-        members: {
-          include: {
-            participant: {
-              select: {
-                fullName: true,
-                email: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+      }),
+      // 7. Active Quizzes Count
+      prisma.quiz.count({
+        where: {
+          isActive: true,
+          OR: [
+            { endDateTime: null },
+            { endDateTime: { gte: new Date() } }
+          ],
+          attempts: { none: { userId } }
+        }
+      }),
+      // 8. Upcoming Events Count
+      prisma.eventPoint.count({
+        where: {
+          eventDate: { gte: new Date() }
+        }
+      }),
+      // 9. Open Tickets Count
+      prisma.supportTicket.count({
+        where: {
+          userId,
+          status: { in: ['OPEN', 'IN_PROGRESS'] }
+        }
+      }),
+      // 10. Recent Tickets
+      prisma.supportTicket.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        take: 3
+      })
+    ]);
 
-    // Calculate dashboard statistics
+    // Calculate Total Points
+    const totalPoints = 
+      (attendancePoints._sum.points || 0) +
+      taskSubmissions.reduce((acc, curr) => acc + (curr.pointsAwarded || 0), 0) +
+      eventParticipations.reduce((acc, curr) => acc + (curr.pointsAwarded || 0), 0) +
+      quizAttempts.reduce((acc, curr) => acc + (curr.pointsEarned || 0), 0);
+
+    // Aggregate Recent Activities
+    const activities: RecentActivity[] = [
+      ...announcements.map(a => ({
+        id: `ann-${a.id}`,
+        type: 'announcement' as const,
+        title: a.title,
+        description: a.description.substring(0, 100), // Truncate if needed
+        date: a.createdAt,
+      })),
+      ...taskSubmissions.map(t => ({
+        id: `task-${t.id}`,
+        type: 'task' as const,
+        title: `Task: ${t.task.title}`,
+        description: `Status: ${t.status}`,
+        date: t.updatedAt,
+        status: t.status,
+        points: t.pointsAwarded
+      })),
+      ...eventParticipations.map(e => ({
+        id: `event-${e.id}`,
+        type: 'event' as const,
+        title: `Event: ${e.event.title}`,
+        description: `Status: ${e.status}`,
+        date: e.updatedAt,
+        status: e.status,
+        points: e.pointsAwarded
+      })),
+      ...quizAttempts.map(q => ({
+        id: `quiz-${q.id}`,
+        type: 'quiz' as const,
+        title: `Quiz: ${q.quiz.title}`,
+        description: `Score: ${q.score}/${q.totalQuestions}`,
+        date: q.updatedAt,
+        points: q.pointsEarned
+      })),
+      ...recentTickets.map(t => ({
+        id: `ticket-${t.id}`,
+        type: 'ticket' as const,
+        title: `Support Ticket: ${t.subject}`,
+        description: `Status: ${t.status}`,
+        date: t.updatedAt,
+        status: t.status
+      }))
+    ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 10);
+
     const stats: DashboardStats = {
-      totalRegistrations: participations.length,
-      pendingPayments: participations.filter(p => 
-        p.status === 'PAYMENT_SUBMITTED' || p.status === 'REGISTERED'
-      ).length,
-      confirmedEvents: participations.filter(p => 
-        p.status === 'CONFIRMED'
-      ).length,
-      totalSpent: participations
-        .filter(p => p.status === 'CONFIRMED')
-        .reduce((sum, p) => sum + (p.paymentAmount || p.event.price), 0),
-      teamsJoined: teamMemberships.length,
-      teamsLeading: teamLeaderships.length,
+      totalPoints,
+      pendingTasks: pendingTasksCount,
+      activeQuizzes: activeQuizzesCount,
+      upcomingEvents: upcomingEventsCount,
+      openTickets: openTicketsCount,
+      totalAnnouncements: announcements.length // Just for this batch, or could fetch total count if needed
     };
 
-    // Generate recent activities
-    const activities: RecentActivity[] = [];
-
-    // Add participation activities
-    participations.forEach(participation => {
-      // Registration activity
-      activities.push({
-        id: `reg-${participation.id}`,
-        type: 'registration',
-        title: 'Event Registration',
-        description: `Registered for ${participation.event.title}`,
-        date: participation.registeredAt,
-        eventTitle: participation.event.title,
-      });
-
-      // Payment submitted activity
-      if (participation.paymentSubmittedAt) {
-        activities.push({
-          id: `pay-sub-${participation.id}`,
-          type: 'payment_submitted',
-          title: 'Payment Submitted',
-          description: `Payment submitted for ${participation.event.title}`,
-          date: participation.paymentSubmittedAt,
-          eventTitle: participation.event.title,
-        });
-      }
-
-      // Payment verified activity
-      if (participation.paymentVerifiedAt) {
-        activities.push({
-          id: `pay-ver-${participation.id}`,
-          type: 'payment_verified',
-          title: 'Payment Confirmed',
-          description: `Payment confirmed for ${participation.event.title}`,
-          date: participation.paymentVerifiedAt,
-          eventTitle: participation.event.title,
-        });
+    // Fetch complete user profile for profile completion calculation
+    const userProfile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        name: true,
+        email: true,
+        image: true,
+        profileImageKey: true,
+        emailVerified: true,
+        createdAt: true,
+        mobileNumber: true,
+        whatsappNumber: true,
+        state: true,
+        district: true,
+        collegeName: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        registration: true,
+        rollNumber: true,
+        branch: true,
+        admissionYear: true,
+        address: true,
+        pinCode: true,
+        githubUsername: true,
+        profileComplete: true,
       }
     });
-
-    // Add team activities for leaderships
-    teamLeaderships.forEach(team => {
-      activities.push({
-        id: `team-leader-${team.id}`,
-        type: 'team_created',
-        title: 'Created Team',
-        description: `Created team "${team.name}" for ${team.event.title}`,
-        date: team.createdAt,
-        eventTitle: team.event.title,
-        teamName: team.name,
-      });
-    });
-
-    // Add team activities for memberships
-    teamMemberships.forEach(membership => {
-      activities.push({
-        id: `team-${membership.id}`,
-        type: 'team_joined',
-        title: 'Joined Team',
-        description: `Joined team "${membership.team.name}" for ${membership.team.event.title}`,
-        date: membership.joinedAt,
-        eventTitle: membership.team.event.title,
-        teamName: membership.team.name,
-      });
-    });
-
-    // Sort activities by date (most recent first)
-    activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return {
       status: "success" as const,
       data: {
         stats,
-        participations,
-        teamMemberships,
-        teamLeaderships,
-        recentActivities: activities.slice(0, 10), // Last 10 activities
-        user: {
-          name: session.user.name,
-          email: session.user.email,
+        recentActivities: activities,
+        user: userProfile || {
+          name: session.user.name || "",
+          email: session.user.email || "",
+          image: session.user.image || null,
+          profileImageKey: null,
+          emailVerified: false,
+          createdAt: new Date(),
+          mobileNumber: null,
+          whatsappNumber: null,
+          state: null,
+          district: null,
+          collegeName: null,
+          username: null,
+          firstName: null,
+          lastName: null,
+          registration: null,
+          rollNumber: null,
+          branch: null,
+          admissionYear: null,
+          address: null,
+          pinCode: null,
+          githubUsername: null,
+          profileComplete: false,
         },
       },
     };
@@ -263,105 +250,6 @@ export async function getUserDashboardData() {
     return {
       status: "error" as const,
       message: "Failed to fetch dashboard data",
-    };
-  }
-}
-
-export async function getUpcomingEvents() {
-  try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
-      return {
-        status: "error" as const,
-        message: "Authentication required",
-      };
-    }
-
-    // Get upcoming events that the user hasn't registered for
-    const userEventIds = await prisma.participation.findMany({
-      where: { userId: session.user.id },
-      select: { eventId: true },
-    });
-
-    const registeredEventIds = userEventIds.map(p => p.eventId);
-
-    const upcomingEvents = await prisma.event.findMany({
-      where: {
-        date: { gte: new Date() },
-        id: { notIn: registeredEventIds },
-      },
-      select: {
-        id: true,
-        slugId: true,
-        title: true,
-        category: true,
-        date: true,
-        venue: true,
-        price: true,
-        description: true,
-      },
-      orderBy: { date: 'asc' },
-      take: 6,
-    });
-
-    return {
-      status: "success" as const,
-      data: upcomingEvents,
-    };
-  } catch (error) {
-    console.error("Error fetching upcoming events:", error);
-    return {
-      status: "error" as const,
-      message: "Failed to fetch upcoming events",
-    };
-  }
-}
-
-export async function getPaymentPendingEvents() {
-  try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
-      return {
-        status: "error" as const,
-        message: "Authentication required",
-      };
-    }
-
-    const pendingPayments = await prisma.participation.findMany({
-      where: {
-        userId: session.user.id,
-        status: { in: ['REGISTERED', 'PAYMENT_SUBMITTED'] },
-      },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            category: true,
-            date: true,
-            venue: true,
-            price: true,
-          },
-        },
-      },
-      orderBy: { registeredAt: 'desc' },
-    });
-
-    return {
-      status: "success" as const,
-      data: pendingPayments,
-    };
-  } catch (error) {
-    console.error("Error fetching pending payments:", error);
-    return {
-      status: "error" as const,
-      message: "Failed to fetch pending payments",
     };
   }
 }

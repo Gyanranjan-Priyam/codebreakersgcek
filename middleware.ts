@@ -21,23 +21,20 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Temporarily disabled main middleware to avoid Edge Runtime issues
-  // Server-side protection in admin layout and requireAdmin() provides security
-  // Registration status checking is handled at the page level
+  // Note: Auth checking is handled at the page level instead of middleware
+  // to avoid Edge Runtime compatibility issues with Better Auth.
+  // Pages use server-side protection through:
+  // - auth.api.getSession() in server components
+  // - Admin layout protection
+  // - Callback route checks
+  // - Onboarding page guards
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
-    '/_next/image'
+    // Only match image optimization requests
+    '/_next/image',
   ],
 };

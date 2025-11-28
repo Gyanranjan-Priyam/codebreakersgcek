@@ -20,6 +20,19 @@ const userProfileUpdateSchema = z.object({
   district: z.string().min(1, "District is required").max(50, "District name is too long"),
   collegeName: z.string().min(1, "College name is required").max(200, "College name is too long"),
   collegeAddress: z.string().min(1, "College address is required").max(500, "College address is too long"),
+  username: z.string().optional(),
+  firstName: z.string().optional(),
+  middleName: z.string().optional(),
+  lastName: z.string().optional(),
+  registration: z.string().optional(),
+  rollNumber: z.string().optional(),
+  branch: z.string().optional(),
+  admissionYear: z.string().optional(),
+  address: z.string().optional(),
+  postOffice: z.string().optional(),
+  policeStation: z.string().optional(),
+  block: z.string().optional(),
+  pinCode: z.string().optional(),
 });
 
 export interface UserProfileData {
@@ -32,6 +45,19 @@ export interface UserProfileData {
   district: string;
   collegeName: string;
   collegeAddress: string;
+  username?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  registration?: string;
+  rollNumber?: string;
+  branch?: string;
+  admissionYear?: string;
+  address?: string;
+  postOffice?: string;
+  policeStation?: string;
+  block?: string;
+  pinCode?: string;
 }
 
 export async function getCurrentUserProfileData() {
@@ -63,6 +89,20 @@ export async function getCurrentUserProfileData() {
         collegeAddress: true,
         createdAt: true,
         updatedAt: true,
+        username: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        registration: true,
+        rollNumber: true,
+        branch: true,
+        admissionYear: true,
+        address: true,
+        postOffice: true,
+        policeStation: true,
+        block: true,
+        pinCode: true,
+        githubUsername: true,
       },
     });
 
@@ -71,46 +111,6 @@ export async function getCurrentUserProfileData() {
         status: "error" as const,
         message: "User not found",
       };
-    }
-
-    // If user data is incomplete, try to get it from their latest participation
-    if (!user.aadhaarNumber || !user.state || !user.district || !user.collegeName) {
-      const latestParticipation = await prisma.participation.findFirst({
-        where: { userId: session.user.id },
-        orderBy: { registeredAt: 'desc' },
-        select: {
-          fullName: true,
-          email: true,
-          mobileNumber: true,
-          whatsappNumber: true,
-          aadhaarNumber: true,
-          state: true,
-          district: true,
-          collegeName: true,
-          collegeAddress: true,
-        },
-      });
-
-      if (latestParticipation) {
-        // Merge user data with participation data, preferring user data where available
-        const mergedData = {
-          ...user,
-          name: user.name || latestParticipation.fullName,
-          email: user.email || latestParticipation.email,
-          mobileNumber: user.mobileNumber || latestParticipation.mobileNumber,
-          whatsappNumber: user.whatsappNumber || latestParticipation.whatsappNumber,
-          aadhaarNumber: user.aadhaarNumber || latestParticipation.aadhaarNumber,
-          state: user.state || latestParticipation.state,
-          district: user.district || latestParticipation.district,
-          collegeName: user.collegeName || latestParticipation.collegeName,
-          collegeAddress: user.collegeAddress || latestParticipation.collegeAddress,
-        };
-
-        return {
-          status: "success" as const,
-          data: mergedData,
-        };
-      }
     }
 
     return {
@@ -168,6 +168,23 @@ export async function updateUserProfileData(data: UserProfileData) {
       }
     }
 
+    // Check if username is being changed and if it's already taken by another user
+    if (validatedData.username) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          username: validatedData.username,
+          id: { not: session.user.id },
+        },
+      });
+
+      if (existingUser) {
+        return {
+          status: "error" as const,
+          message: "Username is already taken by another user",
+        };
+      }
+    }
+
     // Update user profile in a transaction
     await prisma.$transaction(async (tx) => {
       // Update user profile
@@ -183,66 +200,39 @@ export async function updateUserProfileData(data: UserProfileData) {
           district: validatedData.district,
           collegeName: validatedData.collegeName,
           collegeAddress: validatedData.collegeAddress,
+          username: validatedData.username || null,
+          firstName: validatedData.firstName || null,
+          middleName: validatedData.middleName || null,
+          lastName: validatedData.lastName || null,
+          registration: validatedData.registration || null,
+          rollNumber: validatedData.rollNumber || null,
+          branch: validatedData.branch || null,
+          admissionYear: validatedData.admissionYear || null,
+          address: validatedData.address || null,
+          postOffice: validatedData.postOffice || null,
+          policeStation: validatedData.policeStation || null,
+          block: validatedData.block || null,
+          pinCode: validatedData.pinCode || null,
           updatedAt: new Date(),
         },
       });
 
-      // Update all user's participations with the new data
-      await tx.participation.updateMany({
-        where: { userId: session.user.id },
-        data: {
-          fullName: validatedData.name,
-          email: validatedData.email,
-          mobileNumber: validatedData.mobileNumber,
-          whatsappNumber: validatedData.whatsappNumber || null,
-          aadhaarNumber: validatedData.aadhaarNumber,
-          state: validatedData.state,
-          district: validatedData.district,
-          collegeName: validatedData.collegeName,
-          collegeAddress: validatedData.collegeAddress,
-          updatedAt: new Date(),
-        },
-      });
-
-      // Update all team member records
-      await tx.teamMember.updateMany({
-        where: { 
-          participant: {
-            userId: session.user.id
-          }
-        },
-        data: {
-          fullName: validatedData.name,
-          email: validatedData.email,
-          mobileNumber: validatedData.mobileNumber,
-          whatsappNumber: validatedData.whatsappNumber || null,
-          aadhaarNumber: validatedData.aadhaarNumber,
-          state: validatedData.state,
-          district: validatedData.district,
-          collegeName: validatedData.collegeName,
-          collegeAddress: validatedData.collegeAddress,
-        },
-      });
-
-      // Update all team join requests
-      await tx.teamJoinRequest.updateMany({
-        where: { 
-          participant: {
-            userId: session.user.id
-          }
-        },
-        data: {
-          fullName: validatedData.name,
-          email: validatedData.email,
-          mobileNumber: validatedData.mobileNumber,
-          whatsappNumber: validatedData.whatsappNumber || null,
-          aadhaarNumber: validatedData.aadhaarNumber,
-          state: validatedData.state,
-          district: validatedData.district,
-          collegeName: validatedData.collegeName,
-          collegeAddress: validatedData.collegeAddress,
-        },
-      });
+      // // Update all user's participations with the new data
+      // await tx.participation.updateMany({
+      //   where: { userId: session.user.id },
+      //   data: {
+      //     fullName: validatedData.name,
+      //     email: validatedData.email,
+      //     mobileNumber: validatedData.mobileNumber,
+      //     whatsappNumber: validatedData.whatsappNumber || null,
+      //     aadhaarNumber: validatedData.aadhaarNumber,
+      //     state: validatedData.state,
+      //     district: validatedData.district,
+      //     collegeName: validatedData.collegeName,
+      //     collegeAddress: validatedData.collegeAddress,
+      //     updatedAt: new Date(),
+      //   },
+      // });
     });
 
     // Revalidate the settings page to show updated data
@@ -250,7 +240,7 @@ export async function updateUserProfileData(data: UserProfileData) {
 
     return {
       status: "success" as const,
-      message: "Profile updated successfully. All your event registrations and team information have been updated.",
+      message: "Profile updated successfully. All your event registrations have been updated.",
     };
   } catch (error) {
     console.error("Error updating user profile:", error);

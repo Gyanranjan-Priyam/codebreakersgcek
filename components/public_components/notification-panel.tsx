@@ -55,7 +55,6 @@ const getCategoryDisplay = (category: string) => {
     GENERAL_ANNOUNCEMENT: "General",
     EVENT_UPDATE: "Event Update",
     REGISTRATION_UPDATE: "Registration",
-    ACCOMMODATION_UPDATE: "Accommodation",
     PAYMENT_UPDATE: "Payment",
     TEAM_UPDATE: "Team",
     SYSTEM_MAINTENANCE: "System",

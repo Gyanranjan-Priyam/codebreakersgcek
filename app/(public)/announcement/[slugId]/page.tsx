@@ -21,13 +21,6 @@ interface AnnouncementData {
   updatedAt: string;
   attachmentKeys: string[];
   imageKeys: string[];
-  relatedEvent?: {
-    id: string;
-    title: string;
-    slugId: string;
-    description: string;
-    date: string;
-  };
   createdBy: string;
 }
 
@@ -36,17 +29,6 @@ async function getAnnouncement(slugId: string): Promise<AnnouncementData | null>
   try {
     const announcement = await prisma.announcement.findUnique({
       where: { slugId },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-            description: true,
-            date: true,
-          }
-        }
-      }
     });
 
     if (!announcement) {
@@ -64,13 +46,6 @@ async function getAnnouncement(slugId: string): Promise<AnnouncementData | null>
       updatedAt: announcement.updatedAt.toISOString(),
       attachmentKeys: announcement.attachmentKeys || [],
       imageKeys: announcement.imageKeys || [],
-      relatedEvent: announcement.relatedEvent ? {
-        id: announcement.relatedEvent.id,
-        title: announcement.relatedEvent.title,
-        slugId: announcement.relatedEvent.slugId,
-        description: announcement.relatedEvent.description,
-        date: announcement.relatedEvent.date.toISOString(),
-      } : undefined,
       createdBy: announcement.createdBy,
     };
   } catch (error) {
@@ -238,39 +213,6 @@ export default async function AnnouncementPage({ params }: { params: Promise<{ s
               </div>
             </CardContent>
           </Card>
-
-          {/* Related Event */}
-          {announcement.relatedEvent && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-blue-600" />
-                  Related Event
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-foreground">
-                    {announcement.relatedEvent.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {announcement.relatedEvent.description}
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {format(new Date(announcement.relatedEvent.date), 'PPP')}
-                    </span>
-                  </div>
-                  <Link href={`/dashboard/events/${announcement.relatedEvent.slugId}`}>
-                    <Button size="sm" variant="outline">
-                      View Event Details
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Sidebar */}

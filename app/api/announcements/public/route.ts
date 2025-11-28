@@ -25,14 +25,6 @@ export async function GET(request: NextRequest) {
       ],
       take: limit,
       skip: (page - 1) * limit,
-      include: {
-        relatedEvent: {
-          select: {
-            title: true,
-            slugId: true
-          }
-        }
-      }
     });
 
     // Get total count for pagination
@@ -50,7 +42,6 @@ export async function GET(request: NextRequest) {
       priority: announcement.priority,
       createdAt: announcement.createdAt,
       updatedAt: announcement.updatedAt,
-      relatedEvent: announcement.relatedEvent,
       hasAttachments: announcement.attachmentKeys && announcement.attachmentKeys.length > 0,
       hasImages: announcement.imageKeys && announcement.imageKeys.length > 0
     }));

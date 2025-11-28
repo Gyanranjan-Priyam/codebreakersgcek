@@ -1,63 +1,5 @@
 import { z } from "zod";
 
-export const eventCategories = [
-  "Robosprano",
-  "Hackathon",
-  "OtherEvent",
-  "Civil",
-  "Mechanical",
-  "ComputerScience",
-  "Electrical",
-  "Gaming",
-] as const;
-
-export const eventSchema = z.object({
-  title: z
-    .string()
-    .min(3, { message: "Event name must be at least 3 characters long" })
-    .max(100, { message: "Event name must be at most 100 characters long" }),
-  slugId: z
-    .string()
-    .min(3, { message: "Slug ID must be at least 3 characters long" })
-    .max(100, { message: "Slug ID must be at most 100 characters long" }),
-  description: z
-    .string()
-    .min(10, { message: "Description must be at least 10 characters long" })
-    .max(10000, {
-      message: "Description must be at most 10000 characters long",
-    }),
-  rules: z
-    .string()
-    .min(10, { message: "Rules must be at least 10 characters long" })
-    .max(10000, {
-      message: "Rules must be at most 10000 characters long",
-    }),
-  thumbnailKey: z.string().min(1, { message: "Thumbnail key is required" }),
-  pdfKey: z.string().min(1, { message: "PDF key is required" }),
-  imageKeys: z
-    .array(z.string())
-    .min(1, { message: "At least one image is required" })
-    .max(10, { message: "Maximum 10 images allowed" }),
-  priceType: z.enum(["free", "paid"], { message: "Price type is required" }),
-  price: z.coerce
-    .number()
-    .min(0, { message: "Price must be a positive number or zero" }),
-  venue: z
-    .string()
-    .min(3, { message: "Venue must be at least 3 characters long" })
-    .max(200, { message: "Venue must be at most 200 characters long" }),
-  date: z.coerce.date({ message: "Event date is required" }),
-  category: z.enum(eventCategories, { message: "Category is required" }),
-  teamSize: z.coerce
-    .number()
-    .min(1, { message: "Team size must be at least 1 member" })
-    .max(20, { message: "Team size cannot exceed 20 members" })
-    .optional()
-    .default(4),
-});
-
-// Remove the separate eventUpdateSchema since z.coerce.date() handles string conversion
-
 export const userSchema = z.object({
   name: z
     .string()
@@ -99,59 +41,6 @@ export const verificationSchema = z.object({
   value: z.string().min(1, { message: "Value is required" }),
   expiresAt: z.date({ message: "Expiration date is required" }),
 });
-
-export const participationSchema = z.object({
-  fullName: z
-    .string()
-    .min(2, { message: "Full name must be at least 2 characters long" })
-    .max(100, { message: "Full name must be at most 100 characters long" }),
-  email: z
-    .string()
-    .email({ message: "Invalid email address" }),
-  mobileNumber: z
-    .string()
-    .regex(/^[6-9]\d{9}$/, { message: "Invalid mobile number. Must be 10 digits starting with 6-9" }),
-  whatsappNumber: z
-    .string()
-    .regex(/^[6-9]\d{9}$/, { message: "Invalid WhatsApp number. Must be 10 digits starting with 6-9" })
-    .optional()
-    .or(z.literal("")),
-  aadhaarNumber: z
-    .string()
-    .regex(/^\d{12}$/, { message: "Aadhaar number must be exactly 12 digits" }),
-  state: z
-    .string()
-    .min(2, { message: "State must be at least 2 characters long" })
-    .max(50, { message: "State must be at most 50 characters long" }),
-  district: z
-    .string()
-    .min(2, { message: "District must be at least 2 characters long" })
-    .max(50, { message: "District must be at most 50 characters long" }),
-  collegeName: z
-    .string()
-    .min(3, { message: "College name must be at least 3 characters long" })
-    .max(200, { message: "College name must be at most 200 characters long" }),
-  collegeAddress: z
-    .string()
-    .min(10, { message: "College address must be at least 10 characters long" })
-    .max(500, { message: "College address must be at most 500 characters long" }),
-});
-
-export const checkoutSchema = z.object({
-  paymentScreenshotKey: z
-    .string()
-    .min(1, { message: "Payment screenshot is required" }),
-  transactionId: z
-    .string()
-    .min(5, { message: "Transaction ID must be at least 5 characters long" })
-    .max(50, { message: "Transaction ID must be at most 50 characters long" })
-    .optional()
-    .or(z.literal("")),
-});
-
-export type ParticipationSchemaType = z.infer<typeof participationSchema>;
-export type CheckoutSchemaType = z.infer<typeof checkoutSchema>;
-export type EventSchemaType = z.infer<typeof eventSchema>;
 
 // Announcement constants and schemas
 export const announcementCategories = [
@@ -197,7 +86,6 @@ export const announcementSchema = z.object({
     .max(10000, { message: "Description must be at most 10000 characters long" }),
   category: z.enum(announcementCategories, { message: "Please select a valid category" }),
   priority: z.enum(announcementPriorities, { message: "Please select a valid priority" }).default("NORMAL"),
-  relatedEventId: z.string().optional().nullable(),
 
   // Media & Attachments  
   attachmentKeys: z
@@ -267,3 +155,34 @@ export const announcementSchema = z.object({
 );
 
 export type AnnouncementSchemaType = z.infer<typeof announcementSchema>;
+
+export const formSchema = z.object({
+  profileImageKey: z.string().optional(),
+  username: z.string().min(2, "Username must be at least 2 characters"),
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  middleName: z.string().optional(),
+  lastName: z.string().min(2, "Last name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  whatsappNumber: z
+    .string()
+    .min(10, "WhatsApp number must be at least 10 digits"),
+  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  aadhaarNumber: z
+    .string()
+    .min(12, "Aadhaar number must be at least 12 digits"),
+  registration: z.string().min(2, "Registration number is required"),
+  rollNumber: z.string().min(2, "Roll number is required"),
+  branch: z.string().min(1, "Please select a branch"),
+  admissionYear: z.string().min(1, "Please select admission year"),
+  collegeName: z.string().min(1, "Please select a college"),
+  collegeAddress: z.string().min(5, "College address is required"),
+  address: z.string().min(5, "Address must be at least 5 characters"),
+  postOffice: z.string().min(1, "Post Office is required"),
+  policeStation: z.string().min(1, "Police Station is required"),
+  block: z.string().min(1, "Block is required"),
+  pinCode: z.string().min(4, "Pin Code is required"),
+  state: z.string().min(1, "Please select a state"),
+  district: z.string().min(1, "Please select a district"),
+});
+
+export type FormValues = z.infer<typeof formSchema>;

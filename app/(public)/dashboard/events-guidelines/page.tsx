@@ -28,7 +28,7 @@ export default function EventsGuidelinesPage() {
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12">
           <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold bg-linear-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-3 sm:mb-4 leading-tight">
-            INSPRANO Techfest
+            CodeBreakers Techfest
           </h1>
           <p className="text-lg sm:text-xl md:text-2xl font-semibold text-muted-foreground mb-2 px-2">
             Comprehensive Event Guidelines
@@ -48,7 +48,7 @@ export default function EventsGuidelinesPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-              INSPRANO is the official annual technical festival of Government College of Engineering Kalahandi, Bhawanipatna. 
+              CodeBreakers is the official annual technical festival of Government College of Engineering Kalahandi, Bhawanipatna. 
               These guidelines define the structure, expectations, responsibilities, and standard procedures to ensure smooth and 
               successful execution of all events under the festival.
             </p>
@@ -60,7 +60,7 @@ export default function EventsGuidelinesPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Target className="h-5 w-5 sm:h-6 sm:w-6" />
-              Objectives of INSPRANO
+              Objectives of CodeBreakers
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -329,7 +329,7 @@ export default function EventsGuidelinesPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
-                <div>• Use official INSPRANO branding</div>
+                <div>• Use official CodeBreakers branding</div>
                 <div>• Approve materials before publication</div>
                 <div>• Timely, engaging social media content</div>
                 <div>• Professional press releases and photography</div>
@@ -459,7 +459,7 @@ export default function EventsGuidelinesPage() {
           <CardContent>
             <div className="bg-linear-to-r from-primary/10 to-blue-100/50 rounded-lg p-4 sm:p-6 text-center">
               <p className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
-                These guidelines ensure that INSPRANO remains an exceptional platform celebrating innovation, teamwork, and technical excellence. 
+                These guidelines ensure that CodeBreakers remains an exceptional platform celebrating innovation, teamwork, and technical excellence. 
                 All participants, volunteers, and coordinators are expected to adhere to them to make the festival successful and memorable.
               </p>
               <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-primary/20">

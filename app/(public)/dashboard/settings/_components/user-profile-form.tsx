@@ -1,14 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, Save, User, Mail, Phone, MessageCircle, IdCard, MapPin, Building } from "lucide-react";
+import { Loader2, Save, User, Mail, Phone, MessageCircle, IdCard, MapPin, Building, BookOpen } from "lucide-react";
 import { updateUserProfileData, type UserProfileData } from "../actions";
+import statesDistrictsData from "@/lib/new/states-districts.json";
 
 interface UserProfileFormProps {
   initialData: {
@@ -21,11 +30,24 @@ interface UserProfileFormProps {
     district?: string | null;
     collegeName?: string | null;
     collegeAddress?: string | null;
+    username?: string | null;
+    firstName?: string | null;
+    middleName?: string | null;
+    lastName?: string | null;
+    registration?: string | null;
+    rollNumber?: string | null;
+    branch?: string | null;
+    address?: string | null;
+    admissionYear?: string | null;
+    postOffice?: string | null;
+    policeStation?: string | null;
+    block?: string | null;
+    pinCode?: string | null;
   };
 }
 
 export function UserProfileForm({ initialData }: UserProfileFormProps) {
-  const [formData, setFormData] = useState<UserProfileData>({
+  const [formData, setFormData] = useState({
     name: initialData.name || "",
     email: initialData.email || "",
     mobileNumber: initialData.mobileNumber || "",
@@ -35,16 +57,38 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
     district: initialData.district || "",
     collegeName: initialData.collegeName || "",
     collegeAddress: initialData.collegeAddress || "",
+    username: initialData.username || "",
+    firstName: initialData.firstName || "",
+    middleName: initialData.middleName || "",
+    lastName: initialData.lastName || "",
+    registration: initialData.registration || "",
+    rollNumber: initialData.rollNumber || "",
+    admissionYear: initialData.admissionYear || "",
+    branch: initialData.branch || "",
+    address: initialData.address || "",
+    postOffice: initialData.postOffice || "",
+    policeStation: initialData.policeStation || "",
+    block: initialData.block || "",
+    pinCode: initialData.pinCode || "",
   });
 
+  const [selectedState, setSelectedState] = useState(initialData.state || "");
   const [pending, startTransition] = useTransition();
+
+  const availableDistricts = useMemo(() => {
+    if (!selectedState) return [];
+    const stateData = statesDistrictsData.states.find(
+      (s) => s.state === selectedState
+    );
+    return stateData?.districts || [];
+  }, [selectedState]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     startTransition(async () => {
       try {
-        const result = await updateUserProfileData(formData);
+        const result = await updateUserProfileData(formData as any);
         
         if (result.status === "success") {
           toast.success(result.message);
@@ -57,50 +101,105 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
     });
   };
 
-  const handleInputChange = (field: keyof UserProfileData, value: string) => {
+  const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
     }));
   };
 
+  const handleStateChange = (value: string) => {
+    setSelectedState(value);
+    setFormData(prev => ({
+      ...prev,
+      state: value,
+      district: "", // Reset district when state changes
+    }));
+  };
+
   return (
     <div className="space-y-6">
-      {/* Personal Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <User className="w-4 h-4 sm:w-5 sm:h-5" />
-            Personal Information
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Update your personal details and contact information
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {/* Full Name */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Personal Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <User className="w-4 h-4 sm:w-5 sm:h-5" />
+              Personal Information
+            </CardTitle>
+            <CardDescription className="text-sm">
+              Update your personal details and contact information
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Username */}
+            <div className="space-y-2">
+              <Label htmlFor="username" className="flex items-center gap-2 text-sm">
+                <User className="w-3 h-3 sm:w-4 sm:h-4" />
+                Username
+              </Label>
+              <Input
+                id="username"
+                type="text"
+                value={formData.username}
+                onChange={(e) => handleInputChange("username", e.target.value)}
+                placeholder="Enter your username"
+                disabled={pending}
+                className="h-10 text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              {/* First Name */}
               <div className="space-y-2">
-                <Label htmlFor="name" className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Full Name *
-                </Label>
+                <Label htmlFor="firstName" className="text-sm">First Name *</Label>
                 <Input
-                  id="name"
+                  id="firstName"
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  placeholder="Enter your full name"
+                  value={formData.firstName}
+                  onChange={(e) => handleInputChange("firstName", e.target.value)}
+                  placeholder="First name"
                   required
                   disabled={pending}
+                  className="h-10 text-sm"
                 />
               </div>
 
+              {/* Middle Name */}
+              <div className="space-y-2">
+                <Label htmlFor="middleName" className="text-sm">Middle Name</Label>
+                <Input
+                  id="middleName"
+                  type="text"
+                  value={formData.middleName}
+                  onChange={(e) => handleInputChange("middleName", e.target.value)}
+                  placeholder="Middle name"
+                  disabled={pending}
+                  className="h-10 text-sm"
+                />
+              </div>
+
+              {/* Last Name */}
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-sm">Last Name *</Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) => handleInputChange("lastName", e.target.value)}
+                  placeholder="Last name"
+                  required
+                  disabled={pending}
+                  className="h-10 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
+                <Label htmlFor="email" className="flex items-center gap-2 text-sm">
+                  <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
                   Email Address *
                 </Label>
                 <Input
@@ -111,13 +210,14 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
                   placeholder="Enter your email address"
                   required
                   disabled={pending}
+                  className="h-10 text-sm"
                 />
               </div>
 
               {/* Mobile Number */}
               <div className="space-y-2">
-                <Label htmlFor="mobileNumber" className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
+                <Label htmlFor="mobileNumber" className="flex items-center gap-2 text-sm">
+                  <Phone className="w-3 h-3 sm:w-4 sm:h-4" />
                   Mobile Number *
                 </Label>
                 <Input
@@ -128,13 +228,14 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
                   placeholder="+91 9876543210"
                   required
                   disabled={pending}
+                  className="h-10 text-sm"
                 />
               </div>
 
               {/* WhatsApp Number */}
               <div className="space-y-2">
-                <Label htmlFor="whatsappNumber" className="flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4" />
+                <Label htmlFor="whatsappNumber" className="flex items-center gap-2 text-sm">
+                  <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                   WhatsApp Number
                 </Label>
                 <Input
@@ -144,13 +245,14 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
                   onChange={(e) => handleInputChange("whatsappNumber", e.target.value)}
                   placeholder="+91 9876543210"
                   disabled={pending}
+                  className="h-10 text-sm"
                 />
               </div>
 
               {/* Aadhaar Number */}
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="aadhaarNumber" className="flex items-center gap-2">
-                  <IdCard className="w-4 h-4" />
+              <div className="space-y-2">
+                <Label htmlFor="aadhaarNumber" className="flex items-center gap-2 text-sm">
+                  <IdCard className="w-3 h-3 sm:w-4 sm:h-4" />
                   Aadhaar Number *
                 </Label>
                 <Input
@@ -162,161 +264,270 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
                   required
                   disabled={pending}
                   maxLength={12}
+                  className="h-10 text-sm"
                 />
-                <p className="text-xs text-muted-foreground">
-                  12-digit Aadhaar number for identity verification
-                </p>
               </div>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Location Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
-            Location Information
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Your current location details
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {/* State */}
-            <div className="space-y-2">
-              <Label htmlFor="state" className="flex items-center gap-2 text-sm">
-                <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                State *
-              </Label>
-              <Input
-                id="state"
-                type="text"
-                value={formData.state}
-                onChange={(e) => handleInputChange("state", e.target.value)}
-                placeholder="Enter your state"
-                required
-                disabled={pending}
-                className="h-10 text-sm"
-              />
+        {/* Academic Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+              Academic Information
+            </CardTitle>
+            <CardDescription className="text-sm">
+              Your educational and academic details
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              {/* Registration Number */}
+              <div className="space-y-2">
+                <Label htmlFor="registration" className="text-sm">Registration No</Label>
+                <Input
+                  id="registration"
+                  type="text"
+                  value={formData.registration}
+                  onChange={(e) => handleInputChange("registration", e.target.value)}
+                  placeholder="Registration number"
+                  disabled={pending}
+                  className="h-10 text-sm"
+                />
+              </div>
+
+              {/* Roll Number */}
+              <div className="space-y-2">
+                <Label htmlFor="rollNumber" className="text-sm">Roll No</Label>
+                <Input
+                  id="rollNumber"
+                  type="text"
+                  value={formData.rollNumber}
+                  onChange={(e) => handleInputChange("rollNumber", e.target.value)}
+                  placeholder="Roll number"
+                  disabled={pending}
+                  className="h-10 text-sm"
+                />
+              </div>
+
+              {/* Branch */}
+              <div className="space-y-2">
+                <Label htmlFor="branch" className="text-sm">Branch</Label>
+                <Select
+                  value={formData.branch}
+                  onValueChange={(value) => handleInputChange("branch", value)}
+                  disabled={pending}
+                >
+                  <SelectTrigger className="h-10 text-sm">
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CSE">CSE</SelectItem>
+                    <SelectItem value="EE">EE</SelectItem>
+                    <SelectItem value="ME">ME</SelectItem>
+                    <SelectItem value="CE">CE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* District */}
-            <div className="space-y-2">
-              <Label htmlFor="district" className="flex items-center gap-2 text-sm">
-                <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                District *
-              </Label>
-              <Input
-                id="district"
-                type="text"
-                value={formData.district}
-                onChange={(e) => handleInputChange("district", e.target.value)}
-                placeholder="Enter your district"
-                required
-                disabled={pending}
-                className="h-10 text-sm"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            <Separator className="my-4" />
 
-      {/* Educational Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Building className="w-4 h-4 sm:w-5 sm:h-5" />
-            Educational Information
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Your college and educational details
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 sm:space-y-4">
-            {/* College Name */}
-            <div className="space-y-2">
-              <Label htmlFor="collegeName" className="flex items-center gap-2 text-sm">
-                <Building className="w-3 h-3 sm:w-4 sm:h-4" />
-                College Name *
-              </Label>
-              <Input
-                id="collegeName"
-                type="text"
-                value={formData.collegeName}
-                onChange={(e) => handleInputChange("collegeName", e.target.value)}
-                placeholder="Enter your college name"
-                required
-                disabled={pending}
-                className="h-10 text-sm"
-              />
-            </div>
+            {/* College Information */}
+            <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="collegeName" className="flex items-center gap-2 text-sm">
+                  <Building className="w-3 h-3 sm:w-4 sm:h-4" />
+                  College Name *
+                </Label>
+                <Input
+                  id="collegeName"
+                  type="text"
+                  value={formData.collegeName}
+                  onChange={(e) => handleInputChange("collegeName", e.target.value)}
+                  placeholder="Enter your college name"
+                  required
+                  disabled={pending}
+                  className="h-10 text-sm"
+                />
+              </div>
 
-            {/* College Address */}
-            <div className="space-y-2">
-              <Label htmlFor="collegeAddress" className="flex items-center gap-2 text-sm">
-                <Building className="w-3 h-3 sm:w-4 sm:h-4" />
-                College Address *
-              </Label>
-              <Textarea
-                id="collegeAddress"
-                value={formData.collegeAddress}
-                onChange={(e) => handleInputChange("collegeAddress", e.target.value)}
-                placeholder="Enter your college address"
-                required
-                disabled={pending}
-                rows={3}
-                className="text-sm resize-none"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="collegeAddress" className="flex items-center gap-2 text-sm">
+                  <Building className="w-3 h-3 sm:w-4 sm:h-4" />
+                  College Address *
+                </Label>
+                <Textarea
+                  id="collegeAddress"
+                  value={formData.collegeAddress}
+                  onChange={(e) => handleInputChange("collegeAddress", e.target.value)}
+                  placeholder="Enter your college address"
+                  required
+                  disabled={pending}
+                  rows={3}
+                  className="text-sm resize-none"
+                />
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Submit Button */}
-      <div className="flex justify-end pt-4">
-        <Button 
-          type="submit" 
-          disabled={pending} 
-          className="w-full sm:w-auto min-w-40 h-10 text-sm"
-          onClick={handleSubmit}
-        >
-          {pending ? (
-            <>
-              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mr-2" />
-              Updating Profile...
-            </>
-          ) : (
-            <>
-              <Save className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-              Update Profile
-            </>
-          )}
-        </Button>
-      </div>
+        {/* Address Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
+              Address Information
+            </CardTitle>
+            <CardDescription className="text-sm">
+              Your residential address details
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 sm:space-y-4">
+              {/* Full Address */}
+              <div className="space-y-2">
+                <Label htmlFor="address" className="text-sm">Address</Label>
+                <Input
+                  id="address"
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => handleInputChange("address", e.target.value)}
+                  placeholder="Street address"
+                  disabled={pending}
+                  className="h-10 text-sm"
+                />
+              </div>
 
-      {/* Information Notice */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold mt-0.5">
-              ℹ
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {/* Post Office */}
+                <div className="space-y-2">
+                  <Label htmlFor="postOffice" className="text-sm">Post Office</Label>
+                  <Input
+                    id="postOffice"
+                    type="text"
+                    value={formData.postOffice}
+                    onChange={(e) => handleInputChange("postOffice", e.target.value)}
+                    placeholder="Post office"
+                    disabled={pending}
+                    className="h-10 text-sm"
+                  />
+                </div>
+
+                {/* Police Station */}
+                <div className="space-y-2">
+                  <Label htmlFor="policeStation" className="text-sm">Police Station</Label>
+                  <Input
+                    id="policeStation"
+                    type="text"
+                    value={formData.policeStation}
+                    onChange={(e) => handleInputChange("policeStation", e.target.value)}
+                    placeholder="Police station"
+                    disabled={pending}
+                    className="h-10 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                {/* Block */}
+                <div className="space-y-2">
+                  <Label htmlFor="block" className="text-sm">Block</Label>
+                  <Input
+                    id="block"
+                    type="text"
+                    value={formData.block}
+                    onChange={(e) => handleInputChange("block", e.target.value)}
+                    placeholder="Block"
+                    disabled={pending}
+                    className="h-10 text-sm"
+                  />
+                </div>
+
+                {/* PIN Code */}
+                <div className="space-y-2">
+                  <Label htmlFor="pinCode" className="text-sm">PIN Code</Label>
+                  <Input
+                    id="pinCode"
+                    type="text"
+                    value={formData.pinCode}
+                    onChange={(e) => handleInputChange("pinCode", e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="PIN code"
+                    disabled={pending}
+                    maxLength={6}
+                    className="h-10 text-sm"
+                  />
+                </div>
+
+                {/* State */}
+                <div className="space-y-2">
+                  <Label htmlFor="state" className="text-sm">State *</Label>
+                  <Select
+                    value={formData.state}
+                    onValueChange={handleStateChange}
+                    disabled={pending}
+                  >
+                    <SelectTrigger className="h-10 text-sm">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statesDistrictsData.states.map((stateItem) => (
+                        <SelectItem key={stateItem.state} value={stateItem.state}>
+                          {stateItem.state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* District */}
+                <div className="space-y-2">
+                  <Label htmlFor="district" className="text-sm">District *</Label>
+                  <Select
+                    value={formData.district}
+                    onValueChange={(value) => handleInputChange("district", value)}
+                    disabled={!selectedState || pending}
+                  >
+                    <SelectTrigger className="h-10 text-sm">
+                      <SelectValue placeholder="Select district" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableDistricts.map((district) => (
+                        <SelectItem key={district} value={district}>
+                          {district}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <div>
-              <h4 className="font-medium text-blue-900 mb-1">
-                Profile Sync Information
-              </h4>
-              <p className="text-sm text-blue-700">
-                When you update your profile here, all your event registrations, team memberships, 
-                and join requests will be automatically updated with the new information.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Submit Button */}
+        <div className="flex justify-end pt-4">
+          <Button 
+            type="submit" 
+            disabled={pending} 
+            className="w-full sm:w-auto min-w-40 h-10 text-sm"
+          >
+            {pending ? (
+              <>
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mr-2" />
+                Updating Profile...
+              </>
+            ) : (
+              <>
+                <Save className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
+                Update Profile
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

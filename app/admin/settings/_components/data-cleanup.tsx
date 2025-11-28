@@ -22,7 +22,6 @@ interface DataCleanupOptions {
   participants: boolean;
   users: boolean;
   payments: boolean;
-  accommodations: boolean;
   supportTickets: boolean;
   s3Files: boolean;
 }
@@ -34,7 +33,6 @@ export function DataCleanup() {
     participants: false,
     users: false,
     payments: false,
-    accommodations: false,
     supportTickets: false,
     s3Files: false,
   });
@@ -76,7 +74,6 @@ export function DataCleanup() {
           participants: false,
           users: false,
           payments: false,
-          accommodations: false,
           supportTickets: false,
           s3Files: false,
         });
@@ -135,7 +132,7 @@ export function DataCleanup() {
                   onCheckedChange={(checked) => handleOptionChange("participants", checked as boolean)}
                 />
                 <label htmlFor="participants" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Participant Details & Team Data
+                  Participant Details
                 </label>
               </div>
 
@@ -158,17 +155,6 @@ export function DataCleanup() {
                 />
                 <label htmlFor="payments" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Payment Records & Receipts
-                </label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="accommodations"
-                  checked={cleanupOptions.accommodations}
-                  onCheckedChange={(checked) => handleOptionChange("accommodations", checked as boolean)}
-                />
-                <label htmlFor="accommodations" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Accommodation Bookings
                 </label>
               </div>
 

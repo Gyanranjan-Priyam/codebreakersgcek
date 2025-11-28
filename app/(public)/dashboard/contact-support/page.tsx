@@ -34,33 +34,6 @@ export default function ContactSupportPage() {
           <SupportTeamDetails />
         </div>
       </div>
-
-      <Separator className="my-8" />
-
-      {/* Support Information */}
-      <div className="bg-muted/50 rounded-lg p-6 mt-8">
-        <h2 className="text-lg font-semibold mb-4">Support Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-          <div>
-            <h3 className="font-medium mb-2">Response Times</h3>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>• Urgent issues: Within 2 hours</li>
-              <li>• High priority: Within 4 hours</li>
-              <li>• Medium priority: Within 1 business day</li>
-              <li>• Low priority: Within 2 business days</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-medium mb-2">What to Include</h3>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>• Clear description of the issue</li>
-              <li>• Steps to reproduce the problem</li>
-              <li>• Screenshots or error messages</li>
-              <li>• Your device and browser information</li>
-            </ul>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

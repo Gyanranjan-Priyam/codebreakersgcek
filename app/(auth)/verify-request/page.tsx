@@ -61,6 +61,7 @@ function VerifyRequest() {
                             <InputOTPSlot index={1} />
                             <InputOTPSlot index={2} />
                         </InputOTPGroup>
+                        -
                         <InputOTPGroup>
                             <InputOTPSlot index={3} />
                             <InputOTPSlot index={4} />
@@ -78,6 +79,36 @@ function VerifyRequest() {
                         ) : (
                             <span>Verify Email</span>
                         )}
+                </Button>
+                <Button 
+                    variant="outline" 
+                    className="w-full text-center text-sm cursor-pointer" 
+                    disabled={emailPending} 
+                    onClick={() => {
+                        startTransition(async () => {
+                            await authClient.emailOtp.sendVerificationOtp({
+                                email: email,
+                                type: "sign-in",
+                                fetchOptions: {
+                                    onSuccess: () => {
+                                        toast.success("Verification code has been resent to your email.");
+                                    },
+                                    onError: (ctx) => {
+                                        toast.error(ctx.error.message || "Failed to resend code. Please try again.");
+                                    }
+                                }
+                            });
+                        });
+                    }}
+                >
+                    {emailPending ? (
+                        <>
+                            <Loader2 className="size-4 animate-spin"/>
+                            <span>Resending...</span>
+                        </>
+                    ) : (
+                        <span>Resend Code</span>
+                    )}
                 </Button>
             </CardContent>
         </Card>

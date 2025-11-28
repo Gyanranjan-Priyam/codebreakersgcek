@@ -167,7 +167,6 @@ export function AnnouncementsList({ announcements, onEdit, onRefresh }: Announce
           isPinned: !announcement.isPinned,
           publishDate: announcement.publishDate,
           expiryDate: announcement.expiryDate,
-          relatedEventId: announcement.relatedEvent?.id || null,
           attachmentKeys: [],
           imageKeys: [],
           audience: announcement.audience as any,

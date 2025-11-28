@@ -14,13 +14,6 @@ interface AnnouncementData {
   updatedAt: string;
   attachmentKeys: string[];
   imageKeys: string[];
-  relatedEvent?: {
-    id: string;
-    title: string;
-    slugId: string;
-    description: string;
-    date: string;
-  };
   createdBy: string;
 }
 
@@ -29,17 +22,6 @@ async function getAnnouncement(slugId: string): Promise<AnnouncementData | null>
   try {
     const announcement = await prisma.announcement.findUnique({
       where: { slugId },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-            description: true,
-            date: true,
-          }
-        }
-      }
     });
 
     if (!announcement) {
@@ -57,13 +39,6 @@ async function getAnnouncement(slugId: string): Promise<AnnouncementData | null>
       updatedAt: announcement.updatedAt.toISOString(),
       attachmentKeys: announcement.attachmentKeys || [],
       imageKeys: announcement.imageKeys || [],
-      relatedEvent: announcement.relatedEvent ? {
-        id: announcement.relatedEvent.id,
-        title: announcement.relatedEvent.title,
-        slugId: announcement.relatedEvent.slugId,
-        description: announcement.relatedEvent.description,
-        date: announcement.relatedEvent.date.toISOString(),
-      } : undefined,
       createdBy: announcement.createdBy,
     };
   } catch (error) {

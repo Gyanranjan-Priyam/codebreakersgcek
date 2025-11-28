@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { ParticipationSchemaType } from "@/lib/zodSchema";
 
 interface RegistrationData {
   fullName: string;

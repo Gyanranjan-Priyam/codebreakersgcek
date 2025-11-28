@@ -18,13 +18,13 @@ export default function ThankYouPage() {
               Thank You for Your Interest!
             </CardTitle>
             <CardDescription className="text-lg font-bold text-white/60">
-              Registration for INSPRANO events is currently closed
+              Registration for CodeBreakers events is currently closed
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-center space-y-4">
               <p className="text-white leading-relaxed">
-                We appreciate your enthusiasm for participating in <span className="font-semibold text-amber-500">INSPRANO</span>, 
+                We appreciate your enthusiasm for participating in <span className="font-semibold text-amber-500">CodeBreakers</span>, 
                 the flagship technical fest of Government College of Engineering Kalahandi, Bhawanipatna (GCEK).
               </p>
 
@@ -48,7 +48,7 @@ export default function ThankYouPage() {
                   <Mail className="w-5 h-5 text-blue-600" />
                   <div>
                     <p className="font-medium text-gray-900">Email</p>
-                    <p className="text-sm font-semibold text-gray-600">insprano.gcekbpatna@gmail.com</p>
+                    <p className="text-sm font-semibold text-gray-600">CodeBreakers.gcekbpatna@gmail.com</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
@@ -66,17 +66,17 @@ export default function ThankYouPage() {
               <p className="text-amber-100">Follow us on social media for updates:</p>
               <div className="flex justify-center space-x-4">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="https://instagram.com/insprano.gcek" target="_blank">
+                  <Link href="https://instagram.com/CodeBreakers.gcek" target="_blank">
                     <FaInstagram/> Instagram
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="https://facebook.com/insprano.gcek" target="_blank">
+                  <Link href="https://facebook.com/CodeBreakers.gcek" target="_blank">
                     <FaWhatsapp/> WhatsApp
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="https://linkedin.com/company/insprano" target="_blank">
+                  <Link href="https://linkedin.com/company/CodeBreakers" target="_blank">
                     <FaDiscord/> Discord
                   </Link>
                 </Button>

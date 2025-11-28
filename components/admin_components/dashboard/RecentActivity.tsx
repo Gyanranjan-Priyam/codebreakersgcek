@@ -43,10 +43,6 @@ interface RecentParticipationsProps {
             email: string;
             image: string | null;
         };
-        event: {
-            title: string;
-            slugId: string;
-        };
     }>;
 }
 
@@ -203,7 +199,7 @@ export function RecentParticipations({ participations }: RecentParticipationsPro
                                             {participation.user.name || participation.fullName}
                                         </h4>
                                         <p className="text-xs text-muted-foreground truncate">
-                                            {participation.event.title}
+                                            {participation.email}
                                         </p>
                                     </div>
                                 </div>

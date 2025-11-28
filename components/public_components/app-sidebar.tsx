@@ -1,22 +1,20 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   Calendar,
-  BarChart,
   LayoutDashboard,
-  Folder,
   HelpCircle,
-  Home,
   Settings,
   Users,
-  Plus,
-  List,
-} from "lucide-react"
+  Trophy,
+  Code,
+  FolderGit,
+} from "lucide-react";
 
-import { NavMain } from "@/components/public_components/nav-main"
-import { NavSecondary } from "@/components/public_components/nav-secondary"
-import { NavUser } from "@/components/public_components/nav-user"
+import { NavMain } from "@/components/public_components/nav-main";
+import { NavSecondary } from "@/components/public_components/nav-secondary";
+import { NavUser } from "@/components/public_components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -25,9 +23,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import Link from "next/link"
-import Image from "next/image"
+} from "@/components/ui/sidebar";
+import Link from "next/link";
+import Image from "next/image";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -35,6 +33,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
     name: string;
     email: string;
     image?: string | null;
+    profileImageKey?: string | null;
     role?: string | null;
   };
 }
@@ -47,24 +46,29 @@ const data = {
       icon: LayoutDashboard,
     },
     {
-      title: "Events",
-      url: "/dashboard/events",
+      title: "Quizzes",
+      url: "/dashboard/quizzes",
       icon: Calendar,
     },
     {
-      title: "Accommodations",
-      url: "/dashboard/accommodations",
-      icon: Home,
+      title: "Achievements",
+      url: "/dashboard/achievements",
+      icon: Trophy,
     },
     {
-      title: "Participate",
-      url: "/dashboard/participate",
-      icon: Plus,
-    },
-    {
-      title: "Teams",
-      url: "/dashboard/teams",
+      title: "Leaderboards",
+      url: "/dashboard/leaderboard",
       icon: Users,
+    },
+    {
+      title: "Play Ground (Beta)",
+      url: "/dashboard/playground",
+      icon: Code,
+    },
+    {
+      title: "Projects (Beta)",
+      url: "/dashboard/projects",
+      icon: FolderGit,
     },
   ],
 
@@ -80,19 +84,23 @@ const data = {
       icon: HelpCircle,
     },
   ],
-}
+};
 
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   // Create user data with proper formatting
-  const userData = user ? {
-    name: user.name || "User",
-    email: user.email,
-    avatar: user.image || "/default-avatar.png",
-  } : {
-    name: "User",
-    email: "user@example.com", 
-    avatar: "/default-avatar.png",
-  };
+  const userData = user
+    ? {
+        name: user.name || "User",
+        email: user.email,
+        avatar: user.image || "/default-avatar.png",
+        profileImageKey: user.profileImageKey || null,
+      }
+    : {
+        name: "User",
+        email: "user@example.com",
+        avatar: "/default-avatar.png",
+        profileImageKey: null,
+      };
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -104,16 +112,16 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             >
               <Link href="/dashboard">
                 <div className="flex items-center">
-                  <span className="text-xl font-bold inline-flex items-center hover:text-amber-400">
+                  <span className="text-[1.1rem] font-bold inline-flex items-center hover:text-amber-400">
                     <Image
-                    src="/assets/logo.png"
-                    alt="Insprano Logo"
-                    width={40}
-                    height={40}
-                    className="inline-block mr-2 mb-1"
-                    priority
-                  />
-                    INSPRANO | GCEK
+                      src="/assets/logo.png"
+                      alt="CodeBreakers Logo"
+                      width={32}
+                      height={32}
+                      className="inline-block mr-2 mb-1"
+                      priority
+                    />
+                    CodeBreakers | GCEK
                   </span>
                 </div>
               </Link>
@@ -129,5 +137,5 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <NavUser user={userData} />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

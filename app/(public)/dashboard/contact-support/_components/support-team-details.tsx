@@ -15,7 +15,8 @@ export default function SupportTeamDetails() {
                <div>
                   <h3 className="font-medium mb-2">Contact Information</h3>
                   <ul className="space-y-1 text-sm text-muted-foreground">
-                     <li>• Email: insprano.gcekbhawanipatna@gmail.com</li>
+                     <li>• Email: codebreakersgcek@gmail.com</li>
+                     <li>• Alternate Email: contact.codebreakersgcek@gmail.com</li>
                   </ul>
                </div>
                
@@ -24,19 +25,20 @@ export default function SupportTeamDetails() {
                   <ul className="space-y-2 text-sm text-muted-foreground">
                      <li>
                         <strong>Technical Support:</strong><br />
-                        • XYZ - +91 97654 32109<br />
-                        • Email: insprano.gcekbhawanipatna@gmail.com
+                        • Gyanranjan Priyam - +91 88952 20675<br />
+                        • Email: codebreakersgcek@gmail.com<br />
+                        • Alternate Email: web.gyanranjan@gmail.com
                      </li>
                      <li>
-                        <strong>Event Coordinator:</strong><br />
-                        • Nukesh - +91 9556 92291<br />
-                        • Yuvraj - +91 99052 39937<br />
-                        • Email: insprano.gcekbhawanipatna@gmail.com
+                        <strong>Club Leads</strong><br />
+                        • Biswajit - +91 12345 67890<br />
+                        • R. Reddy - +91 12345 67890<br />
+                        • Email: codebreakersgcek@gmail.com
                      </li>
                      <li>
                         <strong>General Inquiries:</strong><br />
-                        • Madhusmitha - +91 99389 62004<br />
-                        • Email: insprano.gcekbhawanipatna@gmail.com
+                        • Smruti - +91 12345 67890<br />
+                        • Email: codebreakersgcek@gmail.com
                      </li>
                   </ul>
                </div>

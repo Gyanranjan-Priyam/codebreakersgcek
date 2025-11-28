@@ -18,7 +18,7 @@ export default function TermsPage() {
             <p>Last Updated: November 16, 2025</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
-            <Badge variant="secondary">Event: INSPRANO Techfest</Badge>
+            <Badge variant="secondary">Event: CodeBreakers Techfest</Badge>
             <Badge variant="outline">Institution: Government College of Engineering Kalahandi, Bhawanipatna</Badge>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function TermsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p>
-                By registering, attending, or participating in INSPRANO ("Event"), you agree to abide by these Terms & Conditions, all event rules, and any guidelines issued by the Organizing Committee of INSPRANO and Government College of Engineering Kalahandi, Bhawanipatna.
+                By registering, attending, or participating in CodeBreakers ("Event"), you agree to abide by these Terms & Conditions, all event rules, and any guidelines issued by the Organizing Committee of CodeBreakers and Government College of Engineering Kalahandi, Bhawanipatna.
               </p>
               <p className="text-muted-foreground font-medium">
                 If you do not agree to these terms, you should not participate in or engage with the event or its platforms.
@@ -145,7 +145,7 @@ export default function TermsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p>By attending INSPRANO, participants consent to:</p>
+              <p>By attending CodeBreakers, participants consent to:</p>
               <ul className="list-disc pl-6 space-y-1">
                 <li>Being photographed or recorded during the event</li>
                 <li>Use of images/video in promotional, educational, or media publications</li>
@@ -195,7 +195,7 @@ export default function TermsPage() {
               <CardTitle>10. Third-Party Services & Links</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p>INSPRANO platforms may use/interact with systems provided by third parties for:</p>
+              <p>CodeBreakers platforms may use/interact with systems provided by third parties for:</p>
               <ul className="list-disc pl-6 space-y-1 mb-4">
                 <li>Registrations, payments, certificates, or communication</li>
               </ul>
@@ -277,14 +277,14 @@ export default function TermsPage() {
               <p>For questions or concerns regarding these Terms & Conditions, contact:</p>
               
               <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                <div className="font-semibold">INSPRANO Organizing Committee</div>
+                <div className="font-semibold">CodeBreakers Organizing Committee</div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="w-4 h-4" />
                   <span>Government College of Engineering Kalahandi, Bhawanipatna</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="w-4 h-4" />
-                  <span>Email: insprano.gcekbhawanipatna@gmail.com</span>
+                  <span>Email: CodeBreakers.gcekbhawanipatna@gmail.com</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Phone className="w-4 h-4" />
@@ -303,7 +303,7 @@ export default function TermsPage() {
             </CardHeader>
             <CardContent>
               <p className="font-medium">
-                By accessing the INSPRANO portal, completing registration, or participating in any event, you acknowledge that you have read, understood, and agreed to these Terms & Conditions.
+                By accessing the CodeBreakers portal, completing registration, or participating in any event, you acknowledge that you have read, understood, and agreed to these Terms & Conditions.
               </p>
             </CardContent>
           </Card>

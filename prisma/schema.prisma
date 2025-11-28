@@ -29,6 +29,32 @@ model User {
   district        String?
   collegeName     String?
   collegeAddress  String?
+  
+  // Personal Details (Extended)
+  username        String?         @unique
+  firstName       String?
+  middleName      String?
+  lastName        String?
+  
+  // Academic Details
+  registration    String?
+  rollNumber      String?
+  branch          String?
+  admissionYear   String?
+  
+  // Address Details (Detailed)
+  address         String?
+  postOffice      String?
+  policeStation   String?
+  block           String?
+  pinCode         String?
+  
+  // Profile completion status
+  profileComplete Boolean         @default(false)
+  
+  // Linked Accounts
+  githubUsername  String?
+  
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @default(now()) @updatedAt
   role            String?
@@ -37,8 +63,6 @@ model User {
   banExpires      DateTime?
   sessions        Session[]
   accounts        Account[]
-  participations  Participation[]
-  accommodationBookings AccommodationBooking[]
   supportTickets  SupportTicket[]
   supportResponses SupportResponse[]
   adminResponses  SupportResponse[] @relation("AdminResponses")
@@ -91,267 +115,6 @@ model Verification {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@map("verification")
-}
-
-enum EventCategory {
-  Robosprano
-  Hackathon
-  OtherEvent
-  Civil
-  Mechanical
-  ComputerScience
-  Electrical
-  Gaming
-}
-
-enum EventPriceType {
-  free
-  paid
-}
-
-model Event {
-  id             String          @id @default(cuid())
-  title          String
-  slugId         String          @unique
-  description    String
-  rules          String
-  thumbnailKey   String
-  pdfKey         String
-  imageKeys      String[]        @default([])
-  priceType      EventPriceType  @default(free)
-  price          Int
-  venue          String
-  date           DateTime
-  category       EventCategory
-  teamSize       Int?            @default(4) // Maximum team members allowed for this event
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  participations Participation[]
-  teams          Team[]
-  announcements  Announcement[]
-
-  @@map("event")
-}
-
-enum ParticipationStatus {
-  REGISTERED
-  PENDING_PAYMENT
-  PAYMENT_SUBMITTED
-  CONFIRMED
-  CANCELLED
-}
-
-model Participation {
-  id           String              @id @default(cuid())
-  userId       String
-  eventId      String
-  status       ParticipationStatus @default(REGISTERED)
-  registeredAt DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-
-  // User registration details
-  fullName       String
-  email          String
-  mobileNumber   String
-  whatsappNumber String?
-  aadhaarNumber  String
-  state          String
-  district       String
-  collegeName    String
-  collegeAddress String
-
-  // Payment details
-  paymentScreenshotKey String?
-  paymentSubmittedAt   DateTime?
-  paymentVerifiedAt    DateTime?
-  paymentAmount        Int?
-  transactionId        String?
-
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event        Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  teamLeader   Team[]            @relation("TeamLeader")
-  teamMember   TeamMember[]
-  joinRequests TeamJoinRequest[]
-
-  @@unique([userId, eventId])
-  @@map("participation")
-}
-
-model Team {
-  id          String   @id @default(cuid())
-  name        String
-  slugId      String?  @unique
-  teamCode    String?  @unique
-  eventId     String
-  leaderId    String
-  description String?
-  maxMembers  Int      @default(4)
-  isPublic    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  event        Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  leader       Participation     @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: Cascade)
-  members      TeamMember[]
-  joinRequests TeamJoinRequest[]
-
-  @@unique([name, eventId])
-  @@map("team")
-}
-
-model TeamMember {
-  id            String   @id @default(cuid())
-  teamId        String
-  participantId String
-  joinedAt      DateTime @default(now())
-  isActive      Boolean  @default(true)
-
-  // Member profile information
-  fullName        String?
-  email           String?
-  mobileNumber    String?
-  whatsappNumber  String?
-  aadhaarNumber   String?
-  profileImageKey String?
-
-  // College information
-  collegeName    String?
-  collegeAddress String?
-  state          String?
-  district       String?
-  pinCode        String?
-
-  team        Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  participant Participation @relation(fields: [participantId], references: [id], onDelete: Cascade)
-
-  @@unique([teamId, participantId])
-  @@map("team_member")
-}
-
-enum JoinRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model TeamJoinRequest {
-  id            String            @id @default(cuid())
-  teamId        String
-  participantId String
-  status        JoinRequestStatus @default(PENDING)
-  message       String? // Optional message from the requester
-  requestedAt   DateTime          @default(now())
-  respondedAt   DateTime?
-  respondedBy   String? // Team leader who responded
-
-  // Additional participant details for the request
-  fullName       String
-  email          String
-  mobileNumber   String
-  whatsappNumber String?
-  aadhaarNumber  String
-  state          String
-  district       String
-  collegeName    String
-  collegeAddress String
-
-  team        Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  participant Participation @relation(fields: [participantId], references: [id], onDelete: Cascade)
-
-  @@unique([teamId, participantId])
-  @@map("team_join_request")
-}
-
-model AccommodationBooking {
-  id        String   @id @default(cuid())
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // User Details
-  name           String
-  mobileNumber   String
-  whatsappNumber String?
-  state          String
-  district       String
-  collegeName    String
-  collegeAddress String
-
-  // Stay Details
-  stayId           String
-  roomType         String
-  checkInDate      DateTime
-  checkOutDate     DateTime
-  numberOfNights   Int
-  totalStayPrice   Decimal
-
-  // Meal Details
-  selectedMeals    String[] // Array of meal IDs
-  totalMealPrice   Decimal
-
-  // Payment Details
-  totalPrice         Decimal
-  transactionId      String?
-  paymentScreenshot  String? // S3 URL
-  upiId             String?
-  paymentStatus     String @default("PENDING") // PENDING, VERIFIED, FAILED
-  verifiedAt        DateTime?
-  verifiedBy        String?
-
-  // Original Payment Tracking (for edit history)
-  originalTotalPrice      Decimal? // Original amount when first booked
-  originalTransactionId   String?  // Original transaction ID
-  originalPaymentScreenshot String? // Original payment screenshot
-  originalPaymentStatus   String?  // Original payment status
-  hasBeenModified        Boolean @default(false) // Track if booking was edited
-
-  // Booking Status
-  status String @default("CONFIRMED") // CONFIRMED, CANCELLED
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("accommodation_booking")
-}
-
-model Stay {
-  id        String   @id @default(cuid())
-  imageKey  String
-  roomPrice Int
-  place     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("stay")
-}
-
-enum WeekDay {
-  MONDAY
-  TUESDAY
-  WEDNESDAY
-  THURSDAY
-  FRIDAY
-  SATURDAY
-  SUNDAY
-}
-
-enum MealType {
-  BREAKFAST
-  LUNCH
-  DINNER
-}
-
-model Food {
-  id              String   @id @default(cuid())
-  weekDay         WeekDay
-  mealType        MealType
-  foodItems       String[] // Array of food items
-  imageKey        String
-  pricePerDay     Int      // Price for this meal on this day
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([weekDay, mealType])
-  @@map("food")
 }
 
 model SystemSettings {
@@ -483,10 +246,6 @@ model Announcement {
   category    AnnouncementCategory
   priority    AnnouncementPriority @default(NORMAL)
   
-  // Optional related event
-  relatedEventId String?
-  relatedEvent   Event?  @relation(fields: [relatedEventId], references: [id], onDelete: SetNull)
-  
   // Media & attachments
   attachmentKeys String[] @default([]) // S3 keys for PDFs, documents
   imageKeys      String[] @default([]) // S3 keys for images/posters
@@ -517,4 +276,161 @@ model Announcement {
   deletedAt DateTime?
   
   @@map("announcement")
+}
+
+model AttendanceSession {
+  id            String       @id @default(cuid())
+  sessionNumber Int
+  title         String
+  date          DateTime
+  day           String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  createdBy     String       // Admin user ID who created this
+  attendances   Attendance[]
+
+  @@unique([sessionNumber])
+  @@map("attendance_session")
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  status    String   // "pending", "present", "absent"
+  points    Int      @default(0) // Points awarded for attendance
+  markedAt  DateTime @default(now())
+  markedBy  String   // Admin user ID who marked the attendance
+  updatedAt DateTime @updatedAt
+
+  session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@map("attendance")
+}
+
+model Task {
+  id          String           @id @default(cuid())
+  taskNumber  Int
+  title       String
+  description String?
+  startDate   DateTime
+  dueDate     DateTime
+  points      Int              @default(0) // Points awarded for task completion
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  createdBy   String           // Admin user ID who created this
+  submissions TaskSubmission[]
+
+  @@unique([taskNumber])
+  @@map("task")
+}
+
+model TaskSubmission {
+  id             String    @id @default(cuid())
+  taskId         String
+  userId         String
+  status         String    // "pending", "submitted", "approved", "rejected"
+  submittedAt    DateTime?
+  evaluatedAt    DateTime?
+  evaluatedBy    String?   // Admin user ID who evaluated
+  pointsAwarded  Int       @default(0)
+  feedback       String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@map("task_submission")
+}
+
+model EventPoint {
+  id          String   @id @default(cuid())
+  eventNumber Int
+  title       String
+  description String?
+  eventDate   DateTime
+  points      Int      @default(0) // Points awarded for event participation
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String   // Admin user ID who created this
+  participations EventParticipation[]
+
+  @@unique([eventNumber])
+  @@map("event_point")
+}
+
+model EventParticipation {
+  id             String    @id @default(cuid())
+  eventId        String
+  userId         String
+  status         String    // "pending", "participated", "approved", "rejected"
+  participatedAt DateTime?
+  evaluatedAt    DateTime?
+  evaluatedBy    String?   // Admin user ID who evaluated
+  pointsAwarded  Int       @default(0)
+  feedback       String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  event EventPoint @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_participation")
+}
+
+model Quiz {
+  id               String         @id @default(cuid())
+  quizId           String         @unique // CODEBREAKER-QUIZZES-randomstring
+  title            String
+  description      String         @db.Text // Description and rules
+  sets             Int            @default(1) // Number of sets (1-8)
+  duration         Int            // Duration in minutes
+  pointsPerQuestion Int           @default(1) // Points awarded per correct answer
+  startDateTime    DateTime?      // Quiz start date and time
+  endDateTime      DateTime?      // Quiz end date and time
+  questionsJson    String         @db.Text // JSON string of questions
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  createdBy        String         // Admin user ID who created this
+  attempts         QuizAttempt[]
+  setAssignments   QuizSetAssignment[]
+
+  @@map("quiz")
+}
+
+model QuizSetAssignment {
+  id          String   @id @default(cuid())
+  quizId      String
+  userId      String
+  assignedSet String   // The set letter (A, B, C, etc.)
+  assignedAt  DateTime @default(now())
+  
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  @@unique([quizId, userId])
+  @@map("quiz_set_assignment")
+}
+
+model QuizAttempt {
+  id             String    @id @default(cuid())
+  quizId         String
+  userId         String
+  setNumber      Int       // Which set (A, B, C, etc.)
+  score          Int       @default(0)
+  totalQuestions Int
+  correctAnswers Int       @default(0)
+  pointsEarned   Int       @default(0)
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  answersJson    String?   @db.Text // JSON string of user's answers
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, userId, setNumber])
+  @@map("quiz_attempt")
 }

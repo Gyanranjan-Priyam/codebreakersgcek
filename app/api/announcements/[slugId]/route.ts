@@ -15,22 +15,8 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Fetch announcement with related data
     const announcement = await prisma.announcement.findUnique({
-      where: {
-        slugId: slugId
-      },
-      include: {
-        relatedEvent: {
-          select: {
-            id: true,
-            title: true,
-            slugId: true,
-            description: true,
-            date: true
-          }
-        }
-      }
+      where: { slugId }
     });
 
     if (!announcement) {
@@ -52,7 +38,7 @@ export async function GET(
       updatedAt: announcement.updatedAt,
       attachmentKeys: announcement.attachmentKeys,
       imageKeys: announcement.imageKeys,
-      relatedEvent: announcement.relatedEvent,
+
       createdBy: announcement.createdBy
     };
 

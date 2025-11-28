@@ -1,7 +1,6 @@
-import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   LayoutDashboard, 
@@ -9,19 +8,20 @@ import {
   Settings,
   Bell,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getUserDashboardData, getUpcomingEvents } from "./actions";
+import { getUserDashboardData } from "./actions";
 import { DashboardStatsCards } from "./_components/dashboard-stats-cards";
-import { MyRegistrations } from "./_components/my-registrations";
-import { MyTeams } from "./_components/my-teams";
-import { UpcomingEvents } from "./_components/upcoming-events";
 import { RecentActivities } from "./_components/recent-activities";
+import { Progress } from "@/components/ui/progress";
 
 export default async function UserDashboard() {
   // Check authentication
@@ -34,10 +34,7 @@ export default async function UserDashboard() {
   }
 
   // Fetch dashboard data
-  const [dashboardResult, upcomingEventsResult] = await Promise.all([
-    getUserDashboardData(),
-    getUpcomingEvents(),
-  ]);
+  const dashboardResult = await getUserDashboardData();
 
   if (dashboardResult.status === "error") {
     return (
@@ -54,8 +51,17 @@ export default async function UserDashboard() {
     );
   }
 
-  const { stats, participations, teamMemberships, teamLeaderships, recentActivities, user } = dashboardResult.data;
-  const upcomingEvents = upcomingEventsResult.status === "success" ? upcomingEventsResult.data : [];
+  const { stats, recentActivities, user } = dashboardResult.data;
+
+  // Get profile image URL - prioritize profileImageKey from S3
+  const getProfileImageUrl = () => {
+    if (user.profileImageKey) {
+      return `https://registration.t3.storage.dev/${user.profileImageKey}`;
+    }
+    return user.image || "";
+  };
+
+  const profileImageUrl = getProfileImageUrl();
 
   const getInitials = (name: string) => {
     return name
@@ -73,14 +79,58 @@ export default async function UserDashboard() {
     return 'Good evening';
   };
 
+  // Calculate real-time profile completion based on filled fields
+  const calculateProfileCompletion = () => {
+    const fields = [
+      user.name,
+      user.email,
+      user.emailVerified,
+      user.mobileNumber,
+      user.whatsappNumber,
+      user.state,
+      user.district,
+      user.collegeName,
+      user.username,
+      user.firstName,
+      user.lastName,
+      user.registration,
+      user.rollNumber,
+      user.branch,
+      user.admissionYear,
+      user.address,
+      user.pinCode,
+      user.image,
+    ];
+    
+    const filledFields = fields.filter(field => {
+      if (typeof field === 'boolean') return field === true;
+      return field !== null && field !== undefined && field !== '';
+    }).length;
+    
+    return Math.round((filledFields / fields.length) * 100);
+  };
+
+  const profileCompletion = calculateProfileCompletion();
+  
+  // Get completed profile items
+  const completedItems = [
+    { condition: user.emailVerified, label: 'Email Verified' },
+    { condition: user.name && user.email, label: 'Basic Info Added' },
+    { condition: user.mobileNumber || user.whatsappNumber, label: 'Contact Info Added' },
+    { condition: user.collegeName && user.branch, label: 'Academic Info Added' },
+    { condition: user.username, label: 'Username Set' },
+    { condition: user.githubUsername, label: 'GitHub Connected' },
+  ].filter(item => item.condition); 
+
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-6 sm:space-y-8 px-4 sm:px-6">
       {/* Welcome Header */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-4">
-            <Avatar className="w-12 h-12 sm:w-16 sm:h-16">
-              <AvatarFallback className="text-sm sm:text-lg font-semibold">
+            <Avatar className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-primary/10">
+              <AvatarImage src={profileImageUrl} alt={user.name || "User"} />
+              <AvatarFallback className="text-sm sm:text-lg font-semibold bg-primary/5 text-primary">
                 {getInitials(user.name || "User")}
               </AvatarFallback>
             </Avatar>
@@ -89,7 +139,7 @@ export default async function UserDashboard() {
                 {getCurrentGreeting()}, {user.name?.split(' ')[0] || 'there'}!
               </h1>
               <p className="text-sm sm:text-base text-muted-foreground">
-                Welcome to your dashboard. Here's what's happening with your events.
+                Here's what's happening with your activities today.
               </p>
             </div>
           </div>
@@ -101,13 +151,6 @@ export default async function UserDashboard() {
                 <span className="sm:hidden">Settings</span>
               </Link>
             </Button>
-            <Button size="sm" asChild className="text-xs sm:text-sm">
-              <Link href="/dashboard/events">
-                <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Browse Events</span>
-                <span className="sm:hidden">Events</span>
-              </Link>
-            </Button>
           </div>
         </div>
 
@@ -117,10 +160,6 @@ export default async function UserDashboard() {
             <span className="truncate">Today is {format(new Date(), "EEEE, MMMM do, yyyy")}</span>
           </div>
           <Separator orientation="vertical" className="hidden sm:block h-4" />
-          <div className="flex items-center gap-1">
-            <LayoutDashboard className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span>Dashboard</span>
-          </div>
         </div>
       </div>
 
@@ -129,7 +168,7 @@ export default async function UserDashboard() {
       {/* Dashboard Stats */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-5 h-5" />
+          <TrendingUp className="w-5 h-5 text-primary" />
           <h2 className="text-xl font-semibold">Overview</h2>
         </div>
         <DashboardStatsCards stats={stats} />
@@ -139,114 +178,106 @@ export default async function UserDashboard() {
       <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
         {/* Left Column - Main Content */}
         <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-          {/* My Registrations */}
-          <MyRegistrations participations={participations} />
           
-          {/* My Teams */}
-          <MyTeams teamMemberships={teamMemberships || []} teamLeaderships={teamLeaderships || []} />
-          
-          {/* Upcoming Events */}
-          <UpcomingEvents events={upcomingEvents} />
+          {/* Action Items / Pending Tasks */}
+          {stats.pendingTasks > 0 && (
+            <Card className="border-l-4 border-l-blue-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+                  Action Items
+                </CardTitle>
+                <CardDescription>
+                  You have {stats.pendingTasks} pending tasks that require your attention.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="secondary" size="sm" asChild>
+                  <Link href="/dashboard/tasks" className="flex items-center">
+                    View Pending Tasks <ArrowRight className="ml-2 w-4 h-4" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Activities */}
+          <RecentActivities activities={recentActivities} />
+
         </div>
 
         {/* Right Column - Sidebar */}
         <div className="space-y-6 sm:space-y-8">
-          {/* Recent Activities */}
-          <RecentActivities activities={recentActivities} />
+          
+          {/* Profile Summary */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base sm:text-lg">Profile Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Completion</span>
+                  <span className="font-medium">{profileCompletion}%</span>
+                </div>
+                <Progress value={profileCompletion} className="h-2" />
+              </div>
+              <div className="pt-2 space-y-2">
+                {completedItems.length > 0 ? (
+                  completedItems.slice(0, 4).map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <span>{item.label}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <AlertCircle className="w-4 h-4 text-orange-500" />
+                    <span>Complete your profile to get started</span>
+                  </div>
+                )}
+              </div>
+              <Button variant="outline" className="w-full text-sm mt-2" asChild>
+                <Link href="/dashboard/settings">
+                  Complete Profile
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
           {/* Quick Actions */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
                 Quick Actions
               </CardTitle>
-              <CardDescription className="text-sm">
-                Common tasks and shortcuts
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start text-sm" asChild>
+              <Button variant="ghost" className="w-full justify-start text-sm" asChild>
                 <Link href="/dashboard/events">
-                  <Calendar className="w-4 h-4 mr-2" />
+                  <Calendar className="w-4 h-4 mr-2 text-primary" />
                   Browse All Events
                 </Link>
               </Button>
               
-              <Button variant="outline" className="w-full justify-start text-sm" asChild>
-                <Link href="/dashboard/participate">
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  View My Registrations
-                </Link>
-              </Button>
-              
-              <Button variant="outline" className="w-full justify-start text-sm" asChild>
-                <Link href="/dashboard/teams">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Manage Teams
+              <Button variant="ghost" className="w-full justify-start text-sm" asChild>
+                <Link href="/dashboard/quizzes">
+                  <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
+                  Take a Quiz
                 </Link>
               </Button>
 
-              <Button variant="outline" className="w-full justify-start text-sm" asChild>
-                <Link href="/dashboard/settings">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Account Settings
+              <Button variant="ghost" className="w-full justify-start text-sm" asChild>
+                <Link href="/dashboard/support">
+                  <Bell className="w-4 h-4 mr-2 text-orange-500" />
+                  Contact Support
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Account Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Account Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Email Address
-                </label>
-                <p className="text-sm break-all">{user.email}</p>
-              </div>
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Member Since
-                </label>
-                <p className="text-sm">
-                  {format(new Date(), "MMMM yyyy")}
-                </p>
-              </div>
-              <div className="pt-2">
-                <Button variant="outline" size="sm" className="w-full text-sm" asChild>
-                  <Link href="/dashboard/settings">
-                    Update Profile
-                  </Link>
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {/* Footer Information */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="pt-4 sm:pt-6">
-          <div className="text-center space-y-2">
-            <h3 className="text-base sm:text-lg font-semibold text-primary">Need Help?</h3>
-            <p className="text-sm text-muted-foreground px-4">
-              If you have any questions about events or need assistance, feel free to reach out to our support team.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 pt-2">
-              <Link href="/dashboard/contact-support" className={buttonVariants({ variant: "outline", size: "lg" })}>
-                Contact Support
-              </Link>
-              <Link href="/dashboard/events-guidelines" className={buttonVariants({ variant: "outline", size: "lg" })}>
-                Event Guidelines
-              </Link>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

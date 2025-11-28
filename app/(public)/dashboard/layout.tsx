@@ -7,6 +7,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -26,6 +27,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return redirect("/admin");
   }
 
+  // Fetch user profile with profileImageKey
+  const userProfile = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      profileImageKey: true,
+      role: true,
+    }
+  });
+
+  const userData = userProfile || session.user;
+
   return (
     <NotificationProvider>
       <SidebarProvider
@@ -36,7 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           } as React.CSSProperties
         }
       >
-        <AppSidebar variant="inset" user={session.user} />
+        <AppSidebar variant="inset" user={userData} />
         <SidebarInset>
           <SiteHeader />
           {children}

@@ -158,19 +158,11 @@ export function MyRegistrations({ participations }: MyRegistrationsProps) {
                       <span className="ml-1 text-xs">{formatStatus(participation.status)}</span>
                     </Badge>
                     <span className="text-sm font-medium">
-                      {formatCurrency(participation.paymentAmount || participation.event.price)}
+                      {formatCurrency(participation.paymentAmount || 0)}
                     </span>
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    {participation.status === 'REGISTERED' && (
-                      <Button size="sm" variant="outline" asChild className="text-xs">
-                        <Link href={`/dashboard/participate/${participation.event.id}/checkout`}>
-                          Complete Payment
-                        </Link>
-                      </Button>
-                    )}
-                    
                     <Button size="sm" variant="ghost" asChild className="text-xs">
                       <Link href={`/dashboard/events/${participation.event.slugId}`}>
                         <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -202,11 +194,9 @@ export function MyRegistrations({ participations }: MyRegistrationsProps) {
 
           {participations.length > 5 && (
             <div className="text-center pt-4">
-              <Button variant="outline" asChild className="w-full sm:w-auto text-sm">
-                <Link href="/dashboard/participate">
-                  View All Registrations ({participations.length})
-                </Link>
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Showing 5 of {participations.length} registrations
+              </p>
             </div>
           )}
         </div>

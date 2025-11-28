@@ -12,7 +12,7 @@ export function getBaseUrl(): string {
   
   // For production, use the custom domain
   if (process.env.NODE_ENV === 'production') {
-    return 'https://registration-insprano.vercel.app';
+    return 'https://registration-CodeBreakers.vercel.app';
   }
   
   

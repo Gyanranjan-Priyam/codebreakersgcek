@@ -3,16 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Activity,
-  Calendar,
-  CreditCard,
-  CheckCircle,
-  Users,
-  Clock,
-  Crown,
-  UserPlus
-} from "lucide-react";
+import { Activity, Clock, Bell, CheckSquare, Calendar, BrainCircuit, LifeBuoy } from "lucide-react";
 import { format } from "date-fns";
 import { RecentActivity } from "../actions";
 
@@ -23,35 +14,23 @@ interface RecentActivitiesProps {
 export function RecentActivities({ activities }: RecentActivitiesProps) {
   const getActivityIcon = (type: RecentActivity['type']) => {
     switch (type) {
-      case 'registration':
-        return <Calendar className="w-4 h-4" />;
-      case 'payment_submitted':
-        return <CreditCard className="w-4 h-4" />;
-      case 'payment_verified':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'team_joined':
-        return <UserPlus className="w-4 h-4" />;
-      case 'team_created':
-        return <Crown className="w-4 h-4" />;
-      default:
-        return <Activity className="w-4 h-4" />;
+      case 'announcement': return <Bell className="w-4 h-4" />;
+      case 'task': return <CheckSquare className="w-4 h-4" />;
+      case 'event': return <Calendar className="w-4 h-4" />;
+      case 'quiz': return <BrainCircuit className="w-4 h-4" />;
+      case 'ticket': return <LifeBuoy className="w-4 h-4" />;
+      default: return <Activity className="w-4 h-4" />;
     }
   };
 
   const getActivityColor = (type: RecentActivity['type']) => {
     switch (type) {
-      case 'registration':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'payment_submitted':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'payment_verified':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'team_joined':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'team_created':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'announcement': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'task': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'event': return 'bg-green-100 text-green-800 border-green-200';
+      case 'quiz': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'ticket': return 'bg-orange-100 text-orange-800 border-orange-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -112,7 +91,7 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-80 pr-4">
+        <ScrollArea className="h-[400px] pr-4">
           <div className="space-y-3 sm:space-y-4">
             {activities.map((activity) => (
               <div 
@@ -130,24 +109,16 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
                     <div className="min-w-0 flex-1">
                       <h4 className="text-xs sm:text-sm font-medium truncate">{activity.title}</h4>
                       <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{activity.description}</p>
+                      {activity.points && activity.points > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 mt-1">
+                          +{activity.points} pts
+                        </span>
+                      )}
                     </div>
                     <span className="text-xs text-muted-foreground shrink-0 sm:ml-2">
                       {formatRelativeTime(activity.date)}
                     </span>
                   </div>
-                  
-                  {activity.eventTitle && (
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                      <Badge variant="secondary" className="text-xs w-fit">
-                        <span className="truncate">{activity.eventTitle}</span>
-                      </Badge>
-                      {activity.teamName && (
-                        <Badge variant="outline" className="text-xs w-fit">
-                          Team: <span className="truncate">{activity.teamName}</span>
-                        </Badge>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

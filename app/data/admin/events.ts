@@ -2,73 +2,19 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "./require-admin";
-import { EventCategory } from "@prisma/client";
+
+// Note: Event model has been deprecated in favor of EventPoint model
+// This file is kept for reference but should not be used
+// Use EventPoint-related functions in app/admin/points/events/actions.ts instead
 
 export async function getAllEvents() {
-    await requireAdmin();
-    
-    try {
-        const events = await prisma.event.findMany({
-            orderBy: {
-                createdAt: 'desc'
-            }
-        });
-        return events;
-    } catch (error) {
-        console.error('Error fetching events:', error);
-        throw new Error('Failed to fetch events');
-    }
+    throw new Error("Event model is deprecated. Use EventPoint instead.");
 }
 
 export async function getEventBySlugId(slugId: string) {
-    await requireAdmin();
-    
-    try {
-        const event = await prisma.event.findUnique({
-            where: {
-                slugId: slugId
-            }
-        });
-        
-        if (!event) {
-            throw new Error('Event not found');
-        }
-        
-        return event;
-    } catch (error) {
-        console.error('Error fetching event:', error);
-        throw new Error('Failed to fetch event');
-    }
+    throw new Error("Event model is deprecated. Use EventPoint instead.");
 }
 
-export async function updateEvent(slugId: string, data: {
-    title?: string;
-    description?: string;
-    rules?: string;
-    thumbnailKey?: string;
-    pdfKey?: string;
-    imageKeys?: string[];
-    price?: number;
-    venue?: string;
-    date?: Date;
-    category?: EventCategory;
-}) {
-    await requireAdmin();
-    
-    try {
-        const event = await prisma.event.update({
-            where: {
-                slugId: slugId
-            },
-            data: {
-                ...data,
-                updatedAt: new Date()
-            }
-        });
-        
-        return event;
-    } catch (error) {
-        console.error('Error updating event:', error);
-        throw new Error('Failed to update event');
-    }
+export async function updateEvent(slugId: string, data: any) {
+    throw new Error("Event model is deprecated. Use EventPoint instead.");
 }

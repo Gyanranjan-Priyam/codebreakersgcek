@@ -7,14 +7,12 @@ export async function checkRegistrationStatus(request: NextRequest) {
   const registrationRoutes = [
     '/register',
     '/signup',
-    '/events/register',
-    '/participate',
-    '/dashboard/participate'
+    '/events/register'
   ];
 
   // Check if this is a registration-related route
   const isRegistrationRoute = registrationRoutes.some(route => 
-    pathname.startsWith(route) || pathname.includes('register') || pathname.includes('participate')
+    pathname.startsWith(route) || pathname.includes('register')
   );
 
   if (isRegistrationRoute) {

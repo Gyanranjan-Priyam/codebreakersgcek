@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 
 export default function DashboardLoading() {
   return (
-    <div className="container mx-auto py-6 space-y-8">
+    <div className="container mx-auto p-6 space-y-8">
       {/* Welcome Header Skeleton */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">

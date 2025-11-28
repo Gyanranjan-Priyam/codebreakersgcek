@@ -8,7 +8,6 @@ interface DataCleanupOptions {
   participants: boolean;
   users: boolean;
   payments: boolean;
-  accommodations: boolean;
   supportTickets: boolean;
   s3Files: boolean;
 }
@@ -58,26 +57,27 @@ export async function POST(request: NextRequest) {
     // Start a transaction for database operations with extended timeout
     await prisma.$transaction(async (tx) => {
       
-      // 1. Clean up participants and teams if selected
+      // 1. Clean up participants (quiz attempts, event participation, task submissions, attendance)
       if (options.participants) {
-        // Delete team-related data
-        await tx.teamMember.deleteMany({});
-        await tx.teamJoinRequest.deleteMany({});
-        await tx.team.deleteMany({});
-        deletedItems.push("Team data");
+        // Delete quiz-related data
+        await tx.quizSetAssignment.deleteMany({});
+        await tx.quizAttempt.deleteMany({});
+        deletedItems.push("Quiz attempts and set assignments");
 
-        // Delete individual participations
-        await tx.participation.deleteMany({});
-        deletedItems.push("Individual participations");
+        // Delete event participation
+        await tx.eventParticipation.deleteMany({});
+        deletedItems.push("Event participations");
+
+        // Delete task submissions
+        await tx.taskSubmission.deleteMany({});
+        deletedItems.push("Task submissions");
+
+        // Delete attendance records
+        await tx.attendance.deleteMany({});
+        deletedItems.push("Attendance records");
       }
 
-      // 2. Clean up accommodations if selected
-      if (options.accommodations) {
-        await tx.accommodationBooking.deleteMany({});
-        deletedItems.push("Accommodation bookings");
-      }
-
-      // 3. Clean up support tickets if selected
+      // 2. Clean up support tickets if selected
       if (options.supportTickets) {
         // Delete in correct order respecting foreign key constraints
         await tx.supportResponseAttachment.deleteMany({});
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         deletedItems.push("Support tickets");
       }
 
-      // 4. Clean up non-admin users if selected (do this last)
+      // 3. Clean up non-admin users if selected (do this last)
       if (options.users) {
         // Delete non-admin users (this will cascade delete related data due to foreign keys)
         const deletedUsers = await tx.user.deleteMany({
