@@ -4,6 +4,12 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { getAllQuizzes } from "./actions";
 import QuizzesTable from "./_components/quizzes-table";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Quiz Management",
+  description: "Manage quizzes for CodeBreakers members",
+};
 
 export default async function AdminQuizzesPage() {
   const result = await getAllQuizzes();

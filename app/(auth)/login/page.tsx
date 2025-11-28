@@ -3,6 +3,12 @@ import { LoginForm } from "./_components/LoginForm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Login",
+  description: "Login to CodeBreakers portal - Government College of Engineering Kalahandi",
+};
 
 export default async function LoginPage() {
     const session = await auth.api.getSession({

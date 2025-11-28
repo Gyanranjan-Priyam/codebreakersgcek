@@ -3,6 +3,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import OnboardingForm from "./_components/OnboardingForm";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Complete Your Profile",
+  description: "Complete your profile to access CodeBreakers portal",
+};
 
 export default async function OnboardingPage() {
   const session = await auth.api.getSession({

@@ -16,6 +16,12 @@ import {
    TrendingUp,
    LayoutDashboard
 } from "lucide-react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Admin Dashboard",
+  description: "CodeBreakers admin dashboard - Manage members, events, and activities",
+};
 
 // Loading components
 function StatsLoading() {

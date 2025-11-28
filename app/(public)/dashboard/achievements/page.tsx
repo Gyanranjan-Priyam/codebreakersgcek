@@ -13,6 +13,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "My Achievements",
+  description: "View your achievements, attendance, tasks, events, and quiz results",
+};
 
 export default async function AchievementsPage() {
   const user = await getCurrentUser();

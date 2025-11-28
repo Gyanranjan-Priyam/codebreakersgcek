@@ -22,6 +22,12 @@ import { getUserDashboardData } from "./actions";
 import { DashboardStatsCards } from "./_components/dashboard-stats-cards";
 import { RecentActivities } from "./_components/recent-activities";
 import { Progress } from "@/components/ui/progress";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+  description: "Your CodeBreakers dashboard - View your stats, activities, and upcoming events",
+};
 
 export default async function UserDashboard() {
   // Check authentication

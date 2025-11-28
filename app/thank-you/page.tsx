@@ -3,6 +3,12 @@ import { CheckCircle, Heart, Mail, Phone, Home } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FaDiscord, FaInstagram, FaWhatsapp } from "react-icons/fa";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Thank You",
+  description: "Thank you for your interest in CodeBreakers",
+};
 
 export default function ThankYouPage() {
   return (

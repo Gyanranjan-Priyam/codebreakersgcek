@@ -14,6 +14,12 @@ import { getAllEventPoints } from "./events/actions";
 import { getAllQuizzes } from "./quiz/actions";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Points Management",
+  description: "Manage attendance, tasks, events, and quiz points for members",
+};
 
 export default async function PointsPage() {
   const session = await auth.api.getSession({

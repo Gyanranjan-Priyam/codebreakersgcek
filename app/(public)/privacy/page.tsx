@@ -1,5 +1,11 @@
 import { Mail } from "lucide-react";
 import Image from "next/image";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | CodeBreakers",
+  description: "Privacy Policy for CodeBreakers - The official coding club of Government College of Engineering Kalahandi, Bhawanipatna",
+};
 
 export default function PrivacyPage() {
   return (

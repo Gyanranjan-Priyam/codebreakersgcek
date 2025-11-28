@@ -4,6 +4,12 @@ import { Trophy, Calendar } from "lucide-react";
 import { getOverallLeaderboard, getMonthlyLeaderboard } from "./actions";
 import OverallLeaderboard from "./_components/overall-leaderboard";
 import MonthlyLeaderboard from "./_components/monthly-leaderboard";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Leaderboard",
+  description: "View top performers and your ranking based on points earned",
+};
 
 export default async function LeaderboardPage() {
   const currentDate = new Date();
