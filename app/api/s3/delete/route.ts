@@ -1,9 +1,10 @@
-import { requireAdminAPI } from "@/app/data/admin/require-admin-api";
 import arcjet, {  fixedWindow } from "@/lib/arcjet";
 import { env } from "@/lib/env";
 import { S3 } from "@/lib/s3Client";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
         const aj = arcjet
             .withRule(
@@ -16,10 +17,13 @@ import { NextResponse } from "next/server";
 
 export async function DELETE(request: Request) {
 
-    const session = await requireAdminAPI();
+    // Check if user is authenticated (not just admin)
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
 
-    if (!session) {
-        return NextResponse.json({ error: "Unauthorized. Admin access required." }, { status: 401 });
+    if (!session?.user) {
+        return NextResponse.json({ error: "Unauthorized. Please login to delete files." }, { status: 401 });
     }
 
     try {
@@ -28,7 +32,7 @@ export async function DELETE(request: Request) {
         const key = body.key;
 
         const decision = await aj.protect(request, {
-            fingerprint: session?.user.id as string,
+            fingerprint: session.user.id as string,
         });
         
         if (decision.isDenied()) {
