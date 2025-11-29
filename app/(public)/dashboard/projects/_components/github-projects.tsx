@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Star, 
-  GitFork, 
-  Eye, 
-  ExternalLink, 
-  Calendar, 
-  Code2, 
+import {
+  Star,
+  GitFork,
+  ExternalLink,
+  Calendar,
+  Code2,
   Github,
   AlertCircle,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { getUserGitHubRepos } from "../actions";
 import Link from "next/link";
@@ -40,7 +45,10 @@ interface GitHubRepo {
 export function GitHubProjects() {
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [allRepos, setAllRepos] = useState<GitHubRepo[]>([]);
-  const [user, setUser] = useState<{ name: string; githubUsername: string } | null>(null);
+  const [user, setUser] = useState<{
+    name: string;
+    githubUsername: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForked, setShowForked] = useState(false);
@@ -49,7 +57,7 @@ export function GitHubProjects() {
     async function loadRepos() {
       try {
         const result = await getUserGitHubRepos();
-        
+
         if (result.status === "error") {
           setError(result.message);
         } else {
@@ -58,7 +66,10 @@ export function GitHubProjects() {
           setRepos(result.data.repos);
         }
       } catch (err) {
-        setError("Failed to load repositories: " + (err instanceof Error ? err.message : String(err)));
+        setError(
+          "Failed to load repositories: " +
+            (err instanceof Error ? err.message : String(err))
+        );
       } finally {
         setLoading(false);
       }
@@ -69,10 +80,10 @@ export function GitHubProjects() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { 
-      year: "numeric", 
-      month: "short", 
-      day: "numeric" 
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
@@ -102,7 +113,9 @@ export function GitHubProjects() {
       <div className="flex items-center justify-center py-12">
         <div className="text-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Loading your GitHub repositories...</p>
+          <p className="text-muted-foreground">
+            Loading your GitHub repositories...
+          </p>
         </div>
       </div>
     );
@@ -134,33 +147,49 @@ export function GitHubProjects() {
               <Github className="h-8 w-8 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="font-semibold text-lg mb-2">No Public Repositories Found</h3>
+              <h3 className="font-semibold text-lg mb-2">
+                No Public Repositories Found
+              </h3>
               <p className="text-muted-foreground max-w-md mx-auto">
                 No public repositories found for @{user?.githubUsername}.
               </p>
               <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg text-sm text-left max-w-md mx-auto space-y-3">
                 <div>
-                  <p className="font-semibold mb-2">⏱️ Just made a repo public?</p>
+                  <p className="font-semibold mb-2">
+                    ⏱️ Just made a repo public?
+                  </p>
                   <p className="text-muted-foreground">
-                    GitHub's API can take <strong>5-30 minutes</strong> to update after changing repository visibility. Try the refresh button in a few minutes.
+                    GitHub's API can take <strong>5-30 minutes</strong> to
+                    update after changing repository visibility. Try the refresh
+                    button in a few minutes.
                   </p>
                 </div>
                 <div>
-                  <p className="font-semibold mb-2">📌 To make a repository public:</p>
+                  <p className="font-semibold mb-2">
+                    📌 To make a repository public:
+                  </p>
                   <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
                     <li>Go to your repository on GitHub</li>
-                    <li>Click <strong>Settings</strong> tab</li>
-                    <li>Scroll to <strong>Danger Zone</strong></li>
-                    <li>Click <strong>Change visibility</strong></li>
-                    <li>Select <strong>Make public</strong></li>
+                    <li>
+                      Click <strong>Settings</strong> tab
+                    </li>
+                    <li>
+                      Scroll to <strong>Danger Zone</strong>
+                    </li>
+                    <li>
+                      Click <strong>Change visibility</strong>
+                    </li>
+                    <li>
+                      Select <strong>Make public</strong>
+                    </li>
                   </ol>
                 </div>
               </div>
             </div>
             <Button asChild variant="outline">
-              <a 
-                href={`https://github.com/${user?.githubUsername}`} 
-                target="_blank" 
+              <a
+                href={`https://github.com/${user?.githubUsername}`}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="gap-2"
               >
@@ -180,17 +209,22 @@ export function GitHubProjects() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <p className="text-sm text-muted-foreground">
-            Showing {showForked ? allRepos.length : repos.length} repositor{(showForked ? allRepos.length : repos.length) === 1 ? "y" : "ies"} from
+            Showing {showForked ? allRepos.length : repos.length} repositor
+            {(showForked ? allRepos.length : repos.length) === 1 ? "y" : "ies"}{" "}
+            from
           </p>
-          <Button asChild variant="link" className="p-0 h-auto font-semibold text-base">
-            <a 
+          <Button
+            asChild
+            variant="link"
+            className="p-0 h-auto font-semibold text-base"
+          >
+            <a
               href={`https://github.com/${user?.githubUsername}`}
               target="_blank"
               rel="noopener noreferrer"
               className="gap-2"
             >
-              <Github className="h-4 w-4" />
-              @{user?.githubUsername}
+              <Github className="h-4 w-4" />@{user?.githubUsername}
               <ExternalLink className="h-3 w-3" />
             </a>
           </Button>
@@ -198,14 +232,17 @@ export function GitHubProjects() {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            className="cursor-pointer"
             size="sm"
             onClick={() => setShowForked(!showForked)}
           >
-            {showForked ? "Hide" : "Show"} Forked ({allRepos.length - repos.length})
+            {showForked ? "Hide" : "Show"} Forked (
+            {allRepos.length - repos.length})
           </Button>
           <Button
             variant="outline"
             size="sm"
+            className="cursor-pointer"
             onClick={() => {
               setLoading(true);
               setError(null);
@@ -221,7 +258,10 @@ export function GitHubProjects() {
       {/* Repository Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {(showForked ? allRepos : repos).map((repo) => (
-          <Card key={repo.id} className="flex flex-col hover:shadow-lg transition-shadow">
+          <Card
+            key={repo.id}
+            className="flex flex-col hover:shadow-lg transition-shadow"
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -252,9 +292,9 @@ export function GitHubProjects() {
               {repo.topics && repo.topics.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {repo.topics.slice(0, 3).map((topic) => (
-                    <Badge 
-                      key={topic} 
-                      variant="outline" 
+                    <Badge
+                      key={topic}
+                      variant="outline"
                       className="text-xs px-2 py-0"
                     >
                       {topic}
@@ -272,7 +312,11 @@ export function GitHubProjects() {
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 {repo.language && (
                   <div className="flex items-center gap-1.5">
-                    <div className={`w-3 h-3 rounded-full ${getLanguageColor(repo.language)}`} />
+                    <div
+                      className={`w-3 h-3 rounded-full ${getLanguageColor(
+                        repo.language
+                      )}`}
+                    />
                     <span className="text-xs">{repo.language}</span>
                   </div>
                 )}

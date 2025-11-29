@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +57,12 @@ export default function QuizProctorInterface({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tabSwitches, setTabSwitches] = useState(0);
   const [showWarning, setShowWarning] = useState(false);
+  const [showFullscreenWarning, setShowFullscreenWarning] = useState(false);
+  const [fullscreenWarningTimer, setFullscreenWarningTimer] = useState(10);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [blockedMessageTimer, setBlockedMessageTimer] = useState(5);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const blockedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(quiz.duration * 60); // Convert minutes to seconds
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -289,41 +294,105 @@ export default function QuizProctorInterface({
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
       
-      if (!document.fullscreenElement && currentStep === 'quiz-started' && !isBlocked) {
-        setTabSwitches(prev => {
-          const newCount = prev + 1;
-          
-          if (newCount >= 3) {
-            // Third strike - block the quiz
+      if (!document.fullscreenElement && currentStep === 'quiz-started' && !isBlocked && !showFullscreenWarning) {
+        // Show the warning modal with countdown
+        setShowFullscreenWarning(true);
+        setFullscreenWarningTimer(10);
+      } else if (document.fullscreenElement && showFullscreenWarning) {
+        // User returned to fullscreen - clear warning and timer
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+        setShowFullscreenWarning(false);
+        setFullscreenWarningTimer(10);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [currentStep, isBlocked, showFullscreenWarning]);
+
+  // Handle fullscreen warning countdown
+  useEffect(() => {
+    if (showFullscreenWarning && fullscreenWarningTimer > 0) {
+      countdownIntervalRef.current = setInterval(() => {
+        setFullscreenWarningTimer((prev) => {
+          if (prev <= 1) {
+            // Time's up - block the user
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
+            
+            setTabSwitches(prevCount => prevCount + 1);
             setIsBlocked(true);
-            setShowWarning(true);
+            setShowFullscreenWarning(false);
+            setShowWarning(false);
+            setBlockedMessageTimer(5);
             
             // Call server action to record the block
             blockUserFromQuizAction({
               quizId: quiz.id,
               quizIdentifier: quiz.quizId,
-              reason: `Exceeded maximum violations (${newCount} fullscreen exits detected during quiz)`,
+              reason: `Failed to return to fullscreen within 10 seconds`,
               violationType: "FULLSCREEN_EXIT",
-              violationCount: newCount,
+              violationCount: 1,
             }).catch(error => {
               console.error("Failed to record quiz block:", error);
             });
-          } else {
-            // First and second warning
-            setShowWarning(true);
-            setTimeout(() => setShowWarning(false), 5000);
+            
+            return 0;
           }
-          
-          return newCount;
+          return prev - 1;
         });
+      }, 1000);
+    }
+
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
       }
     };
+  }, [showFullscreenWarning]);
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+  // Handle blocked message countdown and auto-close
+  useEffect(() => {
+    if (isBlocked && blockedMessageTimer > 0) {
+      blockedTimerRef.current = setInterval(() => {
+        setBlockedMessageTimer((prev) => {
+          if (prev <= 1) {
+            if (blockedTimerRef.current) {
+              clearInterval(blockedTimerRef.current);
+              blockedTimerRef.current = null;
+            }
+            // Close the window after countdown
+            setTimeout(() => {
+              if (window.opener && !window.opener.closed) {
+                window.opener.location.href = '/dashboard/quizzes';
+                window.close();
+              } else {
+                window.location.href = '/dashboard/quizzes';
+              }
+            }, 100);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      if (blockedTimerRef.current) {
+        clearInterval(blockedTimerRef.current);
+        blockedTimerRef.current = null;
+      }
     };
-  }, [currentStep, isBlocked]);
+  }, [isBlocked]);
 
   const handleStartQuiz = () => {
     enterFullscreen();
@@ -726,6 +795,62 @@ export default function QuizProctorInterface({
   // Step 3: Quiz Started
   return (
     <div className="min-h-screen bg-background">
+      {/* Fullscreen Exit Warning Modal */}
+      {showFullscreenWarning && !isBlocked && (
+        <div className="fixed inset-0 bg-black/95 z-60 flex items-center justify-center p-4">
+          <Card className="max-w-md w-full border-destructive border-2 shadow-2xl">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3 text-destructive">
+                <AlertTriangle className="h-6 w-6 animate-pulse" />
+                <CardTitle className="text-lg">Fullscreen Mode Exited!</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Countdown Timer */}
+              <Alert variant="destructive" className="border-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    <AlertDescription className="text-sm font-semibold m-0">
+                      Return to fullscreen in:
+                    </AlertDescription>
+                  </div>
+                  <div className="flex items-center gap-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-md">
+                    <Timer className="h-4 w-4" />
+                    <span className="text-2xl font-bold tabular-nums">
+                      {fullscreenWarningTimer}s
+                    </span>
+                  </div>
+                </div>
+              </Alert>
+
+              <div className="p-3 bg-muted rounded-lg text-xs space-y-1">
+                <p className="font-semibold text-destructive">⚠️ If timer reaches 0:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-muted-foreground ml-2">
+                  <li>Quiz will be blocked immediately</li>
+                  <li>Violation reported to admin</li>
+                  <li>Need admin approval to continue</li>
+                </ul>
+              </div>
+
+              {/* Action Button */}
+              <Button
+                onClick={enterFullscreen}
+                className="w-full bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                size="lg"
+              >
+                <Eye className="h-5 w-5 mr-2" />
+                Enter Fullscreen Now
+              </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                Or press <kbd className="px-1.5 py-0.5 bg-muted rounded border text-xs">F11</kbd>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Blocked Screen Overlay */}
       {isBlocked && (
         <div className="fixed inset-0 bg-black/90 z-100 flex items-center justify-center p-4">
@@ -740,15 +865,16 @@ export default function QuizProctorInterface({
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="text-base">
-                  Your quiz has been blocked due to multiple violations of exam rules.
+                  Your quiz has been blocked due to violation of exam rules.
                 </AlertDescription>
               </Alert>
               
               <div className="space-y-2">
-                <p className="font-semibold">Violations Detected:</p>
+                <p className="font-semibold">Violation Details:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                  <li>Tab switching: {tabSwitches} time{tabSwitches !== 1 ? 's' : ''}</li>
-                  <li>You were warned {tabSwitches - 1} time{tabSwitches - 1 !== 1 ? 's' : ''} before blocking</li>
+                  <li>Failed to return to fullscreen mode within the allowed time</li>
+                  <li>Total violations recorded: {tabSwitches}</li>
+                  <li>The violation has been reported to administrators</li>
                 </ul>
               </div>
 
@@ -757,11 +883,19 @@ export default function QuizProctorInterface({
                   <strong>What happens now?</strong>
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Your quiz attempt has been terminated and the violations have been recorded. 
+                  Your quiz attempt has been terminated and the violation has been recorded. 
                   The administrators have been notified and will review your case. 
-                  Please contact your instructor or administrator for further instructions.
+                  You must contact your instructor or administrator to unblock your quiz access.
                 </p>
               </div>
+
+              {/* Auto-close timer */}
+              <Alert className="border-primary">
+                <Clock className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  Window will close automatically in <strong>{blockedMessageTimer} second{blockedMessageTimer !== 1 ? 's' : ''}</strong>
+                </AlertDescription>
+              </Alert>
 
               <div className="text-center pt-4">
                 <CloseWindowButton
@@ -770,7 +904,7 @@ export default function QuizProctorInterface({
                   className="w-full"
                   size="lg"
                 >
-                  Close Quiz Window
+                  Close Now
                 </CloseWindowButton>
               </div>
             </CardContent>

@@ -80,6 +80,7 @@ export default function EditQuizForm({ quiz }: EditQuizFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [setQuestions, setSetQuestions] = useState<Record<string, any[]>>({});
+  const [textareaValues, setTextareaValues] = useState<Record<string, string>>({});
   const [currentSet, setCurrentSet] = useState("A");
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
@@ -108,23 +109,30 @@ export default function EditQuizForm({ quiz }: EditQuizFormProps) {
       try {
         const parsedQuestions = JSON.parse(quiz.questionsJson);
         const initialQuestions: Record<string, any[]> = {};
+        const initialTextareas: Record<string, string> = {};
         
         if (typeof parsedQuestions === 'object' && !Array.isArray(parsedQuestions)) {
           // Initialize all sets based on quiz.sets
           for (let i = 0; i < quiz.sets; i++) {
             const setLetter = String.fromCharCode(65 + i);
             initialQuestions[setLetter] = parsedQuestions[setLetter] || [];
+            initialTextareas[setLetter] = parsedQuestions[setLetter] 
+              ? JSON.stringify(parsedQuestions[setLetter], null, 2)
+              : "";
           }
         } else if (Array.isArray(parsedQuestions)) {
           // Convert array to set A
           initialQuestions.A = parsedQuestions;
+          initialTextareas.A = JSON.stringify(parsedQuestions, null, 2);
           for (let i = 1; i < quiz.sets; i++) {
             const setLetter = String.fromCharCode(65 + i);
             initialQuestions[setLetter] = [];
+            initialTextareas[setLetter] = "";
           }
         }
         
         setSetQuestions(initialQuestions);
+        setTextareaValues(initialTextareas);
         setIsInitialized(true);
       } catch (error) {
         console.error("Error parsing questions:", error);
@@ -140,15 +148,19 @@ export default function EditQuizForm({ quiz }: EditQuizFormProps) {
     if (isInitialized) {
       const sets = watchSets;
       const newSetQuestions: Record<string, any[]> = {};
+      const newTextareas: Record<string, string> = {};
       for (let i = 0; i < sets; i++) {
         const setLetter = String.fromCharCode(65 + i);
         if (setQuestions[setLetter]) {
           newSetQuestions[setLetter] = setQuestions[setLetter];
+          newTextareas[setLetter] = textareaValues[setLetter] || "";
         } else {
           newSetQuestions[setLetter] = [];
+          newTextareas[setLetter] = "";
         }
       }
       setSetQuestions(newSetQuestions);
+      setTextareaValues(newTextareas);
       setCurrentSet("A");
     }
   }, [watchSets, isInitialized]);
@@ -184,6 +196,10 @@ export default function EditQuizForm({ quiz }: EditQuizFormProps) {
       setSetQuestions(prev => ({
         ...prev,
         [setLetter]: parsed
+      }));
+      setTextareaValues(prev => ({
+        ...prev,
+        [setLetter]: JSON.stringify(parsed, null, 2)
       }));
       setJsonError(null);
       toast.success(`Questions updated for Set ${setLetter}`);
@@ -473,9 +489,12 @@ export default function EditQuizForm({ quiz }: EditQuizFormProps) {
                           rows={12}
                           className="font-mono text-sm"
                           key={`questions-textarea-${setLetter}`}
-                          value={setQuestions[setLetter]?.length > 0 ? JSON.stringify(setQuestions[setLetter], null, 2) : ""}
+                          value={textareaValues[setLetter] || ""}
                           onChange={(e) => {
-                            // Allow editing but don't update state until "Update Questions" is clicked
+                            setTextareaValues(prev => ({
+                              ...prev,
+                              [setLetter]: e.target.value
+                            }));
                           }}
                           id={`questions-${setLetter}`}
                         />
@@ -484,8 +503,7 @@ export default function EditQuizForm({ quiz }: EditQuizFormProps) {
                           <Button
                             type="button"
                             onClick={() => {
-                              const textarea = document.getElementById(`questions-${setLetter}`) as HTMLTextAreaElement;
-                              validateAndUpdateSet(textarea.value, setLetter);
+                              validateAndUpdateSet(textareaValues[setLetter] || "", setLetter);
                             }}
                             variant="secondary"
                             className="flex-1"
