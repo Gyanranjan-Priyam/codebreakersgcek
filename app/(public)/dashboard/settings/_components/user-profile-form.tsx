@@ -512,7 +512,7 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
           <Button 
             type="submit" 
             disabled={pending} 
-            className="w-full sm:w-auto min-w-40 h-10 text-sm"
+            className="w-full sm:w-auto min-w-40 h-10 text-sm cursor-pointer"
           >
             {pending ? (
               <>

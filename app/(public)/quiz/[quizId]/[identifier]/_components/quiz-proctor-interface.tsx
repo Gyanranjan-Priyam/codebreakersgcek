@@ -824,6 +824,7 @@ export default function QuizProctorInterface({
                 variant="ghost"
                 size="sm"
                 onClick={isFullscreen ? exitFullscreen : enterFullscreen}
+                className="cursor-pointer"
               >
                 {isFullscreen ? (
                   <><EyeOff className="h-4 w-4 mr-2" />Exit Fullscreen</>
@@ -933,6 +934,7 @@ export default function QuizProctorInterface({
                       disabled={currentQuestionIndex === 0}
                       variant="outline"
                       size="lg"
+                      className="cursor-pointer"
                     >
                       ← Previous
                     </Button>
@@ -946,7 +948,7 @@ export default function QuizProctorInterface({
                         onClick={handleSubmitQuiz}
                         disabled={Object.keys(answers).length !== questions.length || isSubmitting}
                         size="lg"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-green-600 hover:bg-green-700 cursor-pointer"
                       >
                         {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
                       </Button>
@@ -954,6 +956,7 @@ export default function QuizProctorInterface({
                       <Button
                         onClick={handleNextQuestion}
                         size="lg"
+                        className="cursor-pointer"
                       >
                         Next →
                       </Button>
@@ -981,10 +984,10 @@ export default function QuizProctorInterface({
                         className={`
                           aspect-square rounded-lg border-2 font-semibold text-sm transition-all
                           ${currentQuestionIndex === index
-                            ? 'border-primary bg-primary text-primary-foreground'
+                            ? 'border-primary bg-primary text-primary-foreground cursor-pointer'
                             : answers[index] !== undefined
-                            ? 'border-green-600 bg-green-600/10 text-green-600'
-                            : 'border-muted hover:border-muted-foreground/50'
+                            ? 'border-green-600 bg-green-600/10 text-green-600 cursor-pointer'
+                            : 'border-muted hover:border-muted-foreground/50 cursor-pointer'
                           }
                         `}
                       >
@@ -1012,7 +1015,7 @@ export default function QuizProctorInterface({
                     <Button
                       onClick={handleSubmitQuiz}
                       disabled={Object.keys(answers).length !== questions.length || isSubmitting}
-                      className="w-full bg-green-600 hover:bg-green-700"
+                      className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
                       size="sm"
                     >
                       {isSubmitting ? 'Submitting...' : 'Submit Quiz'}

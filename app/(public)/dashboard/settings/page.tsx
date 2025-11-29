@@ -216,13 +216,6 @@ export default async function SettingsPage() {
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 bg-primary rounded-full mt-2 shrink-0" />
               <span>
-                Team memberships and join requests will be updated with your new
-                information
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="w-1.5 h-1.5 bg-primary rounded-full mt-2 shrink-0" />
-              <span>
                 Profile images are stored securely and are only visible to event
                 organizers
               </span>

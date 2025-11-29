@@ -118,7 +118,7 @@ export function LinkedAccountsSection({ githubUsername }: LinkedAccountsSectionP
                   size="sm"
                   onClick={handleUnlinkGithub}
                   disabled={isUnlinking}
-                  className="text-xs"
+                  className="text-xs cursor-pointer"
                 >
                   {isUnlinking ? (
                     <>
@@ -138,7 +138,7 @@ export function LinkedAccountsSection({ githubUsername }: LinkedAccountsSectionP
                   size="sm"
                   onClick={handleLinkGithub}
                   disabled={isLinking}
-                  className="text-xs"
+                  className="text-xs cursor-pointer"
                 >
                   {isLinking ? (
                     <>

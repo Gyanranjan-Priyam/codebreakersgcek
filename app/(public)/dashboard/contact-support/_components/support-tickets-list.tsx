@@ -153,6 +153,7 @@ export default function SupportTicketsList() {
           size="sm"
           onClick={handleRefresh}
           disabled={refreshing}
+          className="cursor-pointer"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
@@ -242,12 +243,6 @@ export default function SupportTicketsList() {
                           Updated {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
                         </span>
                       </div>
-                      
-                      {/* Future: Add view details button */}
-                      {/* <Button variant="ghost" size="sm">
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        View Details
-                      </Button> */}
                     </div>
                   </div>
                 );
