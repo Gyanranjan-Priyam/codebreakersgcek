@@ -5,6 +5,7 @@ import QuizProctorInterface from "./_components/quiz-proctor-interface";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { CloseWindowButton } from "./_components/close-window-button";
 
 export default async function QuizProctorPage({ 
   params 
@@ -49,9 +50,13 @@ export default async function QuizProctorPage({
             </p>
           </div>
           <div className="space-y-3">
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/dashboard">Return to Dashboard</Link>
-            </Button>
+            <CloseWindowButton 
+              redirectTo="/dashboard" 
+              variant="outline" 
+              className="w-full"
+            >
+              Return to Dashboard
+            </CloseWindowButton>
             <Button asChild className="w-full">
               <Link href="/dashboard/contact-support">Contact Support</Link>
             </Button>
@@ -124,9 +129,13 @@ export default async function QuizProctorPage({
             </p>
           </div>
           <div className="space-y-3">
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/dashboard/quizzes">Back to Quizzes</Link>
-            </Button>
+            <CloseWindowButton 
+              redirectTo="/dashboard/quizzes" 
+              variant="outline" 
+              className="w-full"
+            >
+              Back to Quizzes
+            </CloseWindowButton>
             <Button asChild className="w-full">
               <Link href="/dashboard/contact-support">Contact Support</Link>
             </Button>

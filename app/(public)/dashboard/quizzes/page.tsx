@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, BookOpen, Play, CheckCircle2, Calendar, Lock, Timer, ShieldBan } from "lucide-react";
 import { getQuizzesData } from "./actions";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -25,6 +26,42 @@ export default function QuizzesPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBlockedDialog, setShowBlockedDialog] = useState(false);
+
+  // Poll for ban status changes every 5 seconds
+  useEffect(() => {
+    if (!user) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await getQuizzesData();
+        if (result.status === "success") {
+          const wasBanned = user.banned;
+          const isNowBanned = result.data.user.banned;
+          
+          // If ban status changed
+          if (wasBanned !== isNowBanned) {
+            setUser(result.data.user);
+            setQuizzes(result.data.quizzes);
+            setUserAttempts(result.data.attempts);
+            
+            if (isNowBanned) {
+              setShowBlockedDialog(true);
+              toast.error("You have been blocked from accessing quizzes");
+            } else {
+              setShowBlockedDialog(false);
+              toast.success("You have been unblocked! You can now access quizzes.");
+              // Refresh the router to update all server components
+              router.refresh();
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error polling ban status:", error);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [user, router]);
 
   // Update current time every second for countdown
   useEffect(() => {

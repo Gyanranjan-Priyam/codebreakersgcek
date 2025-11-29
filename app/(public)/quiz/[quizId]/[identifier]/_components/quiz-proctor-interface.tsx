@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, Phone, IdCard, Building2, BookOpen, Award, Timer, CheckCircle2 } from "lucide-react";
 import { submitQuizAttempt } from "../actions";
 import { blockUserFromQuizAction } from "../block-actions";
+import { CloseWindowButton } from "./close-window-button";
 
 interface Quiz {
   id: string;
@@ -692,16 +693,23 @@ export default function QuizProctorInterface({
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  onClick={() => window.close()}
+                <CloseWindowButton 
+                  redirectTo="/dashboard/quizzes"
                   variant="outline"
                   className="flex-1"
                   size="lg"
                 >
                   Close Window
-                </Button>
+                </CloseWindowButton>
                 <Button 
-                  onClick={() => window.location.href = '/dashboard/achievements'}
+                  onClick={() => {
+                    if (window.opener && !window.opener.closed) {
+                      window.opener.location.href = '/dashboard/achievements';
+                      window.close();
+                    } else {
+                      window.location.href = '/dashboard/achievements';
+                    }
+                  }}
                   className="flex-1"
                   size="lg"
                 >
@@ -756,13 +764,14 @@ export default function QuizProctorInterface({
               </div>
 
               <div className="text-center pt-4">
-                <Button 
-                  onClick={() => window.close()}
+                <CloseWindowButton
+                  redirectTo="/dashboard/quizzes"
                   variant="destructive"
+                  className="w-full"
                   size="lg"
                 >
                   Close Quiz Window
-                </Button>
+                </CloseWindowButton>
               </div>
             </CardContent>
           </Card>
