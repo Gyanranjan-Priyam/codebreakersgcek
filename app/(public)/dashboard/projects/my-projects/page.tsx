@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { GitHubProjects } from "./_components/github-projects";
 
 export const metadata: Metadata = {
-  title: "Projects",
+  title: "My Projects",
   description: "View your GitHub repositories and projects",
 };
 

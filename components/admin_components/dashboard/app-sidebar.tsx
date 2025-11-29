@@ -134,7 +134,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                     className="inline-block mr-2 mb-1"
                     priority
                   />
-                    CodeBreakers | GCEK
+                    CodeBreakers
                   </span>
                 </div>
               </Link>

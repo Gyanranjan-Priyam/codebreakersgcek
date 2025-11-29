@@ -19,6 +19,8 @@ import {
   Github,
   AlertCircle,
   Loader2,
+  Grid3x3,
+  List,
 } from "lucide-react";
 import { getUserGitHubRepos } from "../actions";
 import Link from "next/link";
@@ -52,6 +54,7 @@ export function GitHubProjects() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForked, setShowForked] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
     async function loadRepos() {
@@ -216,7 +219,7 @@ export function GitHubProjects() {
           <Button
             asChild
             variant="link"
-            className="p-0 h-auto font-semibold text-base"
+            className="p-0 h-auto font-semibold text-base mt-2"
           >
             <a
               href={`https://github.com/${user?.githubUsername}`}
@@ -230,6 +233,24 @@ export function GitHubProjects() {
           </Button>
         </div>
         <div className="flex gap-2">
+          <div className="flex border rounded-md">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="rounded-r-none cursor-pointer"
+              onClick={() => setViewMode("grid")}
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              className="rounded-l-none cursor-pointer"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
           <Button
             variant="outline"
             className="cursor-pointer"
@@ -255,9 +276,10 @@ export function GitHubProjects() {
         </div>
       </div>
 
-      {/* Repository Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {(showForked ? allRepos : repos).map((repo) => (
+      {/* Repository Grid View */}
+      {viewMode === "grid" && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {(showForked ? allRepos : repos).map((repo) => (
           <Card
             key={repo.id}
             className="flex flex-col hover:shadow-lg transition-shadow"
@@ -365,8 +387,118 @@ export function GitHubProjects() {
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* Repository List View */}
+      {viewMode === "list" && (
+        <div className="space-y-3">
+          {(showForked ? allRepos : repos).map((repo) => (
+            <Card key={repo.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <a
+                            href={repo.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-primary font-semibold text-lg flex items-center gap-2"
+                          >
+                            <Code2 className="h-5 w-5 shrink-0" />
+                            <span className="truncate">{repo.name}</span>
+                          </a>
+                          {repo.visibility === "private" && (
+                            <Badge variant="secondary" className="text-xs">
+                              Private
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {repo.description || "No description provided"}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button asChild size="sm" variant="outline">
+                          <a
+                            href={repo.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="gap-2"
+                          >
+                            <Github className="h-3.5 w-3.5" />
+                            Code
+                          </a>
+                        </Button>
+                        {repo.homepage && (
+                          <Button asChild size="sm">
+                            <a
+                              href={repo.homepage}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="gap-2"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              Demo
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6 flex-wrap">
+                      {repo.language && (
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className={`w-3 h-3 rounded-full ${
+                              getLanguageColor(repo.language)
+                            }`}
+                          />
+                          <span className="text-sm">{repo.language}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Star className="h-4 w-4" />
+                        <span>{repo.stargazers_count}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <GitFork className="h-4 w-4" />
+                        <span>{repo.forks_count}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>Updated {formatDate(repo.updated_at)}</span>
+                      </div>
+                    </div>
+
+                    {repo.topics && repo.topics.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {repo.topics.slice(0, 5).map((topic) => (
+                          <Badge
+                            key={topic}
+                            variant="outline"
+                            className="text-xs px-2 py-0.5"
+                          >
+                            {topic}
+                          </Badge>
+                        ))}
+                        {repo.topics.length > 5 && (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5">
+                            +{repo.topics.length - 5} more
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
