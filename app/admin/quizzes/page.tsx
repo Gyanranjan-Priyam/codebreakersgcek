@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, ShieldBan } from "lucide-react";
 import Link from "next/link";
 import { getAllQuizzes } from "./actions";
 import QuizzesTable from "./_components/quizzes-table";
@@ -34,12 +34,20 @@ export default async function AdminQuizzesPage() {
               View and manage all quizzes in the system
             </CardDescription>
           </div>
-          <Button asChild className="w-full sm:w-auto">
-            <Link href="/admin/quizzes/create">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Quiz
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+              <Link href="/admin/quizzes/blocked-members">
+                <ShieldBan className="h-4 w-4 mr-2" />
+                Blocked Members
+              </Link>
+            </Button>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/admin/quizzes/create">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Quiz
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <QuizzesTable quizzes={quizzes} />

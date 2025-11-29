@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, Phone, IdCard, Building2, BookOpen, Award, Timer, CheckCircle2 } from "lucide-react";
 import { submitQuizAttempt } from "../actions";
+import { blockUserFromQuizAction } from "../block-actions";
 
 interface Quiz {
   id: string;
@@ -197,6 +198,17 @@ export default function QuizProctorInterface({
             // Third strike - block the quiz
             setIsBlocked(true);
             setShowWarning(true);
+            
+            // Call server action to record the block
+            blockUserFromQuizAction({
+              quizId: quiz.id,
+              quizIdentifier: quiz.quizId,
+              reason: `Exceeded maximum violations (${newCount} tab switches/visibility changes detected during quiz)`,
+              violationType: "TAB_SWITCH",
+              violationCount: newCount,
+            }).catch(error => {
+              console.error("Failed to record quiz block:", error);
+            });
           } else {
             // First and second warning
             setShowWarning(true);
@@ -284,6 +296,17 @@ export default function QuizProctorInterface({
             // Third strike - block the quiz
             setIsBlocked(true);
             setShowWarning(true);
+            
+            // Call server action to record the block
+            blockUserFromQuizAction({
+              quizId: quiz.id,
+              quizIdentifier: quiz.quizId,
+              reason: `Exceeded maximum violations (${newCount} fullscreen exits detected during quiz)`,
+              violationType: "FULLSCREEN_EXIT",
+              violationCount: newCount,
+            }).catch(error => {
+              console.error("Failed to record quiz block:", error);
+            });
           } else {
             // First and second warning
             setShowWarning(true);
@@ -727,6 +750,7 @@ export default function QuizProctorInterface({
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
                   Your quiz attempt has been terminated and the violations have been recorded. 
+                  The administrators have been notified and will review your case. 
                   Please contact your instructor or administrator for further instructions.
                 </p>
               </div>

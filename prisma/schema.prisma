@@ -434,3 +434,20 @@ model QuizAttempt {
   @@unique([quizId, userId, setNumber])
   @@map("quiz_attempt")
 }
+
+model QuizBlock {
+  id              String   @id @default(cuid())
+  quizId          String
+  userId          String
+  reason          String   @db.Text // Reason for blocking (e.g., "Multiple violations detected")
+  violationType   String   // Type of violation (e.g., "TAB_SWITCH", "FULLSCREEN_EXIT")
+  violationCount  Int      @default(0) // Number of violations before block
+  blockedAt       DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([quizId, userId])
+  @@index([userId])
+  @@index([quizId])
+  @@map("quiz_block")
+}

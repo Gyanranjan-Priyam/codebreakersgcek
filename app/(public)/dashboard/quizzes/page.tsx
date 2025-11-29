@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, BookOpen, Play, CheckCircle2, Calendar, Lock, Timer } from "lucide-react";
+import { Clock, BookOpen, Play, CheckCircle2, Calendar, Lock, Timer, ShieldBan } from "lucide-react";
 import { getQuizzesData } from "./actions";
 import { useRouter } from "next/navigation";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function QuizzesPage() {
   const router = useRouter();
@@ -16,6 +24,7 @@ export default function QuizzesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showBlockedDialog, setShowBlockedDialog] = useState(false);
 
   // Update current time every second for countdown
   useEffect(() => {
@@ -41,6 +50,11 @@ export default function QuizzesPage() {
           setUser(result.data.user);
           setQuizzes(result.data.quizzes);
           setUserAttempts(result.data.attempts);
+          
+          // Check if user is banned
+          if (result.data.user.banned) {
+            setShowBlockedDialog(true);
+          }
         }
       } catch (err) {
         setError("An error occurred while loading quizzes");
@@ -263,6 +277,11 @@ export default function QuizzesPage() {
                       ) : (
                         <Button 
                           onClick={() => {
+                            // Check if user is banned before opening quiz
+                            if (user?.banned) {
+                              setShowBlockedDialog(true);
+                              return;
+                            }
                             const identifier = (user as any).registration || (user as any).username || user.id;
                             const url = `/quiz/${quiz.quizId}/${identifier}`;
                             window.open(
@@ -285,6 +304,56 @@ export default function QuizzesPage() {
           })}
         </div>
       )}
+
+      {/* Blocked User Dialog */}
+      <AlertDialog open={showBlockedDialog} onOpenChange={setShowBlockedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                <ShieldBan className="h-8 w-8 text-destructive" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-center text-xl">
+              Access Blocked
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center space-y-3">
+              <p className="text-base">
+                You have been blocked from accessing quizzes.
+              </p>
+              {user?.banReason && (
+                <div className="p-3 bg-destructive/10 rounded-lg">
+                  <p className="text-sm font-medium text-destructive mb-1">Reason:</p>
+                  <p className="text-sm text-foreground">{user.banReason}</p>
+                </div>
+              )}
+              {user?.banExpires && (
+                <p className="text-sm">
+                  Ban expires: {new Date(user.banExpires).toLocaleString()}
+                </p>
+              )}
+              <p className="text-sm pt-2">
+                Please contact the CodeBreakers coordinators for assistance.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowBlockedDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => router.push('/dashboard/contact-support')}
+              className="w-full sm:w-auto"
+            >
+              Contact Support
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

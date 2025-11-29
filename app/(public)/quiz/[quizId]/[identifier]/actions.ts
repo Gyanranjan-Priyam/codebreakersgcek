@@ -23,6 +23,14 @@ export async function submitQuizAttempt(data: SubmitQuizData) {
       };
     }
 
+    // Check if user is banned
+    if (user.banned) {
+      return {
+        status: "error" as const,
+        message: "You have been blocked from accessing quizzes. Please contact support.",
+      };
+    }
+
     // Get quiz and check availability
     const quiz = await prisma.quiz.findUnique({
       where: { id: data.quizDbId },
