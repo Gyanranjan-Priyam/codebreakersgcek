@@ -42,9 +42,9 @@ export const createPromotionalMessage = (eventUrl: string): string => {
 
 🔗 Event Page: ${eventUrl}
 
-🔗 Visit here: https://CodeBreakers.netlify.app/events
-🔗 For Registration Visit: https://registration-CodeBreakers.vercel.app
-📸 Instagram: https://www.instagram.com/gcek.CodeBreakers?igsh=MWdlMXFsdXh1OHZ6Mg==
+🔗 Visit here: https://codebreakersgcek.vercel.app
+🔗 For Registration Visit: https://codebreakersgcek.vercel.app
+📸 Instagram: https://www.instagram.com/codebreakersgcek
 
 Rulebook: https://drive.google.com/drive/folders/1sFeMzhfXp_6N6Ghe96mhLu4LC1sOYfBm?usp=sharing
 For queries contact:
