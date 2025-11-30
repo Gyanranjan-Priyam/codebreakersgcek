@@ -130,7 +130,7 @@ export default async function QuizProctorPage({
           </div>
           <div className="space-y-3">
             <CloseWindowButton 
-              redirectTo="/dashboard/quizzes" 
+              redirectTo="/dashboard/activities/quizzes" 
               variant="outline" 
               className="w-full"
             >
@@ -213,7 +213,7 @@ export default async function QuizProctorPage({
                 Close Window
               </Button>
               <Button 
-                onClick={() => window.location.href = `/dashboard/quizzes/results/${existingAttempt.id}`}
+                onClick={() => window.location.href = `/dashboard/activities/quizzes/results/${existingAttempt.id}`}
                 className="flex-1"
               >
                 View Results

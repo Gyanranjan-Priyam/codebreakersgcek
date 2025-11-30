@@ -65,7 +65,7 @@ export function DashboardStatsCards({ stats }: DashboardStatsCardsProps) {
             ? "These quizzes are active and within their scheduled time window. Take them now to test your knowledge and earn points based on your performance."
             : "No quizzes are currently active. New quizzes will be available according to the schedule.",
           actionLabel: stats.activeQuizzes > 0 ? "Take a Quiz" : "View All Quizzes",
-          actionHref: "/dashboard/quizzes",
+          actionHref: "/dashboard/activities/quizzes",
           tips: stats.activeQuizzes > 0 ? [
             "Quizzes may have time limits - be prepared",
             "Read questions carefully before answering",

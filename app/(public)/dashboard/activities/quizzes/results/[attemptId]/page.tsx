@@ -241,7 +241,7 @@ export default async function QuizResultsPage({
             className="w-full"
             size="lg"
           >
-            <Link href="/dashboard/quizzes">
+            <Link href="/dashboard/activities/quizzes">
               Back to Quizzes
             </Link>
           </Button>

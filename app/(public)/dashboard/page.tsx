@@ -268,7 +268,7 @@ export default async function UserDashboard() {
               </Button>
               
               <Button variant="ghost" className="w-full justify-start text-sm" asChild>
-                <Link href="/dashboard/quizzes">
+                <Link href="/dashboard/activities/quizzes">
                   <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
                   Take a Quiz
                 </Link>

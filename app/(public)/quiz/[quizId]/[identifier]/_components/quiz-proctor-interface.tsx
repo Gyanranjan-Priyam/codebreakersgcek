@@ -373,10 +373,10 @@ export default function QuizProctorInterface({
             // Close the window after countdown
             setTimeout(() => {
               if (window.opener && !window.opener.closed) {
-                window.opener.location.href = '/dashboard/quizzes';
+                window.opener.location.href = '/dashboard/activities/quizzes';
                 window.close();
               } else {
-                window.location.href = '/dashboard/quizzes';
+                window.location.href = '/dashboard/activities/quizzes';
               }
             }, 100);
             return 0;
@@ -763,7 +763,7 @@ export default function QuizProctorInterface({
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row gap-3">
                 <CloseWindowButton 
-                  redirectTo="/dashboard/quizzes"
+                  redirectTo="/dashboard/activities/quizzes"
                   variant="outline"
                   className="flex-1"
                   size="lg"
@@ -899,7 +899,7 @@ export default function QuizProctorInterface({
 
               <div className="text-center pt-4">
                 <CloseWindowButton
-                  redirectTo="/dashboard/quizzes"
+                  redirectTo="/dashboard/activities/quizzes"
                   variant="destructive"
                   className="w-full"
                   size="lg"

@@ -39,7 +39,7 @@ export async function blockUserFromQuiz(
 
     revalidatePath("/admin/quizzes/blocked-members");
     revalidatePath("/admin/members");
-    revalidatePath("/dashboard/quizzes");
+    revalidatePath("/dashboard/activities/quizzes");
     revalidatePath("/quiz");
 
     return {
@@ -85,7 +85,7 @@ export async function unblockUserFromQuiz(userId: string) {
 
     revalidatePath("/admin/quizzes/blocked-members");
     revalidatePath("/admin/members");
-    revalidatePath("/dashboard/quizzes");
+    revalidatePath("/dashboard/activities/quizzes");
     revalidatePath("/quiz");
 
     return {
@@ -143,7 +143,7 @@ export async function unblockUserFromSpecificQuiz(userId: string, quizId: string
 
     revalidatePath("/admin/quizzes/blocked-members");
     revalidatePath("/admin/members");
-    revalidatePath("/dashboard/quizzes");
+    revalidatePath("/dashboard/activities/quizzes");
     revalidatePath("/quiz");
 
     return {

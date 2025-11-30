@@ -63,7 +63,7 @@ export async function blockUserFromQuizAction(params: BlockUserFromQuizParams) {
 
     // Revalidate relevant paths
     revalidatePath("/admin/quizzes/blocked-members");
-    revalidatePath("/dashboard/quizzes");
+    revalidatePath("/dashboard/activities/quizzes");
     revalidatePath(`/quiz/${params.quizIdentifier}`);
 
     return {

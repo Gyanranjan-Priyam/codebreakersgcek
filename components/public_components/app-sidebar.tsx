@@ -10,6 +10,8 @@ import {
   Trophy,
   Code,
   FolderGit,
+  Activity,
+  ListChecks,
 } from "lucide-react";
 
 import { NavMain } from "@/components/public_components/nav-main";
@@ -46,9 +48,22 @@ const data = {
       icon: LayoutDashboard,
     },
     {
-      title: "Quizzes",
-      url: "/dashboard/quizzes",
-      icon: Calendar,
+      title: "Activities",
+      url: "#",
+      icon: Activity,
+      isCollapsible: true,
+      items: [
+        {
+          title: "Quizzes",
+          url: "/dashboard/activities/quizzes",
+          icon: Calendar,
+        },
+        {
+          title: "Tasks (Beta)",
+          url: "/dashboard/activities/tasks",
+          icon: ListChecks,
+        },
+      ],
     },
     {
       title: "Achievements",

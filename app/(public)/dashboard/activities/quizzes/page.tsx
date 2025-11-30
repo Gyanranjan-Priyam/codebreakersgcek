@@ -303,7 +303,7 @@ export default function QuizzesPage() {
                         <Button 
                           onClick={() => {
                             const attempt = attemptMap.get(quiz.id);
-                            router.push(`/dashboard/quizzes/results/${attempt.id}`);
+                            router.push(`/dashboard/activities/quizzes/results/${attempt.id}`);
                           }}
                           variant="outline"
                           className="w-full cursor-pointer sm:w-auto min-w-[140px]"
