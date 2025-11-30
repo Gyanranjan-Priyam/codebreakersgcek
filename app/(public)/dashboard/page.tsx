@@ -21,6 +21,7 @@ import { redirect } from "next/navigation";
 import { getUserDashboardData } from "./actions";
 import { DashboardStatsCards } from "./_components/dashboard-stats-cards";
 import { RecentActivities } from "./_components/recent-activities";
+import { AnnouncementBanner } from "./_components/announcement-banner";
 import { Progress } from "@/components/ui/progress";
 import type { Metadata } from "next";
 
@@ -57,7 +58,7 @@ export default async function UserDashboard() {
     );
   }
 
-  const { stats, recentActivities, user } = dashboardResult.data;
+  const { stats, recentActivities, bannerAnnouncements, user } = dashboardResult.data;
 
   // Get profile image URL - prioritize profileImageKey from S3
   const getProfileImageUrl = () => {
@@ -130,6 +131,11 @@ export default async function UserDashboard() {
 
   return (
     <div className="container mx-auto py-4 sm:py-6 space-y-6 sm:space-y-8 px-4 sm:px-6">
+      {/* Announcement Banner */}
+      {bannerAnnouncements && bannerAnnouncements.length > 0 && (
+        <AnnouncementBanner announcements={bannerAnnouncements} />
+      )}
+
       {/* Welcome Header */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

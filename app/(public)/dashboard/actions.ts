@@ -41,6 +41,7 @@ export async function getUserDashboardData() {
     // Parallel data fetching for performance
     const [
       announcements,
+      bannerAnnouncements,
       attendancePoints,
       taskSubmissions,
       eventParticipations,
@@ -57,40 +58,65 @@ export async function getUserDashboardData() {
         take: 5,
         where: { isDeleted: false }
       }),
-      // 2. Attendance Points
+      // 2. Banner Announcements
+      prisma.announcement.findMany({
+        where: {
+          isDeleted: false,
+          showInHomeBanner: true,
+          publishDate: { lte: new Date() },
+          OR: [
+            { expiryDate: null },
+            { expiryDate: { gte: new Date() } }
+          ]
+        },
+        orderBy: [
+          { isPinned: 'desc' },
+          { priority: 'desc' },
+          { publishDate: 'desc' }
+        ],
+        take: 3,
+        select: {
+          id: true,
+          slugId: true,
+          title: true,
+          priority: true,
+          isPinned: true
+        }
+      }),
+      // 3. Attendance Points
       prisma.attendance.aggregate({
         where: { userId, status: 'present' },
         _sum: { points: true }
       }),
-      // 3. Task Submissions (Points & Recent)
+      // 4. Task Submissions (Points & Recent)
       prisma.taskSubmission.findMany({
         where: { userId },
         include: { task: true },
         orderBy: { updatedAt: 'desc' },
         take: 5
       }),
-      // 4. Event Participations (Points & Recent)
+      // 5. Event Participations (Points & Recent)
       prisma.eventParticipation.findMany({
         where: { userId },
         include: { event: true },
         orderBy: { updatedAt: 'desc' },
         take: 5
       }),
-      // 5. Quiz Attempts (Points & Recent)
+      // 6. Quiz Attempts (Points & Recent)
       prisma.quizAttempt.findMany({
         where: { userId },
         include: { quiz: true },
         orderBy: { updatedAt: 'desc' },
         take: 5
       }),
-      // 6. Pending Tasks Count
+      // 7. Pending Tasks Count
       prisma.task.count({
         where: {
           dueDate: { gte: new Date() },
           submissions: { none: { userId } }
         }
       }),
-      // 7. Active Quizzes Count
+      // 8. Active Quizzes Count
       prisma.quiz.count({
         where: {
           isActive: true,
@@ -101,20 +127,20 @@ export async function getUserDashboardData() {
           attempts: { none: { userId } }
         }
       }),
-      // 8. Upcoming Events Count
+      // 9. Upcoming Events Count
       prisma.eventPoint.count({
         where: {
           eventDate: { gte: new Date() }
         }
       }),
-      // 9. Open Tickets Count
+      // 10. Open Tickets Count
       prisma.supportTicket.count({
         where: {
           userId,
           status: { in: ['OPEN', 'IN_PROGRESS'] }
         }
       }),
-      // 10. Recent Tickets
+      // 11. Recent Tickets
       prisma.supportTicket.findMany({
         where: { userId },
         orderBy: { updatedAt: 'desc' },
@@ -135,7 +161,7 @@ export async function getUserDashboardData() {
         id: `ann-${a.id}`,
         type: 'announcement' as const,
         title: a.title,
-        description: a.description.substring(0, 100), // Truncate if needed
+        description: '', // Removed description
         date: a.createdAt,
       })),
       ...taskSubmissions.map(t => ({
@@ -219,6 +245,7 @@ export async function getUserDashboardData() {
       data: {
         stats,
         recentActivities: activities,
+        bannerAnnouncements,
         user: userProfile || {
           name: session.user.name || "",
           email: session.user.email || "",
