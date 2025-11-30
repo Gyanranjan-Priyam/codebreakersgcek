@@ -16,7 +16,7 @@ function generateAnnouncementSlugId(category: string): string {
   // Format category (remove underscores, take first 3 chars)
   const categoryCode = category.replace(/_/g, '').substring(0, 3).toUpperCase();
   
-  return `INSP-ANC-${categoryCode}-GEN-${randomNum}`;
+  return `CBGCEK-ANC-${categoryCode}-GEN-${randomNum}`;
 }
 
 interface CreateAnnouncementResult {
