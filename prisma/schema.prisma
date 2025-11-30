@@ -331,6 +331,8 @@ model TaskSubmission {
   taskId         String
   userId         String
   status         String    // "pending", "submitted", "approved", "rejected"
+  projectUrl     String?   // GitHub repository or project URL
+  screenshotKey  String?   // S3 key for screenshot (max 100kb)
   submittedAt    DateTime?
   evaluatedAt    DateTime?
   evaluatedBy    String?   // Admin user ID who evaluated

@@ -13,7 +13,9 @@ import {
   Users,
   ChartColumnIncreasing,
   Trophy,
-  UserX
+  UserX,
+  Activity,
+  ListChecks
 } from "lucide-react"
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main"
@@ -59,9 +61,22 @@ const data = {
       icon: UserX,
     },
     {
-      title: "Quizzes",
-      url: "/admin/quizzes",
-      icon: Brain,
+      title: "Activities",
+      url: "#",
+      icon: Activity,
+      isCollapsible: true,
+      items: [
+        {
+          title: "Quizzes",
+          url: "/admin/quizzes",
+          icon: Brain,
+        },
+        {
+          title: "Tasks",
+          url: "/admin/tasks",
+          icon: ListChecks,
+        },
+      ],
     },
     {
       title: "Leaderboard",

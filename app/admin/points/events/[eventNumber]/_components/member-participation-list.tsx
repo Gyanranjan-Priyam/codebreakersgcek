@@ -376,10 +376,10 @@ export default function MemberParticipationList({
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEvalDialogOpen(false)}>
+            <Button className="cursor-pointer" variant="outline" onClick={() => setEvalDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmitEvaluation} disabled={evaluatingId !== null}>
+            <Button className="cursor-pointer" onClick={handleSubmitEvaluation} disabled={evaluatingId !== null}>
               {evaluatingId ? "Saving..." : "Save Evaluation"}
             </Button>
           </DialogFooter>

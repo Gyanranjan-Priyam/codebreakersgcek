@@ -199,7 +199,7 @@ export default async function UserDashboard() {
               </CardHeader>
               <CardContent>
                 <Button variant="secondary" size="sm" asChild>
-                  <Link href="/dashboard/tasks" className="flex items-center">
+                  <Link href="/dashboard/activities/tasks" className="flex items-center">
                     View Pending Tasks <ArrowRight className="ml-2 w-4 h-4" />
                   </Link>
                 </Button>

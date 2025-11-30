@@ -3,18 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Calendar, CheckSquare, Brain, Trophy } from "lucide-react";
 import CreateSessionDialog from "./attendance/_components/create-session-dialog";
 import SessionsTable from "./attendance/_components/sessions-table";
-import CreateTaskDialog from "./tasks/_components/create-task-dialog";
 import TasksTable from "./tasks/_components/tasks-table";
 import CreateEventDialog from "./events/_components/create-event-dialog";
 import EventsTable from "./events/_components/events-table";
 import QuizTable from "./quiz/_components/quiz-table";
 import { getAllAttendanceSessions } from "./attendance/actions";
-import { getAllTasks } from "./tasks/actions";
+import { getAllTasks } from "@/app/admin/tasks/actions";
 import { getAllEventPoints } from "./events/actions";
 import { getAllQuizzes } from "./quiz/actions";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import type { Metadata } from "next";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Points Management",
@@ -92,10 +93,14 @@ export default async function PointsPage() {
               <div className="space-y-1">
                 <CardTitle>Tasks</CardTitle>
                 <CardDescription>
-                  Create and manage tasks for members to earn points
+                  View all tasks. Manage tasks from the Tasks section.
                 </CardDescription>
               </div>
-              <CreateTaskDialog userId={session?.user.id || ""} />
+              <Button asChild>
+                <Link href="/admin/tasks">
+                  Manage Tasks
+                </Link>
+              </Button>
             </CardHeader>
             <CardContent>
               <TasksTable tasks={tasks} />
