@@ -345,6 +345,8 @@ export async function evaluateSubmission(
     });
 
     revalidatePath(`/admin/points`);
+    revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
 
     return {
       status: "success" as const,

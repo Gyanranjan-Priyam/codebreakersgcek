@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   description: "Track top performers based on attendance, tasks, events, and quiz points",
 };
 
+// Disable caching for this page to ensure leaderboard updates immediately
+export const dynamic = "force-dynamic";
+
 export default async function AdminLeaderboardPage() {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();

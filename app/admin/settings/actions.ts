@@ -254,8 +254,10 @@ export async function updateUserProfile(data: ProfileUpdateData) {
       },
     });
 
-    // Revalidate the settings page to show updated data
+    // Revalidate all paths where admin data is displayed
+    revalidatePath("/admin", "layout");
     revalidatePath("/admin/settings");
+    revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
 
     return {
       status: "success" as const,
@@ -298,8 +300,10 @@ export async function updateProfileImage(profileImageKey: string) {
       },
     });
 
-    // Revalidate the settings page
+    // Revalidate all paths where admin image is displayed
+    revalidatePath("/admin", "layout");
     revalidatePath("/admin/settings");
+    revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
 
     return {
       status: "success" as const,
@@ -337,8 +341,10 @@ export async function removeProfileImage() {
       },
     });
 
-    // Revalidate the settings page
+    // Revalidate all paths where admin image is displayed
+    revalidatePath("/admin", "layout");
     revalidatePath("/admin/settings");
+    revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
 
     return {
       status: "success" as const,

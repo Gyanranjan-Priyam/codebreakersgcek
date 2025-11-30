@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   description: "View top performers and your ranking based on points earned",
 };
 
+// Disable caching for this page to ensure leaderboard updates immediately
+export const dynamic = "force-dynamic";
+
 export default async function LeaderboardPage() {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();

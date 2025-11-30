@@ -282,6 +282,8 @@ export async function markAttendance(
     });
 
     revalidatePath(`/admin/points`);
+    revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
 
     return {
       status: "success" as const,

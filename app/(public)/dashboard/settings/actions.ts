@@ -186,9 +186,9 @@ export async function updateUserProfileData(data: UserProfileData) {
     }
 
     // Update user profile in a transaction
-    await prisma.$transaction(async (tx) => {
+    const updatedUser = await prisma.$transaction(async (tx) => {
       // Update user profile
-      await tx.user.update({
+      return await tx.user.update({
         where: { id: session.user.id },
         data: {
           name: validatedData.name,
@@ -235,8 +235,11 @@ export async function updateUserProfileData(data: UserProfileData) {
       // });
     });
 
-    // Revalidate the settings page to show updated data
+    // Revalidate all paths where user data is displayed
+    revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/settings");
+    revalidatePath("/leaderboard");
+    revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
 
     return {
       status: "success" as const,
@@ -278,8 +281,10 @@ export async function updateUserProfileImage(profileImageKey: string) {
       },
     });
 
-    // Revalidate the settings page
+    // Revalidate all paths where user image is displayed
+    revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/settings");
+    revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
 
     return {
       status: "success" as const,
@@ -317,8 +322,10 @@ export async function removeUserProfileImage() {
       },
     });
 
-    // Revalidate the settings page
+    // Revalidate all paths where user image is displayed
+    revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/settings");
+    revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
 
     return {
       status: "success" as const,

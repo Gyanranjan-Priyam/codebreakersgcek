@@ -163,6 +163,11 @@ export async function submitQuizAttempt(data: SubmitQuizData) {
       });
     }
 
+    // Revalidate leaderboard and dashboard to show updated points
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
+
     return {
       status: "success" as const,
       data: {
