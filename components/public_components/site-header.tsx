@@ -6,9 +6,9 @@ import { BackButton } from "@/components/ui/back-button"
 import { usePathname } from "next/navigation"
 import { useMemo } from "react"
 import { Bell } from "lucide-react";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { useNotification } from "./notification-context";
-import { Badge } from "../ui/badge";
+import { Badge } from "@/components/ui/badge";
 
 export function SiteHeader() {
   const pathname = usePathname();

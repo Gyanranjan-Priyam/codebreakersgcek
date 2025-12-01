@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import LenisProvider from "@/components/providers/lenis-provider";
 
 
 const sourceCodePro = Source_Code_Pro({
@@ -36,7 +37,9 @@ export default function RootLayout({
       <body
         className={` ${sourceCodePro.variable} antialiased`}
       >
-        {children}
+        <LenisProvider>
+          {children}
+        </LenisProvider>
         <Toaster position="top-center" richColors closeButton />
       </body>
     </html>

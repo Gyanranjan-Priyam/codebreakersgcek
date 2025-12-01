@@ -283,7 +283,7 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
         </CardHeader>
         <CardContent>
           <Button 
-            className="w-full" 
+            className="w-full cursor-pointer" 
             variant="outline"
             onClick={() => setIsEmailSidebarOpen(true)}
           >

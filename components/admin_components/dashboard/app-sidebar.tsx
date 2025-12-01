@@ -138,7 +138,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
               asChild
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
-              <Link href="/admin">
+              <Link href="/">
                 <div className="flex items-center">
                   <span className="text-[1.1rem] font-bold inline-flex items-center hover:text-amber-400">
                     <Image
