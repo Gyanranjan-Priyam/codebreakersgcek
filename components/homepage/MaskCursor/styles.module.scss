@@ -41,14 +41,29 @@
 
   // Media queries for responsiveness
   @media (max-width: 768px) {
+    height: auto;
+    min-height: 60vh;
+    padding: 2rem 0;
+    
     .mask, .body {
-      font-size: 5vw; // Larger font size for smaller screens
+      font-size: 5vw;
+      
+      p {
+        width: 95%;
+        padding: 1rem;
+      }
     }
   }
 
   @media (max-width: 480px) {
+    min-height: 50vh;
+    
     .mask, .body {
-      font-size: 6vw; // Even larger font size for very small screens
+      font-size: 6.5vw;
+      
+      p {
+        padding: 0.75rem;
+      }
     }
   }
 }

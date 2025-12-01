@@ -102,7 +102,7 @@ const Navbar = ({ user }: NavbarProps) => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="hidden md:flex items-center space-x-2 focus:outline-none">
+                <button className="hidden md:flex items-center space-x-2 focus:outline-none cursor-pointer">
                   <Avatar className="h-10 w-10 border-2 border-emerald-500/50 hover:border-emerald-500 transition-colors">
                     <AvatarImage src={user.image || undefined} alt={user.name} />
                     <AvatarFallback className="bg-emerald-500/10 text-emerald-400">

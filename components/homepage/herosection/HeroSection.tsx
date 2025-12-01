@@ -1,9 +1,9 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Vortex } from "../ui/vortex";
+import { Vortex } from "../../ui/vortex";
 import { motion } from "framer-motion";
 import { Code2, Terminal, GitBranch } from "lucide-react";
-import { FlipWords } from "../ui/flip-words";
+import { FlipWords } from "../../ui/flip-words";
 
 
 
@@ -25,25 +25,25 @@ const HeroSection: React.FC = () => {
         baseHue={120}
         className="absolute inset-0 flex items-center justify-center px-8 md:px-16"
       >
-        <div className="flex flex-col justify-center items-center space-y-4 md:space-y-8 md:w-[80%] lg:w-[60%] h-full z-10 text-center px-4">
+        <div className="flex flex-col justify-center items-center space-y-8 md:w-[60%] h-full z-10 text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20"
           >
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-xs md:text-sm text-emerald-400 font-medium">Now Accepting New Members</span>
+            <span className="text-sm text-emerald-400 font-medium">Now Accepting New Members</span>
           </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-xl sm:text-2xl md:text-3xl lg:text-5xl font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-100 via-white to-gray-100"
+            className="text-2xl md:text-2xl lg:text-5xl font-bold leading-tight md:leading-tight lg:leading-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-100 via-white to-gray-100"
           >
            <span>
             Code your <FlipWords words={words}/>into reality, with a community that inspires.
@@ -108,21 +108,21 @@ const HeroSection: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 0.9 }}
-            className="flex items-center gap-3 sm:gap-6 md:gap-8 mt-2 md:mt-4"
+            className="flex items-center gap-8 mt-4"
           >
             <div className="text-center">
-              <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white">500+</div>
-              <div className="text-[10px] sm:text-xs text-gray-400">Active Members</div>
+              <div className="text-2xl md:text-3xl font-bold text-white">500+</div>
+              <div className="text-xs text-gray-400">Active Members</div>
             </div>
-            <div className="h-6 sm:h-8 w-px bg-gray-700"></div>
+            <div className="h-8 w-px bg-gray-700"></div>
             <div className="text-center">
-              <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white">100+</div>
-              <div className="text-[10px] sm:text-xs text-gray-400">Projects Built</div>
+              <div className="text-2xl md:text-3xl font-bold text-white">100+</div>
+              <div className="text-xs text-gray-400">Projects Built</div>
             </div>
-            <div className="h-6 sm:h-8 w-px bg-gray-700"></div>
+            <div className="h-8 w-px bg-gray-700"></div>
             <div className="text-center">
-              <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white">50+</div>
-              <div className="text-[10px] sm:text-xs text-gray-400">Competitions</div>
+              <div className="text-2xl md:text-3xl font-bold text-white">50+</div>
+              <div className="text-xs text-gray-400">Competitions</div>
             </div>
           </motion.div>
         </div>

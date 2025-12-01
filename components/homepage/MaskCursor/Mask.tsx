@@ -10,10 +10,10 @@ export default function MaskEffect() {
   const size = isHovered ? 400 : 40;
 
   return (
-    <div className="hidden md:block bg-black">
+    <div className="bg-black">
       <main className={styles.main}>
         <motion.div
-          className={styles.mask}
+          className={`${styles.mask} hidden md:block`}
           animate={{
             WebkitMaskPosition: `${x - size / 2}px ${y - size / 2}px`,
             WebkitMaskSize: `${size}px`,

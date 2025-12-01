@@ -9,6 +9,7 @@
 
 .body{
   font-size: 5vw;
+  padding: 0 1rem;
 }
 
 .lineMask{
@@ -23,6 +24,21 @@
 
 @media (max-width: 768px) {
   .container {
-    display: none;
+    gap: 10vw;
+    margin-top: 100px;
+    margin-bottom: 100px;
+  }
+  
+  .body{
+    font-size: 6vw;
+    padding: 0 1.5rem;
+  }
+  
+  .lineMask {
+    margin-bottom: 2rem;
+  }
+  
+  .lineMask p {
+    line-height: 1.4;
   }
 }
