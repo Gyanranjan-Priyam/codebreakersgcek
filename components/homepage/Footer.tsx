@@ -84,7 +84,7 @@ export default function FooterSection() {
               <h3 className="text-sm font-semibold text-gray-400 tracking-wider">Community</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link href="#join" className="text-sm text-gray-400 hover:text-white transition-colors">
+                  <Link href="/login" className="text-sm text-gray-400 hover:text-white transition-colors">
                     Join the Club
                   </Link>
                 </li>
