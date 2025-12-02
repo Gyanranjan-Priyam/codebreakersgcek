@@ -24,7 +24,6 @@ interface AnnouncementData {
   createdBy: string;
 }
 
-// Fetch announcement data directly from database
 async function getAnnouncement(slugId: string): Promise<AnnouncementData | null> {
   try {
     const announcement = await prisma.announcement.findUnique({
@@ -54,7 +53,6 @@ async function getAnnouncement(slugId: string): Promise<AnnouncementData | null>
   }
 }
 
-// Priority styling
 function getPriorityStyles(priority: string) {
   switch (priority) {
     case "URGENT":
@@ -90,31 +88,24 @@ function getPriorityStyles(priority: string) {
   }
 }
 
-// Safe description renderer with better error handling
 function SafeDescriptionRenderer({ description }: { description: any }) {
-  // Handle string descriptions
   if (typeof description === 'string') {
     try {
-      // Try to parse as JSON if it's a string
       const parsed = JSON.parse(description);
       if (parsed && typeof parsed === 'object' && (parsed.type || parsed.content)) {
         return <RenderDescription json={parsed} />;
       }
     } catch {
-      // If parsing fails, treat as plain text
       return <p className="text-foreground">{description}</p>;
     }
     return <p className="text-foreground">{description}</p>;
   }
 
-  // Handle JSONContent objects
   if (description && typeof description === 'object') {
-    // Check if it's a valid TipTap JSONContent
     if (description.type || description.content) {
       return <RenderDescription json={description} />;
     }
     
-    // If it's an object but not valid JSONContent, try to extract text
     const textContent = JSON.stringify(description);
     return <p className="text-muted-foreground">Content format not supported: {textContent}</p>;
   }
@@ -122,7 +113,6 @@ function SafeDescriptionRenderer({ description }: { description: any }) {
   return <p className="text-muted-foreground">No description available</p>;
 }
 
-// Category display names
 function getCategoryDisplay(category: string) {
   const categoryMap: Record<string, string> = {
     GENERAL_ANNOUNCEMENT: "General",
@@ -150,24 +140,15 @@ export default async function AnnouncementPage({ params }: { params: Promise<{ s
   const PriorityIcon = priorityStyle.icon;
 
   return (
-    <div className="container mx-auto px-4 py-6 ">
+    <div className="container mx-auto px-4 py-6 bg-black">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1 items-center">
             <div className="flex items-center justify-between gap-2 mb-3">
-               <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
+               <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
               {announcement.title}
             </h1>
-            <div className="flex items-center gap-2 mb-3">
-              <Badge variant="outline" className={`text-xs ${priorityStyle.badge}`}>
-                <PriorityIcon className="h-3 w-3 mr-1" />
-                {announcement.priority}
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                {getCategoryDisplay(announcement.category)}
-              </Badge>
-            </div>
             </div>
 
           </div>
@@ -203,8 +184,8 @@ export default async function AnnouncementPage({ params }: { params: Promise<{ s
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Announcement Details</CardTitle>
+            <CardHeader className="flex flex-col items-center justify-center">
+              <CardTitle className="text-2xl">Announcement Details</CardTitle>
             </CardHeader>
             <Separator />
             <CardContent>

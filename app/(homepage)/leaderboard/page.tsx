@@ -26,8 +26,8 @@ export default async function LeaderboardPage() {
   const monthlyData = monthlyResult.status === "success" ? monthlyResult.data : [];
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <div>
+    <div className="min-h-svh bg-black flex flex-col gap-6 p-4 sm:p-6">
+      <div className="flex flex-col items-center justify-center">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
           Leaderboard
         </h1>
