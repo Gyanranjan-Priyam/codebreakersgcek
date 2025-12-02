@@ -61,6 +61,7 @@ export function PublishProjectDialog({ repo }: PublishProjectDialogProps) {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("type", "profile"); // Use S3 upload for project thumbnails
 
       const response = await fetch("/api/upload", {
         method: "POST",
