@@ -42,8 +42,8 @@ export const createPromotionalMessage = (eventUrl: string): string => {
 
 🔗 Event Page: ${eventUrl}
 
-🔗 Visit here: https://codebreakersgcek.vercel.app
-🔗 For Registration Visit: https://codebreakersgcek.vercel.app
+🔗 Visit here: https://www.codebreakersgcek.tech
+🔗 For Registration Visit: https://www.codebreakersgcek.tech
 📸 Instagram: https://www.instagram.com/codebreakersgcek
 
 Rulebook: https://drive.google.com/drive/folders/1sFeMzhfXp_6N6Ghe96mhLu4LC1sOYfBm?usp=sharing

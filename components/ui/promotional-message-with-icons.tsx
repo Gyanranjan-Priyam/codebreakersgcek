@@ -126,7 +126,7 @@ export const PromotionalMessageWithIcons: React.FC<PromotionalMessageProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <PromotionalIcons.link className="text-gray-600 flex-shrink-0" />
-          <span><strong>Registration:</strong> <a href="https://codebreakersgcek.vercel.app" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://codebreakersgcek.vercel.app</a></span>
+          <span><strong>Registration:</strong> <a href="https://www.codebreakersgcek.tech" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://www.codebreakersgcek.tech</a></span>
         </div>
         <div className="flex items-center gap-2">
           <PromotionalIcons.camera className="text-pink-600 flex-shrink-0" />
