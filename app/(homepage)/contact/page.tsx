@@ -105,30 +105,30 @@ export default function HomepageContactPage() {
                         <div>
                            <p className="text-sm text-gray-400">Secretary</p>
                            <a 
-                              href="tel:+919876543210" 
+                              href="tel:+911234567890" 
                               className="text-green-400 hover:text-green-300 transition-colors text-lg"
                            >
-                              +91 98765 43210
+                              +91 12345 67890
                            </a>
                         </div>
                         <Separator className="bg-zinc-800" />
                         <div>
                            <p className="text-sm text-gray-400">Assistant Secretary</p>
                            <a 
-                              href="tel:+919876543211" 
+                              href="tel:+911234567891" 
                               className="text-green-400 hover:text-green-300 transition-colors text-lg"
                            >
-                              +91 98765 43211
+                              +91 12345 67891
                            </a>
                         </div>
                         <Separator className="bg-zinc-800" />
                         <div>
                            <p className="text-sm text-gray-400">Treasurer</p>
                            <a 
-                              href="tel:+919876543212" 
+                              href="tel:+911234567892" 
                               className="text-green-400 hover:text-green-300 transition-colors text-lg"
                            >
-                              +91 98765 43212
+                              +91 12345 67892
                            </a>
                         </div>
                      </CardContent>
