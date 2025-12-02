@@ -1,9 +1,9 @@
 export const coreMembers = [
   {
     image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764686754/ypipjwmbsrgz4qtrwmru.jpg",
-    title: "Biswajit Podili",
+    title: "Podili Biswajit",
     subtitle: "Secretary",
-    handle: "@biswajitpodili",
+    handle: "@podilibiswajit",
     borderColor: "#3B82F6",
     gradient: "linear-gradient(145deg, #3B82F6, #000)",
     url: "https://www.biswajitpodili.dev/"
