@@ -67,6 +67,15 @@ export const coordinators = [
     url: "https://www.instagram.com/_krishidev_/"
   },
   {
+    image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764700931/wh9ovonm6ldlchkkbtgp.png",
+    title: "Neha Kumari Singh",
+    subtitle: "Event Coordinator",
+    handle: "@nehakumarisingh",
+    borderColor: "#10B981",
+    gradient: "linear-gradient(215deg,#06B6D4,#000)",
+    url: "https://www.linkedin.com/in/neha-kumari-singh-89385a24b?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app"
+  },
+  {
     image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764685797/hletmphai8dsegogthsy.jpg",
     title: "Gyanranjan Priyam",
     subtitle: "Event Coordinator",
