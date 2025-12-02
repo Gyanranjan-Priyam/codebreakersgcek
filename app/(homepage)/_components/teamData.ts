@@ -3,13 +3,13 @@ export const coreMembers = [
     image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764686754/ypipjwmbsrgz4qtrwmru.jpg",
     title: "Podili Biswajit",
     subtitle: "Secretary",
-    handle: "@podilibiswajit",
+    handle: "@biswajitpodili",
     borderColor: "#3B82F6",
     gradient: "linear-gradient(145deg, #3B82F6, #000)",
     url: "https://www.biswajitpodili.dev/"
   },
   {
-    image: "https://i.pravatar.cc/300?img=2",
+    image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764699535/iner68oti4yr5encnv1f.jpg",
     title: "Chayakanta Maharana",
     subtitle: "Assistant Secretary",
     handle: "@chayakanta",
@@ -31,13 +31,13 @@ export const coreMembers = [
 
 export const coordinators = [
    {
-    image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764688867/iks2wekxvo597alehwml.jpg",
+    image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764699685/dz9tw2fu2c4hknnx8m7b.jpg",
     title: "R. Pradyota Reddy",
     subtitle: "Motivator & Event Coordinator",
-    handle: "@mikechen",
+    handle: "@r.r.reddy",
     borderColor: "#10B981",
     gradient: "linear-gradient(180deg, #10B981, #000)",
-    url: "https://linkedin.com/in/mikechen"
+    url: "https://www.linkedin.com/in/r-pradyut-reddy-860563243?utm_source=share_via&utm_content=profile&utm_medium=member_android"
   },
    {
     image: "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764687665/f8n1tm3ay4gobmpr6car.jpg",
