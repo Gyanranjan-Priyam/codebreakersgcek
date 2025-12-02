@@ -66,6 +66,7 @@ model User {
   supportTickets  SupportTicket[]
   supportResponses SupportResponse[]
   adminResponses  SupportResponse[] @relation("AdminResponses")
+  publishedProjects PublishedProject[]
 
   @@unique([email])
   @@map("user")
@@ -452,4 +453,21 @@ model QuizBlock {
   @@index([userId])
   @@index([quizId])
   @@map("quiz_block")
+}
+
+model PublishedProject {
+  id              String   @id @default(cuid())
+  githubRepoId    Int      @unique // GitHub repository ID
+  title           String
+  description     String   @db.Text
+  techStack       String[] // Array of technologies
+  projectUrl      String?  // Optional live project URL
+  thumbnailKey    String   // S3 key for thumbnail image
+  publishedById   String   // Admin who published
+  publishedBy     User     @relation(fields: [publishedById], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([publishedById])
+  @@map("published_project")
 }

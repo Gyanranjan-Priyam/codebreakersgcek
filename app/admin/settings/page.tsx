@@ -6,11 +6,14 @@ import { ProfileForm } from "./_components/profile-form";
 import { ProfileImageUpload } from "./_components/profile-image-upload";
 import { RegistrationToggle } from "./_components/registration-toggle";
 import { DataCleanup } from "./_components/data-cleanup";
-import { getCurrentUserProfile, getRegistrationSetting } from "./actions";
+import { GitHubOrgSettings } from "./_components/github-org-settings";
+import { LinkedAccountsSection } from "./_components/linked-accounts-section";
+import { getCurrentUserProfile, getRegistrationSetting, getGitHubOrgSetting } from "./actions";
 
 export default async function AdminSettingsPage() {
   const profileResult = await getCurrentUserProfile();
   const registrationSettingResult = await getRegistrationSetting();
+  const githubOrgResult = await getGitHubOrgSetting();
 
   if (profileResult.status === "error") {
     redirect("/login");
@@ -20,6 +23,9 @@ export default async function AdminSettingsPage() {
   const isRegistrationEnabled = registrationSettingResult.status === "success" 
     ? registrationSettingResult.data 
     : true; // Default to enabled if error
+  const githubOrgName = githubOrgResult.status === "success"
+    ? githubOrgResult.data
+    : "";
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -54,6 +60,9 @@ export default async function AdminSettingsPage() {
         </div>
       </div>
 
+      {/* GitHub Linked Accounts */}
+      <LinkedAccountsSection githubUsername={userProfile.githubUsername} />
+
       {/* Additional Settings Sections */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         {/* System Settings */}
@@ -69,6 +78,8 @@ export default async function AdminSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <RegistrationToggle initialValue={isRegistrationEnabled} />
+            <Separator />
+            <GitHubOrgSettings initialValue={githubOrgName} />
             <div className="pt-4">
               <DataCleanup />
             </div>

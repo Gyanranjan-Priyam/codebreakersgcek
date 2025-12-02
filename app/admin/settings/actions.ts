@@ -113,6 +113,7 @@ export async function getCurrentUserProfile() {
         pinCode: true,
         state: true,
         district: true,
+        githubUsername: true,
       },
     });
 
@@ -444,6 +445,67 @@ export async function updateRegistrationSetting(enabled: boolean) {
     return {
       status: "error" as const,
       message: "Failed to update registration setting. Please try again.",
+    };
+  }
+}
+
+export async function getGitHubOrgSetting() {
+  try {
+    const setting = await prisma.systemSettings.findUnique({
+      where: { key: 'github_organization' },
+    });
+
+    return {
+      status: 'success' as const,
+      data: setting?.value || '',
+    };
+  } catch (error) {
+    console.error('Error fetching GitHub org setting:', error);
+    return {
+      status: 'error' as const,
+      message: 'Failed to fetch GitHub organization setting',
+    };
+  }
+}
+
+export async function updateGitHubOrgSetting(organizationName: string) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user || session.user.role !== 'admin') {
+      return {
+        status: 'error' as const,
+        message: 'Unauthorized: Admin access required',
+      };
+    }
+
+    await prisma.systemSettings.upsert({
+      where: { key: 'github_organization' },
+      update: {
+        value: organizationName,
+        updatedAt: new Date(),
+      },
+      create: {
+        key: 'github_organization',
+        value: organizationName,
+        description: 'GitHub organization name for fetching repositories',
+      },
+    });
+
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin/projects/all-projects');
+
+    return {
+      status: 'success' as const,
+      message: 'GitHub organization updated successfully',
+    };
+  } catch (error) {
+    console.error('Error updating GitHub org setting:', error);
+    return {
+      status: 'error' as const,
+      message: 'Failed to update GitHub organization setting',
     };
   }
 }

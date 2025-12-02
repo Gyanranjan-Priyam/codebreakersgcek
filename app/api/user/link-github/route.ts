@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
     githubAuthUrl.searchParams.append("client_id", clientId!);
     githubAuthUrl.searchParams.append("redirect_uri", callbackUrl);
     githubAuthUrl.searchParams.append("scope", "read:user");
-    githubAuthUrl.searchParams.append("state", session.user.id);
+    // Encode state as userId:redirectPath
+    githubAuthUrl.searchParams.append("state", `${session.user.id}:/dashboard/settings`);
 
     return NextResponse.redirect(githubAuthUrl.toString());
   } catch (error) {

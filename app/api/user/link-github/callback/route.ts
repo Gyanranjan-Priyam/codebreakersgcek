@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get("code");
-    const state = searchParams.get("state"); // userId
+    const state = searchParams.get("state"); // userId:redirectPath
 
     if (!code || !state) {
       return NextResponse.redirect(
@@ -15,14 +15,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Parse state to get userId and redirect path
+    const [userId, redirectPath] = state.split(":");
+    const finalRedirectPath = redirectPath || "/dashboard/settings";
+
     // Verify the user is still authenticated
     const session = await auth.api.getSession({
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.id !== state) {
+    if (!session?.user || session.user.id !== userId) {
       return NextResponse.redirect(
-        `${request.nextUrl.origin}/dashboard/settings?error=unauthorized`
+        `${request.nextUrl.origin}${finalRedirectPath}?error=unauthorized`
       );
     }
 
@@ -52,7 +56,7 @@ export async function GET(request: NextRequest) {
     if (!tokenData.access_token) {
       console.error("GitHub OAuth token error:", tokenData);
       return NextResponse.redirect(
-        `${request.nextUrl.origin}/dashboard/settings?error=token_failed`
+        `${request.nextUrl.origin}${finalRedirectPath}?error=token_failed`
       );
     }
 
@@ -68,13 +72,13 @@ export async function GET(request: NextRequest) {
 
     if (!githubUser.login) {
       return NextResponse.redirect(
-        `${request.nextUrl.origin}/dashboard/settings?error=user_fetch_failed`
+        `${request.nextUrl.origin}${finalRedirectPath}?error=user_fetch_failed`
       );
     }
 
     // Update user with GitHub username
     await prisma.user.update({
-      where: { id: state },
+      where: { id: userId },
       data: {
         githubUsername: githubUser.login,
         updatedAt: new Date(),
@@ -82,10 +86,11 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      `${request.nextUrl.origin}/dashboard/settings?github=linked`
+      `${request.nextUrl.origin}${finalRedirectPath}?github=linked`
     );
   } catch (error) {
     console.error("Error in GitHub OAuth callback:", error);
+    // Fallback to dashboard if redirect path is not available
     return NextResponse.redirect(
       `${request.nextUrl.origin}/dashboard/settings?error=callback_failed`
     );

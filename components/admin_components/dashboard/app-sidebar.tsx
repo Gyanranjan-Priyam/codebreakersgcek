@@ -89,9 +89,20 @@ const data = {
       icon: Trophy,
     },
     {
-      title: "Project Submissions",
-      url: "/admin/projects",
+      title: "Projects",
+      url: "#",
       icon: FolderGit,
+      isCollapsible: true,
+      items: [
+        {
+          title: "All Projects",
+          url: "/admin/projects/all-projects",
+        },
+        {
+          title: "Submission Projects",
+          url: "/admin/projects/submission-projects",
+        },
+      ],
     },
     {
       title: "Reports",
