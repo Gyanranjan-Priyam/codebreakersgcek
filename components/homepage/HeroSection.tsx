@@ -1,9 +1,10 @@
 "use client";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Vortex } from "../ui/vortex";
 import { motion } from "framer-motion";
 import { Code2, Terminal, GitBranch } from "lucide-react";
 import { FlipWords } from "../ui/flip-words";
+import Link from "next/link";
 
 
 
@@ -89,19 +90,20 @@ const HeroSection: React.FC = () => {
             transition={{ duration: 0.8, delay: 0.7 }}
             className="flex flex-col sm:flex-row gap-4"
           >
-            <Button 
-              size="lg"
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold px-8 border-0 shadow-lg shadow-emerald-500/20 cursor-pointer"
-            >
+            <Link href="/login" className={buttonVariants({
+              variant: "outline",
+              size: "lg",
+              className: "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold px-8 border-0 shadow-lg shadow-emerald-500/20 cursor-pointer"
+            })}>
               Join Community
-            </Button>
-            <Button 
-              size="lg"
-              variant="outline"
-              className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-semibold px-8 cursor-pointer"
-            >
+            </Link>
+            <Link href="/projects" className={buttonVariants({
+              variant: "outline",
+              size: "lg",
+              className: "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-semibold px-8 cursor-pointer"
+            })}>
               View Projects
-            </Button>
+            </Link>
           </motion.div>
 
           <motion.div
