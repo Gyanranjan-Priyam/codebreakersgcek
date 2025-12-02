@@ -3,6 +3,7 @@ import { Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import LenisProvider from "@/components/providers/lenis-provider";
+import { Analytics } from "@vercel/analytics/next"
 
 
 const sourceCodePro = Source_Code_Pro({
@@ -41,6 +42,7 @@ export default function RootLayout({
           {children}
         </LenisProvider>
         <Toaster position="top-center" richColors closeButton />
+        <Analytics />
       </body>
     </html>
   );
