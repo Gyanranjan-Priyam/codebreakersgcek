@@ -20,7 +20,8 @@ export function ProfileImageUpload({ currentImageKey, userName }: ProfileImageUp
   const [uploading, setUploading] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
 
-  const getImageUrl = (imageKey: string) => {
+  const getImageUrl = (imageKey: string | null | undefined) => {
+    if (!imageKey) return undefined;
     // Construct S3 URL based on your bucket configuration
     const bucketName = process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES;
     let url;
@@ -31,7 +32,6 @@ export function ProfileImageUpload({ currentImageKey, userName }: ProfileImageUp
       // Fallback for local development or if S3 isn't configured
       url = `/uploads/profiles/${imageKey}`;
     }
-    console.log('Profile image URL:', url, 'for imageKey:', imageKey);
     return url;
   };
 
@@ -164,17 +164,13 @@ export function ProfileImageUpload({ currentImageKey, userName }: ProfileImageUp
           {currentImageKey ? (
             <div className="relative group w-full h-full flex items-center justify-center">
               <Image
-                src={getImageUrl(currentImageKey)}
+                src={getImageUrl(currentImageKey) || '/assets/logo.png'}
                 alt={`${userName} profile picture`}
                 fill
                 className="object-cover rounded-lg"
                 priority
                 onError={(e) => {
-                  console.error('Failed to load profile image:', getImageUrl(currentImageKey));
-                  console.error('Image load error:', e);
-                }}
-                onLoad={() => {
-                  console.log('Profile image loaded successfully:', getImageUrl(currentImageKey));
+                  console.error('Failed to load profile image');
                 }}
               />
               <Button 

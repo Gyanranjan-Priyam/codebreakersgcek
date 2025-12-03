@@ -49,7 +49,8 @@ export function NavUser({
     if (user.profileImageKey) {
       return `https://codebreakers.t3.storage.dev/${user.profileImageKey}`;
     }
-    return user.avatar;
+    // Only return avatar if it's a valid URL, otherwise return undefined
+    return user.avatar && user.avatar !== 'undefined' ? user.avatar : undefined;
   };
 
   const profileImageUrl = getProfileImageUrl();

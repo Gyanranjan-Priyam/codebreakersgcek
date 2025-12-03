@@ -65,7 +65,7 @@ export default async function HomepageProjectsPage() {
                            {/* Thumbnail */}
                            <div className="relative w-full h-48 rounded-t-lg overflow-hidden">
                               <Image
-                                 src={`${process.env.NEXT_PUBLIC_S3_BASE_URL}/${project.thumbnailKey}`}
+                                 src={`https://codebreakers.t3.storage.dev/${project.thumbnailKey}`}
                                  alt={project.title}
                                  fill
                                  className="object-cover"
