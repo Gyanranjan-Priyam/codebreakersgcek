@@ -260,7 +260,7 @@ export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
                 <FormLabel>Number of Sets</FormLabel>
                 <Select
                   onValueChange={(value) => field.onChange(parseInt(value))}
-                  defaultValue={field.value.toString()}
+                  defaultValue={field.value?.toString() || "1"}
                 >
                   <FormControl>
                     <SelectTrigger>
