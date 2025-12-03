@@ -12,6 +12,8 @@ const AboutPage = dynamic(() => import("@/components/homepage/AboutPage"));
 const FooterSection = dynamic(() => import("@/components/homepage/Footer"));
 const MaskEffect = dynamic(() => import("@/components/homepage/MaskCursor/Mask"));
 const Gallary = dynamic(() => import("@/components/homepage/ZoomParallx/GallaryParallax"));
+const HomepageDock = dynamic(() => import("@/components/homepage/HomepageDock").then(mod => ({ default: mod.HomepageDock })));
+const HomepageDockMobile = dynamic(() => import("@/components/homepage/HomepageDock").then(mod => ({ default: mod.HomepageDockMobile })));
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
@@ -86,6 +88,8 @@ export default function Home() {
       <Gallary />
       <AboutPage />
       <FooterSection />
+      <HomepageDock />
+      <HomepageDockMobile />
     </>
   );
 }

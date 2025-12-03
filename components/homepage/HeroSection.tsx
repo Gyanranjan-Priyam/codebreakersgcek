@@ -18,13 +18,11 @@ const HeroSection: React.FC = () => {
   const words = ["idea", "concept", "dream", "spark"];
 
   return (
-    <div className="h-[90vh] overflow-hidden bg-black relative">
-      {/* Hyperspeed Background */}
+    <div className="min-h-screen overflow-hidden bg-black relative">
       <div className="absolute inset-0 z-0">
         <Hyperspeed />
       </div>
 
-      {/* Content */}
       <div className="absolute inset-0 flex items-center justify-center px-8 md:px-16">
         <div className="flex flex-col justify-center items-center space-y-4 md:space-y-8 md:w-[80%] lg:w-[60%] h-full z-10 text-center px-4">
           <motion.div
