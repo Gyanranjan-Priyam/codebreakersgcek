@@ -1,10 +1,10 @@
 "use client";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Vortex } from "../ui/vortex";
 import { motion } from "framer-motion";
 import { Code2, Terminal, GitBranch } from "lucide-react";
 import { FlipWords } from "../ui/flip-words";
 import Link from "next/link";
+import Hyperspeed from "./_components/Hyperspeed";
 
 
 
@@ -18,14 +18,14 @@ const HeroSection: React.FC = () => {
   const words = ["idea", "concept", "dream", "spark"];
 
   return (
-    <div className="h-[90vh] overflow-hidden bg-black">
-      <Vortex
-        backgroundColor="black"
-        rangeY={400}
-        particleCount={100}
-        baseHue={120}
-        className="absolute inset-0 flex items-center justify-center px-8 md:px-16"
-      >
+    <div className="h-[90vh] overflow-hidden bg-black relative">
+      {/* Hyperspeed Background */}
+      <div className="absolute inset-0 z-0">
+        <Hyperspeed />
+      </div>
+
+      {/* Content */}
+      <div className="absolute inset-0 flex items-center justify-center px-8 md:px-16">
         <div className="flex flex-col justify-center items-center space-y-4 md:space-y-8 md:w-[80%] lg:w-[60%] h-full z-10 text-center px-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -128,7 +128,7 @@ const HeroSection: React.FC = () => {
             </div>
           </motion.div>
         </div>
-      </Vortex>
+      </div>
     </div>
   );
 };
