@@ -25,7 +25,7 @@ export default function FooterSection() {
                 className="object-contain md:w-20 md:h-20"
               />
               <div className="space-y-1 flex flex-col items-center">
-                <Link href="https://gcek.ac.in" target="_blank" className="text-sm md:text-base font-semibold text-white leading-tight text-center">
+                <Link href="https://gcekbpatna.ac.in" target="_blank" className="text-sm md:text-base font-semibold text-white leading-tight text-center">
                   Government College of Engineering, Kalahandi
                 </Link>
                 <p className="text-xs md:text-sm text-gray-400 text-center">Bhawanipatna</p>

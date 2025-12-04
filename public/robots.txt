@@ -1,0 +1,29 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Disallow admin and private routes
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /login
+Disallow: /onboarding
+Disallow: /verify-request
+Disallow: /_next/
+Disallow: /auth/
+
+# Allow public pages
+Allow: /
+Allow: /events
+Allow: /team
+Allow: /contact
+Allow: /gallery
+Allow: /projects
+Allow: https://blogs.codebreakersgcek.tech
+Allow: /announcement
+Allow: /leaderboard
+Allow: /privacy
+Allow: /terms
+
+# Sitemap location
+Sitemap: https://www.codebreakersgcek.tech/sitemap.xml

@@ -50,7 +50,7 @@ export function HomepageDock() {
         </Dock>
         <Dock direction="middle" iconSize={38} iconMagnification={64}>
           <DockIcon>
-            <Link href="/blog" className="flex items-center justify-center w-full h-full">
+            <Link href="https://blogs.codebreakersgcek.tech" className="flex items-center justify-center w-full h-full">
               <FaNewspaper className="w-6 h-6" />
             </Link>
           </DockIcon>
@@ -99,7 +99,7 @@ export function HomepageDockMobile() {
           </Link>
         </DockIcon>
         <DockIcon>
-          <Link href="/blog" className="flex items-center justify-center w-full h-full">
+          <Link href="https://blogs.codebreakersgcek.tech" className="flex items-center justify-center w-full h-full">
             <FaNewspaper className="w-5 h-5 text-green-500" />
           </Link>
         </DockIcon>

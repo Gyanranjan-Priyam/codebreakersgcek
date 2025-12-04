@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
     // Add image optimization settings
     formats: ['image/webp', 'image/avif'],
@@ -43,12 +49,17 @@ const nextConfig: NextConfig = {
   },
   // Add experimental features for better performance
   experimental: {
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', 'framer-motion', 'motion/react'],
   },
   // Add serverExternalPackages to avoid issues
   serverExternalPackages: ['sharp'],
   // Add turbopack configuration to silence deployment warnings
   turbopack: {},
+  // SEO and Performance optimizations
+  compress: true,
+  poweredByHeader: false,
+  // Generate sitemap and robots.txt automatically
+  output: 'standalone',
 };
 
 export default nextConfig;
