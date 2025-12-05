@@ -25,6 +25,7 @@ import {
 import { getUserGitHubRepos } from "../actions";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SendForReviewDialog } from "./send-for-review-dialog";
 
 interface GitHubRepo {
   id: number;
@@ -207,11 +208,11 @@ export function GitHubProjects() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with GitHub Profile Link */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Showing {showForked ? allRepos.length : repos.length} repositor
             {(showForked ? allRepos.length : repos.length) === 1 ? "y" : "ies"}{" "}
             from
@@ -219,7 +220,7 @@ export function GitHubProjects() {
           <Button
             asChild
             variant="link"
-            className="p-0 h-auto font-semibold text-base mt-2"
+            className="p-0 h-auto font-semibold text-sm sm:text-base mt-1 sm:mt-2"
           >
             <a
               href={`https://github.com/${user?.githubUsername}`}
@@ -227,12 +228,12 @@ export function GitHubProjects() {
               rel="noopener noreferrer"
               className="gap-2"
             >
-              <Github className="h-4 w-4" />@{user?.githubUsername}
+              <Github className="h-3.5 w-3.5 sm:h-4 sm:w-4" />@{user?.githubUsername}
               <ExternalLink className="h-3 w-3" />
             </a>
           </Button>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <div className="flex border rounded-md">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -240,7 +241,7 @@ export function GitHubProjects() {
               className="rounded-r-none cursor-pointer"
               onClick={() => setViewMode("grid")}
             >
-              <Grid3x3 className="h-4 w-4" />
+              <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
             <Button
               variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -248,37 +249,38 @@ export function GitHubProjects() {
               className="rounded-l-none cursor-pointer"
               onClick={() => setViewMode("list")}
             >
-              <List className="h-4 w-4" />
+              <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
           <Button
             variant="outline"
-            className="cursor-pointer"
+            className="cursor-pointer flex-1 sm:flex-none"
             size="sm"
             onClick={() => setShowForked(!showForked)}
           >
-            {showForked ? "Hide" : "Show"} Forked (
+            <span className="hidden sm:inline">{showForked ? "Hide" : "Show"} Forked (</span>
+            <span className="sm:hidden">Forked (</span>
             {allRepos.length - repos.length})
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="cursor-pointer"
+            className="cursor-pointer flex-1 sm:flex-none"
             onClick={() => {
               setLoading(true);
               setError(null);
               window.location.reload();
             }}
           >
-            <Loader2 className="h-4 w-4 mr-2" />
-            Refresh
+            <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>
 
       {/* Repository Grid View */}
       {viewMode === "grid" && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {(showForked ? allRepos : repos).map((repo) => (
           <Card
             key={repo.id}
@@ -359,7 +361,7 @@ export function GitHubProjects() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
                 <Button asChild size="sm" className="flex-1" variant="outline">
                   <a
                     href={repo.html_url}
@@ -385,6 +387,15 @@ export function GitHubProjects() {
                   </Button>
                 )}
               </div>
+
+              {/* Send for Review */}
+              <div className="pt-2">
+                <SendForReviewDialog
+                  repoName={repo.name}
+                  repoUrl={repo.html_url}
+                  description={repo.description}
+                />
+              </div>
             </CardContent>
           </Card>
           ))}
@@ -397,18 +408,18 @@ export function GitHubProjects() {
           {(showForked ? allRepos : repos).map((repo) => (
             <Card key={repo.id} className="hover:shadow-lg transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col gap-4">
                   <div className="flex-1 space-y-3">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center flex-wrap gap-2 mb-1">
                           <a
                             href={repo.html_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="hover:text-primary font-semibold text-lg flex items-center gap-2"
+                            className="hover:text-primary font-semibold text-base sm:text-lg flex items-center gap-2"
                           >
-                            <Code2 className="h-5 w-5 shrink-0" />
+                            <Code2 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
                             <span className="truncate">{repo.name}</span>
                           </a>
                           {repo.visibility === "private" && (
@@ -421,8 +432,8 @@ export function GitHubProjects() {
                           {repo.description || "No description provided"}
                         </p>
                       </div>
-                      <div className="flex gap-2 shrink-0">
-                        <Button asChild size="sm" variant="outline">
+                      <div className="flex gap-2">
+                        <Button asChild size="sm" variant="outline" className="flex-1 sm:flex-none">
                           <a
                             href={repo.html_url}
                             target="_blank"
@@ -430,11 +441,11 @@ export function GitHubProjects() {
                             className="gap-2"
                           >
                             <Github className="h-3.5 w-3.5" />
-                            Code
+                            <span className="hidden sm:inline">Code</span>
                           </a>
                         </Button>
                         {repo.homepage && (
-                          <Button asChild size="sm">
+                          <Button asChild size="sm" className="flex-1 sm:flex-none">
                             <a
                               href={repo.homepage}
                               target="_blank"
@@ -442,7 +453,7 @@ export function GitHubProjects() {
                               className="gap-2"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
-                              Demo
+                              <span className="hidden sm:inline">Demo</span>
                             </a>
                           </Button>
                         )}
@@ -492,6 +503,15 @@ export function GitHubProjects() {
                         )}
                       </div>
                     )}
+
+                    {/* Send for Review in List View */}
+                    <div className="pt-2 flex">
+                      <SendForReviewDialog
+                        repoName={repo.name}
+                        repoUrl={repo.html_url}
+                        description={repo.description}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>

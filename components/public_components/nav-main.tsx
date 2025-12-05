@@ -35,7 +35,7 @@ export function NavMain({
     }[]
   }[]
 }) {
-  const [openItems, setOpenItems] = useState<string[]>(["Projects (Beta)"])
+  const [openItems, setOpenItems] = useState<string[]>(["Projects"])
 
   const toggleItem = (title: string) => {
     setOpenItems(prev => 

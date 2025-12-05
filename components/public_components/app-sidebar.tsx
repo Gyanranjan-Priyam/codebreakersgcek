@@ -12,6 +12,8 @@ import {
   FolderGit,
   Activity,
   ListChecks,
+  FileCode,
+  Brain,
 } from "lucide-react";
 
 import { NavMain } from "@/components/public_components/nav-main";
@@ -59,7 +61,7 @@ const data = {
           icon: Calendar,
         },
         {
-          title: "Tasks (Beta)",
+          title: "Tasks",
           url: "/dashboard/activities/tasks",
           icon: ListChecks,
         },
@@ -79,9 +81,22 @@ const data = {
       title: "Play Ground (Beta)",
       url: "/dashboard/playground",
       icon: Code,
+      isCollapsible: true,
+      items: [
+        {
+          title: "Codespace",
+          url: "/dashboard/playground/codespace",
+          icon: FileCode,
+        },
+        {
+          title: "Brainstack",
+          url: "/dashboard/playground/brainstack",
+          icon: Brain,
+        },
+      ],
     },
     {
-      title: "Projects (Beta)",
+      title: "Projects",
       url: "/dashboard/projects",
       icon: FolderGit,
       isCollapsible: true,
@@ -89,6 +104,10 @@ const data = {
         {
           title: "My Projects",
           url: "/dashboard/projects/my-projects",
+        },
+        {
+          title: "My Submissions",
+          url: "/dashboard/projects/my-submissions",
         },
         {
           title: "Collaborative Projects",

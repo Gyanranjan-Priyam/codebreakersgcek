@@ -108,3 +108,129 @@ export async function getUserGitHubRepos() {
     };
   }
 }
+
+export async function submitProjectReview({
+  repoName,
+  repoUrl,
+  description,
+  reviewType,
+  explanation,
+  liveUrl,
+}: {
+  repoName: string;
+  repoUrl: string;
+  description: string | null;
+  reviewType: "review" | "collaboration" | "publish";
+  explanation: string;
+  liveUrl?: string;
+}) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return {
+        success: false,
+        message: "Not authenticated",
+      };
+    }
+
+    // Fetch user with whatsappNumber
+    const user = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        whatsappNumber: true,
+        githubUsername: true,
+      },
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        message: "User not found",
+      };
+    }
+
+    // For publish type, check if whatsappNumber exists
+    if (reviewType === "publish" && !user.whatsappNumber) {
+      return {
+        success: false,
+        message: "WhatsApp number is required for publishing projects. Please update your profile.",
+      };
+    }
+
+    // Create project review submission
+    await prisma.projectReview.create({
+      data: {
+        userId: user.id,
+        repoName,
+        repoUrl,
+        description: description || "",
+        reviewType,
+        explanation,
+        liveUrl: liveUrl || null,
+        whatsappNumber: user.whatsappNumber || null,
+        status: "pending",
+      },
+    });
+
+    let successMessage = "";
+    switch (reviewType) {
+      case "review":
+        successMessage = "Project submitted for review successfully!";
+        break;
+      case "collaboration":
+        successMessage = "Collaboration request submitted successfully!";
+        break;
+      case "publish":
+        successMessage = "Project submitted for website publication!";
+        break;
+    }
+
+    return {
+      success: true,
+      message: successMessage,
+    };
+  } catch (error) {
+    console.error("Error submitting project review:", error);
+    return {
+      success: false,
+      message: "Failed to submit project review. Please try again.",
+    };
+  }
+}
+
+export async function getUserWhatsAppNumber() {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return {
+        success: false,
+        message: "Not authenticated",
+        whatsappNumber: null,
+      };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      select: {
+        whatsappNumber: true,
+      },
+    });
+
+    return {
+      success: true,
+      whatsappNumber: user?.whatsappNumber || null,
+    };
+  } catch (error) {
+    console.error("Error fetching WhatsApp number:", error);
+    return {
+      success: false,
+      message: "Failed to fetch WhatsApp number",
+      whatsappNumber: null,
+    };
+  }
+}
