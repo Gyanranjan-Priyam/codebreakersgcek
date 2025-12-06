@@ -48,7 +48,7 @@ export default function Loader({ onLoadingComplete }: LoaderProps) {
       if (onLoadingComplete) {
         onLoadingComplete();
       }
-    }, 10000); // 10 seconds total
+    }, 5000); // 5 seconds total
 
     return () => {
       clearInterval(progressInterval);

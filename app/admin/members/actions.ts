@@ -67,10 +67,11 @@ export async function getMemberBySlugId(slugId: string) {
   await requireAdmin();
   
   try {
-    // First try to find by username, then by registration number
+    // Try to find by username, registration number, or database ID
     const member = await prisma.user.findFirst({
       where: {
         OR: [
+          { id: slugId },
           { username: slugId },
           { registration: slugId }
         ]
