@@ -70,8 +70,8 @@ export async function getMemberBySlugId(slugId: string) {
     // Normalize the slugId (trim whitespace)
     const normalizedSlugId = slugId.trim();
     
-    // Try to find by username, registration number, or database ID
-    const member = await prisma.user.findFirst({
+    // Strategy 1: Try exact match with case-insensitive search for username and registration
+    let member = await prisma.user.findFirst({
       where: {
         OR: [
           { id: normalizedSlugId },
@@ -112,6 +112,95 @@ export async function getMemberBySlugId(slugId: string) {
         banReason: true,
       },
     });
+
+    // Strategy 2: If not found, try with lowercase conversion
+    if (!member) {
+      const lowercaseSlugId = normalizedSlugId.toLowerCase();
+      member = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: { equals: lowercaseSlugId, mode: 'insensitive' } },
+            { registration: { equals: lowercaseSlugId, mode: 'insensitive' } }
+          ]
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          username: true,
+          firstName: true,
+          middleName: true,
+          lastName: true,
+          profileImageKey: true,
+          registration: true,
+          rollNumber: true,
+          branch: true,
+          admissionYear: true,
+          mobileNumber: true,
+          whatsappNumber: true,
+          collegeName: true,
+          collegeAddress: true,
+          state: true,
+          district: true,
+          address: true,
+          postOffice: true,
+          policeStation: true,
+          block: true,
+          pinCode: true,
+          aadhaarNumber: true,
+          githubUsername: true,
+          createdAt: true,
+          updatedAt: true,
+          emailVerified: true,
+          banned: true,
+          banReason: true,
+        },
+      });
+    }
+
+    // Strategy 3: If still not found, try partial match on registration or username
+    if (!member) {
+      member = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { registration: { contains: normalizedSlugId, mode: 'insensitive' } },
+            { username: { contains: normalizedSlugId, mode: 'insensitive' } }
+          ]
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          username: true,
+          firstName: true,
+          middleName: true,
+          lastName: true,
+          profileImageKey: true,
+          registration: true,
+          rollNumber: true,
+          branch: true,
+          admissionYear: true,
+          mobileNumber: true,
+          whatsappNumber: true,
+          collegeName: true,
+          collegeAddress: true,
+          state: true,
+          district: true,
+          address: true,
+          postOffice: true,
+          policeStation: true,
+          block: true,
+          pinCode: true,
+          aadhaarNumber: true,
+          githubUsername: true,
+          createdAt: true,
+          updatedAt: true,
+          emailVerified: true,
+          banned: true,
+          banReason: true,
+        },
+      });
+    }
 
     if (!member) {
       return {
