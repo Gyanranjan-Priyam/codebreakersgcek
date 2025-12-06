@@ -228,7 +228,7 @@ export default function MembersTable({ members }: MembersTableProps) {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/members/${member.username || member.registration || member.id}`} className="cursor-pointer">
+                            <Link href={`/admin/members/${member.registration || member.username || member.id}`} className="cursor-pointer">
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </Link>
