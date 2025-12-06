@@ -67,13 +67,16 @@ export async function getMemberBySlugId(slugId: string) {
   await requireAdmin();
   
   try {
+    // Normalize the slugId (trim whitespace)
+    const normalizedSlugId = slugId.trim();
+    
     // Try to find by username, registration number, or database ID
     const member = await prisma.user.findFirst({
       where: {
         OR: [
-          { id: slugId },
-          { username: slugId },
-          { registration: slugId }
+          { id: normalizedSlugId },
+          { username: { equals: normalizedSlugId, mode: 'insensitive' } },
+          { registration: { equals: normalizedSlugId, mode: 'insensitive' } }
         ]
       },
       select: {

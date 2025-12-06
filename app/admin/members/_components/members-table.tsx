@@ -181,12 +181,15 @@ export default function MembersTable({ members }: MembersTableProps) {
                 filteredMembers.map((member) => (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
+                      <Link 
+                        href={`/admin/members/${member.registration || member.username || member.id}`}
+                        className="flex items-center gap-2 hover:underline cursor-pointer"
+                      >
                         {member.name}
                         {member.emailVerified && (
                           <CheckCircle className="h-3 w-3 text-green-600" />
                         )}
-                      </div>
+                      </Link>
                     </TableCell>
                     <TableCell className="text-sm">{member.email}</TableCell>
                     <TableCell className="text-sm">
