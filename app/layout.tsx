@@ -18,6 +18,12 @@ export const metadata: Metadata = {
     template: "%s | CodeBreakers GCEK",
     default: "CodeBreakers - Coding Club | Government College of Engineering Kalahandi"
   },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
   description: "Join CodeBreakers, the premier coding club at Government College of Engineering Kalahandi (GCEK). Learn programming, participate in hackathons, compete in coding challenges, and build innovative projects with a community of 500+ passionate developers.",
   keywords: [
     "CodeBreakers",

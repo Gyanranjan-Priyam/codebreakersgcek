@@ -420,7 +420,8 @@ const TerminalLoaderPage = ({ onLoadingComplete }: TerminalLoaderProps = {}) => 
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  className="bg-transparent border-none outline-none text-gray-100 flex-1 font-mono min-w-0 w-full touch-manipulation"
+                  className="bg-transparent border-none outline-none text-gray-100 flex-1 font-mono min-w-0 w-full touch-manipulation text-base"
+                  style={{ fontSize: '16px' }}
                   autoFocus
                   autoComplete="off"
                   autoCorrect="off"
