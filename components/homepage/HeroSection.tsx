@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Code2, Terminal, GitBranch } from "lucide-react";
 import { FlipWords } from "../ui/flip-words";
 import Link from "next/link";
-import Hyperspeed from "./_components/Hyperspeed";
+import HackerTerminal from "./_components/HackerTerminal";
 
 
 
@@ -20,7 +20,7 @@ const HeroSection: React.FC = () => {
   return (
     <div className="min-h-screen overflow-hidden bg-black relative">
       <div className="absolute inset-0 z-0">
-        <Hyperspeed />
+        <HackerTerminal />
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center px-8 md:px-16">
@@ -42,7 +42,7 @@ const HeroSection: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-xl sm:text-2xl md:text-3xl lg:text-5xl font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-100 via-white to-gray-100"
+            className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-100 via-white to-gray-100"
           >
            <span>
             Code your <FlipWords words={words}/>into reality, with a community that inspires.
@@ -55,8 +55,7 @@ const HeroSection: React.FC = () => {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="text-base md:text-lg text-gray-300 max-w-2xl leading-relaxed"
           >
-            Join an elite community of developers, builders, and problem solvers. 
-            Compete in challenges, collaborate on projects, and level up your coding skills.
+            Join top developers to build, compete, and grow your coding skills.
           </motion.p>
 
           <motion.div

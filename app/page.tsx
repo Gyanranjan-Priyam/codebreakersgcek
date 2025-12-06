@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Script from "next/script";
-import Loader from "@/components/homepage/Loader";
+import TerminalLoader from "@/app/(homepage)/_components/terminal-loader/page";
 import { authClient } from "@/lib/auth-client";
 
 // Preload components but render them only after loading
@@ -79,12 +79,29 @@ const structuredData = {
 };
 
 export default function Home() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    // Check if user has already visited in this session
+    if (typeof window !== 'undefined') {
+      const hasVisited = sessionStorage.getItem('homepage-visited');
+      return !hasVisited; // Show loader only if not visited
+    }
+    return true;
+  });
   const [user, setUser] = useState<any>(null);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [shouldShowLoader, setShouldShowLoader] = useState(false);
+
+  // Delay showing loader to prevent flash on reload
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldShowLoader(true);
+    }, 100); // Small delay to check if it's just a reload
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    // Preload critical assets
+    // Preload critical assets and components
     const preloadAssets = async () => {
       const imagesToPreload = [
         "/assets/logo.png",
@@ -116,8 +133,19 @@ export default function Home() {
         }
       });
 
-      // Wait for all assets to load
-      await Promise.all([...imagePromises, sessionPromise]);
+      // Preload dynamic components (force them to load)
+      const componentPreloads = [
+        import("@/components/homepage/Navbar"),
+        import("@/components/homepage/HeroSection"),
+        import("@/components/homepage/AboutPage"),
+        import("@/components/homepage/Footer"),
+        import("@/components/homepage/MaskCursor/Mask"),
+        import("@/components/homepage/ZoomParallx/GallaryParallax"),
+        import("@/components/homepage/HomepageDock"),
+      ];
+
+      // Wait for all assets and components to load
+      await Promise.all([...imagePromises, sessionPromise, ...componentPreloads]);
       setAssetsLoaded(true);
     };
 
@@ -125,6 +153,11 @@ export default function Home() {
   }, []);
 
   const handleLoadingComplete = () => {
+    // Mark that user has visited the homepage in this session
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('homepage-visited', 'true');
+    }
+    
     // Only hide loader when both loading time is complete AND assets are loaded
     if (assetsLoaded) {
       setIsLoading(false);
@@ -139,8 +172,13 @@ export default function Home() {
     }
   }, [assetsLoaded]);
 
+  // Don't show loader flash on reload - wait for initial check
+  if (isLoading && !shouldShowLoader) {
+    return null; // Return nothing during initial check
+  }
+
   if (isLoading) {
-    return <Loader onLoadingComplete={handleLoadingComplete} />;
+    return <TerminalLoader onLoadingComplete={handleLoadingComplete} />;
   }
 
   return (
