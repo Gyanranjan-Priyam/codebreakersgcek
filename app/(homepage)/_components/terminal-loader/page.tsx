@@ -234,7 +234,7 @@ const TerminalLoaderPage = ({ onLoadingComplete }: TerminalLoaderProps = {}) => 
       <div className="relative z-10 text-center flex flex-col items-center gap-3 sm:gap-4">
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28">
           <Image
-            src="/assets/Logo.png"
+            src="/assets/logo.png"
             alt="CodeBreakers Logo"
             fill
             className="object-contain drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]"
