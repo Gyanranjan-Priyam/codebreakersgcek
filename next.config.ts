@@ -63,6 +63,18 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Generate sitemap and robots.txt automatically
   output: 'standalone',
+  // Webpack configuration to inject environment variables
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
