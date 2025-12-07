@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -12,17 +12,18 @@ const sourceCodePro = Source_Code_Pro({
   variable: "--font-source-code-pro", 
 })
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.codebreakersgcek.tech'),
   title: {
     template: "%s | CodeBreakers GCEK",
     default: "CodeBreakers - Coding Club | Government College of Engineering Kalahandi"
-  },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
   },
   description: "Join CodeBreakers, the premier coding club at Government College of Engineering Kalahandi (GCEK). Learn programming, participate in hackathons, compete in coding challenges, and build innovative projects with a community of 500+ passionate developers.",
   keywords: [
