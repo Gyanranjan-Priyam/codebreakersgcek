@@ -90,11 +90,6 @@ const data = {
       isCollapsible: true,
       items: [
         {
-          title: "Codespace",
-          url: "/dashboard/playground/codespace",
-          icon: FileCode,
-        },
-        {
           title: "Brainstack",
           url: "/dashboard/playground/brainstack",
           icon: Brain,

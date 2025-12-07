@@ -3,7 +3,8 @@ import { Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import LenisProvider from "@/components/providers/lenis-provider";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/next";
+import { ConvexClientProvider } from "@/components/providers/convex-provider";
 
 
 const sourceCodePro = Source_Code_Pro({
@@ -114,9 +115,11 @@ export default function RootLayout({
       <body
         className={` ${sourceCodePro.variable} antialiased`}
       >
-        <LenisProvider>
-          {children}
-        </LenisProvider>
+        <ConvexClientProvider>
+          <LenisProvider>
+            {children}
+          </LenisProvider>
+        </ConvexClientProvider>
         <Toaster position="top-center" richColors closeButton />
         <Analytics />
       </body>

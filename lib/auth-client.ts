@@ -7,4 +7,6 @@ export const authClient = createAuthClient({
         emailOTPClient(),
         adminClient(), 
     ]
-}) 
+})
+
+export const { useSession, signIn, signOut, signUp } = authClient; 
