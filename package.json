@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npx convex codegen",
+    "prebuild": "[ \"$VERCEL\" != \"1\" ] && npx convex codegen || echo 'Skipping convex codegen on Vercel'",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
