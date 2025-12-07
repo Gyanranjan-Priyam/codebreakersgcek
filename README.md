@@ -34,3 +34,38 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## External API Access
+
+This project provides a REST API endpoint for external applications to fetch member information.
+
+### Members API
+
+The `/api/members` endpoint allows external projects to retrieve member data with authentication and rate limiting.
+
+**Key Features:**
+- 🔐 API key authentication
+- ⚡ Rate limiting (100 requests/hour)
+- 📊 Optional points and activity data
+- 🔍 Filtering by branch, admission year, and profile status
+- 📄 Pagination support
+
+**Quick Setup:**
+
+1. Generate a secure API key (minimum 32 characters):
+   ```bash
+   openssl rand -base64 32
+   ```
+
+2. Add to your `.env` file:
+   ```env
+   API_KEY=your_generated_key_here
+   ```
+
+3. Use the API in external projects:
+   ```bash
+   curl -H "Authorization: Bearer YOUR_API_KEY" \
+     https://your-domain.com/api/members?includePoints=true
+   ```
+
+For complete documentation, see [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
