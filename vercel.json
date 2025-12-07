@@ -5,5 +5,8 @@
     }
   },
   "buildCommand": "npx prisma generate && npm run build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_CONVEX_URL": "https://academic-fly-239.convex.cloud"
+  }
 }
