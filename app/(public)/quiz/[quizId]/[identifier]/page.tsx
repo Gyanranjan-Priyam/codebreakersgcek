@@ -21,7 +21,10 @@ export default async function QuizProctorPage({
 
   // Check if user is banned
   if (user.banned) {
-    return <BannedUserScreen user={user} />;
+    return <BannedUserScreen user={{
+      banReason: user.banReason ?? null,
+      banExpires: user.banExpires?.toISOString() ?? null,
+    }} />;
   }
 
   // Fetch quiz details
@@ -54,7 +57,12 @@ export default async function QuizProctorPage({
   });
 
   if (quizBlock) {
-    return <QuizBlockedScreen quizBlock={quizBlock} />;
+    return <QuizBlockedScreen quizBlock={{
+      reason: quizBlock.reason,
+      violationType: quizBlock.violationType,
+      violationCount: quizBlock.violationCount,
+      blockedAt: quizBlock.blockedAt.toISOString(),
+    }} />;
   }
 
   // Check if quiz is available based on date/time
@@ -181,10 +189,29 @@ export default async function QuizProctorPage({
     });
   }
 
+  // Serialize objects properly for Client Component
+  const serializedQuiz = {
+    ...quiz,
+    startDateTime: quiz.startDateTime?.toISOString() ?? null,
+    endDateTime: quiz.endDateTime?.toISOString() ?? null,
+    createdAt: quiz.createdAt?.toISOString() ?? null,
+    updatedAt: quiz.updatedAt?.toISOString() ?? null,
+  };
+
+  const serializedUser = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    registration: (user as any).registration ?? null,
+    username: (user as any).username ?? null,
+    mobile: (user as any).mobileNumber ?? null,
+    branch: (user as any).branch ?? null,
+  };
+
   return (
     <QuizProctorInterface 
-      quiz={quiz}
-      user={user}
+      quiz={serializedQuiz as any}
+      user={serializedUser as any}
       hasExistingAttempt={!!existingAttempt}
       assignedSet={assignedSet}
     />

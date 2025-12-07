@@ -14,6 +14,7 @@ import {
   ListChecks,
   FileCode,
   Brain,
+  FolderOpen,
 } from "lucide-react";
 
 import { NavMain } from "@/components/public_components/nav-main";
@@ -71,6 +72,11 @@ const data = {
       title: "Achievements",
       url: "/dashboard/achievements",
       icon: Trophy,
+    },
+    {
+      title: "Resources",
+      url: "/dashboard/resources",
+      icon: FolderOpen,
     },
     {
       title: "Leaderboards",

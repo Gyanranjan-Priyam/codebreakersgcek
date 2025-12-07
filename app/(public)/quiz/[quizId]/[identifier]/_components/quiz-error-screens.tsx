@@ -7,7 +7,7 @@ import { CloseWindowButton } from "./close-window-button";
 interface BannedUserScreenProps {
   user: {
     banReason?: string | null;
-    banExpires?: Date | null;
+    banExpires?: string | null;
   };
 }
 
@@ -62,7 +62,7 @@ interface QuizBlockedScreenProps {
     reason: string;
     violationType: string;
     violationCount: number;
-    blockedAt: Date;
+    blockedAt: string;
   };
 }
 

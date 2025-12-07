@@ -15,7 +15,8 @@ import {
   Trophy,
   UserX,
   Activity,
-  ListChecks
+  ListChecks,
+  FolderOpen
 } from "lucide-react"
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main"
@@ -103,6 +104,11 @@ const data = {
           url: "/admin/projects/submission-projects",
         },
       ],
+    },
+    {
+      title: "Resources",
+      url: "/admin/resources",
+      icon: FolderOpen,
     },
     {
       title: "Reports",

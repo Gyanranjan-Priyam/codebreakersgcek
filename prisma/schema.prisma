@@ -68,6 +68,8 @@ model User {
   adminResponses  SupportResponse[] @relation("AdminResponses")
   publishedProjects PublishedProject[]
   projectReviews  ProjectReview[]
+  resourceFolders ResourceFolder[]  @relation("ResourceFolderCreator")
+  resources       Resource[]        @relation("ResourceUploader")
 
   @@unique([email])
   @@map("user")
@@ -493,5 +495,51 @@ model ProjectReview {
   @@index([status])
   @@index([reviewType])
   @@map("project_review")
+}
+
+model ResourceFolder {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  icon        String?  // Icon name or emoji
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdById String
+  createdBy   User     @relation("ResourceFolderCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  resources   Resource[]
+
+  @@index([createdById])
+  @@index([order])
+  @@map("resource_folder")
+}
+
+model Resource {
+  id          String         @id @default(cuid())
+  folderId    String
+  folder      ResourceFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  title       String
+  description String?        @db.Text
+  type        String         // "pdf", "image", "video", "document", "link"
+  url         String         // Google Drive link, YouTube link, or direct URL
+  thumbnailUrl String?       // Optional thumbnail for videos/images
+  fileSize    String?        // File size (e.g., "2.5 MB")
+  duration    String?        // For videos (e.g., "5:30")
+  tags        String[]       // Array of tags for filtering
+  order       Int            @default(0)
+  isActive    Boolean        @default(true)
+  downloadable Boolean       @default(true)
+  uploadedById String
+  uploadedBy  User           @relation("ResourceUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([folderId])
+  @@index([uploadedById])
+  @@index([type])
+  @@index([order])
+  @@map("resource")
 }
 

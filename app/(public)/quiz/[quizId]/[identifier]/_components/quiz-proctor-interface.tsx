@@ -175,6 +175,15 @@ export default function QuizProctorInterface({
     }
   };
 
+  const handleViewAchievements = () => {
+    if (window.opener && !window.opener.closed) {
+      window.opener.location.href = '/dashboard/achievements';
+      window.close();
+    } else {
+      window.location.href = '/dashboard/achievements';
+    }
+  };
+
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -771,14 +780,7 @@ export default function QuizProctorInterface({
                   Close Window
                 </CloseWindowButton>
                 <Button 
-                  onClick={() => {
-                    if (window.opener && !window.opener.closed) {
-                      window.opener.location.href = '/dashboard/achievements';
-                      window.close();
-                    } else {
-                      window.location.href = '/dashboard/achievements';
-                    }
-                  }}
+                  onClick={handleViewAchievements}
                   className="flex-1"
                   size="lg"
                 >
