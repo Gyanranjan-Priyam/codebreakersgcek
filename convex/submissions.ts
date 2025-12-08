@@ -107,22 +107,31 @@ export const getProblemStats = query({
     problemId: v.id("problems"),
   },
   handler: async (ctx, args) => {
-    const submissions = await ctx.db
-      .query("submissions")
-      .withIndex("by_user_and_problem", (q) =>
-        q.eq("userId", args.userId).eq("problemId", args.problemId)
-      )
-      .collect();
+    try {
+      const submissions = await ctx.db
+        .query("submissions")
+        .withIndex("by_user_and_problem", (q) =>
+          q.eq("userId", args.userId).eq("problemId", args.problemId)
+        )
+        .collect();
 
-    const totalAttempts = submissions.length;
-    const acceptedSubmissions = submissions.filter(s => s.status === "Accepted").length;
-    const successRate = totalAttempts > 0 ? (acceptedSubmissions / totalAttempts) * 100 : 0;
+      const totalAttempts = submissions.length;
+      const acceptedSubmissions = submissions.filter(s => s.status === "Accepted").length;
+      const successRate = totalAttempts > 0 ? (acceptedSubmissions / totalAttempts) * 100 : 0;
 
-    return {
-      totalAttempts,
-      acceptedSubmissions,
-      successRate: Math.round(successRate * 10) / 10, // Round to 1 decimal place
-    };
+      return {
+        totalAttempts,
+        acceptedSubmissions,
+        successRate: Math.round(successRate * 10) / 10, // Round to 1 decimal place
+      };
+    } catch (error) {
+      console.error("Error in getProblemStats:", error);
+      return {
+        totalAttempts: 0,
+        acceptedSubmissions: 0,
+        successRate: 0,
+      };
+    }
   },
 });
 
