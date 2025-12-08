@@ -40,10 +40,30 @@ export async function executeCode(
     ? testCases 
     : testCases.filter(tc => !tc.isHidden).slice(0, 3);
 
+  // Check if code is empty or only contains starter code
+  const normalizedCode = normalizeCode(code);
+  const isEmptyCode = normalizedCode.length < 20 || 
+                      !hasActualImplementation(code, language);
+
+  if (isEmptyCode) {
+    return {
+      status: "Compilation Error",
+      testResults: casesToRun.map(tc => ({
+        passed: false,
+        input: tc.input,
+        expectedOutput: tc.expectedOutput,
+        actualOutput: undefined,
+        error: "No implementation found. Please write your solution code.",
+      })),
+      runtime: 0,
+      memory: 0,
+      errorMessage: "Compilation Error: No valid code implementation found. Your function must contain actual logic to solve the problem.",
+    };
+  }
+
   // Check if code is similar to solution (basic validation)
   let codeQuality = 0.5; // Default quality
   if (solution && solution[language]) {
-    const normalizedCode = normalizeCode(code);
     const normalizedSolution = normalizeCode(solution[language] || "");
     
     // Calculate similarity (basic check for key patterns)
@@ -51,22 +71,31 @@ export async function executeCode(
     codeQuality = similarityScore;
   }
 
-  // Better code gets better pass rate
-  const basePassRate = Math.min(0.9, codeQuality);
+  // Better code gets better pass rate (minimum 0.3 to allow some failures)
+  const basePassRate = Math.max(0.3, Math.min(0.9, codeQuality));
 
+  // Generate test results
   const testResults: TestResult[] = casesToRun.map((testCase, idx) => {
-    // First test case always passes if code quality is reasonable
-    // Other test cases pass based on code quality
-    const passed = codeQuality > 0.4 && (idx === 0 || Math.random() < basePassRate);
+    // Determine if test passes based on code quality
+    const randomFactor = Math.random();
+    const passed = randomFactor < basePassRate;
+    
+    if (!passed) {
+      return {
+        passed: false,
+        input: testCase.input,
+        expectedOutput: testCase.expectedOutput,
+        actualOutput: generateWrongOutput(testCase.expectedOutput),
+        error: undefined,
+      };
+    }
     
     return {
-      passed,
+      passed: true,
       input: testCase.input,
       expectedOutput: testCase.expectedOutput,
-      actualOutput: passed 
-        ? testCase.expectedOutput 
-        : generateWrongOutput(testCase.expectedOutput),
-      error: passed ? undefined : undefined,
+      actualOutput: testCase.expectedOutput,
+      error: undefined,
     };
   });
 
@@ -79,6 +108,33 @@ export async function executeCode(
     runtime,
     memory,
   };
+}
+
+// Check if code has actual implementation
+function hasActualImplementation(code: string, language: string): boolean {
+  const normalized = normalizeCode(code);
+  
+  // Remove common starter code patterns
+  const withoutComments = code
+    .replace(/\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/#.*$/gm, '')
+    .trim();
+  
+  // Check for return statements that aren't just "return 0", "return []", etc.
+  const hasNonTrivialReturn = 
+    /return\s+(?!0|null|undefined|None|false|true|""|\[\]|\{\})/i.test(withoutComments);
+  
+  // Check for loops or conditional logic
+  const hasLogic = 
+    /\b(for|while|if|else|switch|map|filter|reduce|forEach)\b/i.test(withoutComments);
+  
+  // Check for variable assignments or calculations
+  const hasCalculations = 
+    /[=+\-*/](?!=)/g.test(withoutComments.replace(/==|!=|<=|>=|===|!==/, ''));
+  
+  // Code must have some logic or meaningful return
+  return hasLogic || hasNonTrivialReturn || (hasCalculations && normalized.length > 50);
 }
 
 // Normalize code by removing comments and extra whitespace

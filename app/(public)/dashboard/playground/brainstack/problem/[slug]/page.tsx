@@ -9,6 +9,7 @@ import { CodeEditor } from "@/components/brainstack/CodeEditor";
 import { ProblemDescription } from "@/components/brainstack/ProblemDescription";
 import { TestResults } from "@/components/brainstack/TestResults";
 import { SolutionViewer } from "@/components/brainstack/SolutionViewer";
+import { SubmissionHistory } from "@/components/brainstack/SubmissionHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,10 @@ export default function ProblemPage() {
   const problem = useQuery(api.problems.getBySlug, { slug });
   const createSubmission = useMutation(api.submissions.create);
   const updateProblemStats = useMutation(api.problems.updateStats);
+  const problemStats = useQuery(
+    api.submissions.getProblemStats,
+    session?.user?.id ? { userId: session.user.id, problemId: problem?._id! } : "skip"
+  );
 
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [submissionStatus, setSubmissionStatus] = useState<any>(undefined);
@@ -79,8 +84,12 @@ export default function ProblemPage() {
       
       if (result.status === "Accepted") {
         toast.success("All test cases passed!");
+      } else if (result.status === "Compilation Error") {
+        toast.error(result.errorMessage || "Compilation Error: Please write your solution code");
+      } else if (result.status === "Runtime Error") {
+        toast.error("Runtime Error: Your code encountered an error during execution");
       } else {
-        toast.error(`Some test cases failed`);
+        toast.error(`${result.status}: Some test cases failed`);
       }
     } catch (error) {
       toast.error("Failed to run code");
@@ -146,6 +155,26 @@ export default function ProblemPage() {
         <div className="flex-1">
           <h1 className="font-semibold truncate">{problem.title}</h1>
         </div>
+        {/* Stats Display */}
+        {problemStats && problemStats.totalAttempts > 0 && (
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Attempts:</span>
+              <span className="font-semibold">{problemStats.totalAttempts}</span>
+            </div>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Success Rate:</span>
+              <span className={`font-semibold ${
+                problemStats.successRate >= 70 ? 'text-green-600' : 
+                problemStats.successRate >= 40 ? 'text-yellow-600' : 
+                'text-red-600'
+              }`}>
+                {problemStats.successRate}%
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
@@ -200,10 +229,8 @@ export default function ProblemPage() {
                     <TabsContent value="solution" className="flex-1 mt-0 overflow-hidden">
                       <SolutionViewer solution={problem.solution} />
                     </TabsContent>
-                    <TabsContent value="submissions" className="flex-1 mt-0 p-4 overflow-auto">
-                      <div className="text-sm text-muted-foreground">
-                        Submission history will appear here
-                      </div>
+                    <TabsContent value="submissions" className="flex-1 mt-0 overflow-hidden">
+                      <SubmissionHistory userId={session.user.id} problemId={problem._id} />
                     </TabsContent>
                   </Tabs>
                 </ResizablePanel>
@@ -215,11 +242,12 @@ export default function ProblemPage() {
         {/* Mobile: Tab-based Layout */}
         <div className="lg:hidden h-full flex flex-col">
           <Tabs defaultValue="code" className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 rounded-none border-b">
+            <TabsList className="grid w-full grid-cols-5 rounded-none border-b text-xs">
               <TabsTrigger value="description">Problem</TabsTrigger>
               <TabsTrigger value="code">Code</TabsTrigger>
               <TabsTrigger value="testcases">Test</TabsTrigger>
               <TabsTrigger value="solution">Solution</TabsTrigger>
+              <TabsTrigger value="submissions">Submit</TabsTrigger>
             </TabsList>
 
             {/* Problem Description Tab */}
@@ -258,6 +286,11 @@ export default function ProblemPage() {
             {/* Solution Tab */}
             <TabsContent value="solution" className="flex-1 mt-0 overflow-hidden">
               <SolutionViewer solution={problem.solution} />
+            </TabsContent>
+
+            {/* Submissions Tab (Mobile) */}
+            <TabsContent value="submissions" className="flex-1 mt-0 overflow-hidden">
+              <SubmissionHistory userId={session.user.id} problemId={problem._id} />
             </TabsContent>
           </Tabs>
         </div>

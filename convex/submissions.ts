@@ -100,6 +100,32 @@ export const listByUser = query({
   },
 });
 
+// Get problem statistics for a user
+export const getProblemStats = query({
+  args: {
+    userId: v.string(),
+    problemId: v.id("problems"),
+  },
+  handler: async (ctx, args) => {
+    const submissions = await ctx.db
+      .query("submissions")
+      .withIndex("by_user_and_problem", (q) =>
+        q.eq("userId", args.userId).eq("problemId", args.problemId)
+      )
+      .collect();
+
+    const totalAttempts = submissions.length;
+    const acceptedSubmissions = submissions.filter(s => s.status === "Accepted").length;
+    const successRate = totalAttempts > 0 ? (acceptedSubmissions / totalAttempts) * 100 : 0;
+
+    return {
+      totalAttempts,
+      acceptedSubmissions,
+      successRate: Math.round(successRate * 10) / 10, // Round to 1 decimal place
+    };
+  },
+});
+
 // Get submission by ID
 export const get = query({
   args: { submissionId: v.id("submissions") },
