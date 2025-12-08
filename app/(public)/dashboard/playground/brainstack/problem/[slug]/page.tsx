@@ -33,7 +33,7 @@ export default function ProblemPage() {
   const updateProblemStats = useMutation(api.problems.updateStats);
   const problemStats = useQuery(
     api.submissions.getProblemStats,
-    session?.user?.id ? { userId: session.user.id, problemId: problem?._id! } : "skip"
+    session?.user?.id && problem?._id ? { userId: session.user.id, problemId: problem._id } : "skip"
   );
 
   const [testResults, setTestResults] = useState<TestResult[]>([]);
