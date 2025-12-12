@@ -11,6 +11,7 @@ import { ArrowLeft, Edit, Clock, Calendar, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { getQuizByQuizId } from "../actions";
 import { notFound } from "next/navigation";
+import { ExportQuizPDF } from "./_components/ExportQuizPDF";
 
 export default async function QuizDetailsPage({ params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
@@ -131,8 +132,19 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
       {typeof questionsData === 'object' && !Array.isArray(questionsData) ? (
         <Card>
           <CardHeader>
-            <CardTitle>Quiz Questions by Set</CardTitle>
-            <CardDescription>Click on a set to view its questions</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Quiz Questions by Set</CardTitle>
+                <CardDescription>Click on a set to view its questions</CardDescription>
+              </div>
+              <ExportQuizPDF
+                quizTitle={quiz.title}
+                quizId={quiz.quizId}
+                description={quiz.description}
+                duration={quiz.duration}
+                questions={Object.values(questionsData).flat() as any[]}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <Accordion type="single" collapsible className="w-full">
@@ -140,10 +152,22 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
                 <AccordionItem key={setKey} value={`set-${setKey}`}>
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center justify-between w-full pr-4">
-                      <span className="font-semibold">Set {setKey}</span>
-                      <Badge variant="outline">
-                        {questionsData[setKey].length} question{questionsData[setKey].length > 1 ? 's' : ''}
-                      </Badge>
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold">Set {setKey}</span>
+                        <Badge variant="outline">
+                          {questionsData[setKey].length} question{questionsData[setKey].length > 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                      <ExportQuizPDF
+                        quizTitle={quiz.title}
+                        quizId={quiz.quizId}
+                        description={quiz.description}
+                        duration={quiz.duration}
+                        setNumber={setKey}
+                        questions={questionsData[setKey] as any[]}
+                        size="sm"
+                        stopPropagation
+                      />
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
@@ -200,8 +224,19 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
       ) : Array.isArray(questionsData) ? (
         <Card>
           <CardHeader>
-            <CardTitle>Questions</CardTitle>
-            <CardDescription>{questionsData.length} total questions</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Questions</CardTitle>
+                <CardDescription>{questionsData.length} total questions</CardDescription>
+              </div>
+              <ExportQuizPDF
+                quizTitle={quiz.title}
+                quizId={quiz.quizId}
+                description={quiz.description}
+                duration={quiz.duration}
+                questions={questionsData as any[]}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
