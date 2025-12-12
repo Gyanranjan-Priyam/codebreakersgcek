@@ -143,6 +143,7 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
                 description={quiz.description}
                 duration={quiz.duration}
                 questions={Object.values(questionsData).flat() as any[]}
+                questionsBySet={questionsData}
               />
             </div>
           </CardHeader>

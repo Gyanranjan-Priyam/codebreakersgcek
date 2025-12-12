@@ -20,6 +20,7 @@ interface ExportQuizPDFProps {
   duration: number;
   setNumber?: string;
   questions: QuizQuestion[];
+  questionsBySet?: Record<string, QuizQuestion[]>;
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
@@ -33,6 +34,7 @@ export function ExportQuizPDF({
   duration,
   setNumber,
   questions,
+  questionsBySet,
   variant = "outline",
   size = "sm",
   className,
@@ -55,6 +57,7 @@ export function ExportQuizPDF({
         duration,
         setNumber,
         questions,
+        questionsBySet,
       });
       
       const filename = setNumber 
