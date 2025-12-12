@@ -29,20 +29,39 @@ export const metadata: Metadata = {
   description: "Join CodeBreakers, the premier coding club at Government College of Engineering Kalahandi (GCEK). Learn programming, participate in hackathons, compete in coding challenges, and build innovative projects with a community of 500+ passionate developers.",
   keywords: [
     "CodeBreakers",
+    "CodeBreakers GCEK",
+    "Codebreakers GCE Kalahandi",
     "GCEK",
+    "GCE Kalahandi",
     "Government College of Engineering Kalahandi",
-    "coding club",
-    "programming club",
+    "Kalahandi Engineering College",
+    "coding club of GCE Kalahandi",
+    "coding club GCEK",
+    "programming club Kalahandi",
+    "GCEK coding club",
+    "GCE Kalahandi tech club",
     "hackathon",
     "competitive programming",
+    "coding competitions",
+    "programming contests",
     "web development",
     "software development",
-    "tech community",
-    "student developers",
-    "coding competitions",
+    "tech community Kalahandi",
+    "student developers GCEK",
     "Odisha engineering college",
-    "tech events",
-    "project collaboration"
+    "tech events Kalahandi",
+    "project collaboration",
+    "coding bootcamp",
+    "learn programming GCEK",
+    "developer community Odisha",
+    "tech club Odisha",
+    "engineering students Kalahandi",
+    "computer science GCEK",
+    "IT club Kalahandi",
+    "quiz competition",
+    "tech workshops",
+    "coding events",
+    "best coding club Odisha"
   ],
   authors: [{ name: "CodeBreakers GCEK" }],
   creator: "CodeBreakers GCEK",
@@ -97,7 +116,7 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: "your-google-verification-code",
+    google: "google4606fd743fa15671",
   },
   alternates: {
     canonical: "https://www.codebreakersgcek.tech",
@@ -110,8 +129,41 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "CodeBreakers GCEK",
+    "alternateName": ["CodeBreakers", "CodeBreakers GCE Kalahandi", "Coding Club of GCE Kalahandi"],
+    "url": "https://www.codebreakersgcek.tech",
+    "logo": "https://www.codebreakersgcek.tech/assets/logo.png",
+    "description": "Premier coding club at Government College of Engineering Kalahandi (GCEK) with 500+ members, organizing hackathons, coding competitions, and tech events.",
+    "foundingLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Bhawanipatna",
+        "addressRegion": "Kalahandi",
+        "addressCountry": "India"
+      }
+    },
+    "parentOrganization": {
+      "@type": "EducationalOrganization",
+      "name": "Government College of Engineering Kalahandi"
+    },
+    "sameAs": [
+      "https://www.instagram.com/codebreakers_gcek",
+      "https://www.linkedin.com/company/codebreakers-gcek"
+    ]
+  };
+
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+      </head>
       <body
         className={` ${sourceCodePro.variable} antialiased`}
       >

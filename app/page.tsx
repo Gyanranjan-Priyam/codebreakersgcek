@@ -62,18 +62,20 @@ const structuredData = {
     {
       "@type": "EducationalOrganization",
       "name": "CodeBreakers Coding Club",
-      "alternateName": "CodeBreakers GCEK",
+      "alternateName": ["CodeBreakers GCEK", "Codebreakers GCE Kalahandi", "Coding Club of GCE Kalahandi", "GCEK Coding Club", "Kalahandi Engineering College Coding Club"],
       "url": "https://www.codebreakersgcek.tech",
       "logo": "https://www.codebreakersgcek.tech/assets/logo.png",
-      "description": "CodeBreakers is a student-led coding club at Government College of Engineering Kalahandi, dedicated to fostering programming skills, innovation, and collaboration among students.",
+      "description": "CodeBreakers is a student-led coding club at Government College of Engineering Kalahandi (GCE Kalahandi), dedicated to fostering programming skills, innovation, and collaboration among 500+ students. We organize hackathons, coding competitions, workshops, and tech events.",
       "address": {
         "@type": "PostalAddress",
+        "streetAddress": "Government College of Engineering Kalahandi",
         "addressLocality": "Bhawanipatna",
-        "addressRegion": "Odisha",
+        "addressRegion": "Kalahandi, Odisha",
         "postalCode": "766002",
         "addressCountry": "IN"
       },
-      "numberOfStudents": "500+"
+      "numberOfStudents": "500+",
+      "keywords": "codebreakers, codebreakers gcek, gce kalahandi, coding club of gce kalahandi, kalahandi engineering college, gcek coding club, programming club odisha, tech events kalahandi"
     }
   ]
 };
