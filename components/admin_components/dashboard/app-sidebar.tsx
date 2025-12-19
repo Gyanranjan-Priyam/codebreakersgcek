@@ -16,7 +16,8 @@ import {
   UserX,
   Activity,
   ListChecks,
-  FolderOpen
+  FolderOpen,
+  QrCode
 } from "lucide-react"
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main"
@@ -67,6 +68,11 @@ const data = {
       icon: Activity,
       isCollapsible: true,
       items: [
+        {
+          title: "Attendance",
+          url: "/admin/attendance",
+          icon: QrCode,
+        },
         {
           title: "Quizzes",
           url: "/admin/quizzes",

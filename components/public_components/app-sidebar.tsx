@@ -15,6 +15,7 @@ import {
   FileCode,
   Brain,
   FolderOpen,
+  QrCode,
 } from "lucide-react";
 
 import { NavMain } from "@/components/public_components/nav-main";
@@ -56,6 +57,11 @@ const data = {
       icon: Activity,
       isCollapsible: true,
       items: [
+        {
+          title: "Attendance",
+          url: "/dashboard/attendance",
+          icon: QrCode,
+        },
         {
           title: "Quizzes",
           url: "/dashboard/activities/quizzes",

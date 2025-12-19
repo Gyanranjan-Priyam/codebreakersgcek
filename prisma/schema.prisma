@@ -292,9 +292,28 @@ model AttendanceSession {
   updatedAt     DateTime     @updatedAt
   createdBy     String       // Admin user ID who created this
   attendances   Attendance[]
+  qrCodes       AttendanceQR[] // QR codes generated for this session
 
   @@unique([sessionNumber])
   @@map("attendance_session")
+}
+
+model AttendanceQR {
+  id            String   @id @default(cuid())
+  sessionId     String
+  qrToken       String   @unique // Unique token embedded in QR code
+  expiresAt     DateTime // QR code expiration time (5 minutes from creation)
+  createdAt     DateTime @default(now())
+  createdBy     String   // Admin user ID who generated this
+  isActive      Boolean  @default(true) // Can be manually deactivated
+  scanCount     Int      @default(0) // Track how many times scanned
+  
+  session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([qrToken])
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("attendance_qr")
 }
 
 model Attendance {
@@ -304,7 +323,8 @@ model Attendance {
   status    String   // "pending", "present", "absent"
   points    Int      @default(0) // Points awarded for attendance
   markedAt  DateTime @default(now())
-  markedBy  String   // Admin user ID who marked the attendance
+  markedBy  String   // Admin user ID who marked the attendance or "qr-scan" for QR-based
+  method    String   @default("manual") // "manual" or "qr-scan"
   updatedAt DateTime @updatedAt
 
   session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
