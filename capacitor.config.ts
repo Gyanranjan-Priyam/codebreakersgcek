@@ -5,11 +5,15 @@ const config: CapacitorConfig = {
   appName: 'CodeBreakers',
   webDir: 'out',
   
-  // Server configuration for development
+  // Server configuration - point to your deployed backend
   server: {
-    // URL for development server (optional, for live reload)
-    // url: 'http://192.168.1.100:3000',
-    // cleartext: true
+    // For development: Use your local development server
+    // url: 'http://localhost:3000',
+    // cleartext: true,
+    
+    // For production: Use your deployed app URL
+    url: 'https://www.codebreakersgcek.tech',
+    cleartext: false,
   },
   
   // iOS specific configuration

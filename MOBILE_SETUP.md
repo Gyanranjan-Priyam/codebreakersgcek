@@ -29,18 +29,18 @@ The mobile app setup includes:
 
 ### Building the Mobile App
 
-#### 1. Build for Mobile
+#### 1. Configure and Sync Capacitor
 
 ```bash
-# Build the Next.js app for mobile
-npm run build:mobile
+# Sync Capacitor configuration
+npm run cap:sync
 ```
 
-This command:
-- Sets `BUILD_MODE=mobile` to enable static export
-- Generates Prisma client
-- Builds the Next.js app
-- Syncs the build with Capacitor platforms
+**Note:** This app uses a **server-based approach** where the mobile app loads your website from a server URL (configured in `capacitor.config.ts`). This allows all API routes and server-side features to work properly.
+
+The app can point to:
+- **Production:** `https://www.codebreakersgcek.tech` (default)
+- **Development:** `http://localhost:3000` (for local development)
 
 #### 2. Open in Native IDE
 
@@ -211,11 +211,10 @@ The main configuration is in `capacitor.config.ts`:
       backgroundColor: '#000000',
       showSpinner: true,
     },
-    Keyboard: {
-      resize: 'native',
-      style: 'dark',
-      resizeOnFullScreen: true,
-    },
+  },
+  server: {
+    url: 'https://www.codebreakersgcek.tech',
+    cleartext: false,
   },
 }
 ```
@@ -313,16 +312,35 @@ Add safe area padding to your layout:
 
 ## 🔄 Updating the Mobile App
 
-When you make changes to your Next.js code:
+### For Web Changes
 
-1. Rebuild the app:
-   ```bash
-   npm run build:mobile
+Since the app loads from your server URL:
+1. Deploy your changes to production
+2. The mobile app will automatically use the updated version
+3. No rebuild needed!
+
+### For Local Development
+
+1. Update `capacitor.config.ts` to point to localhost:
+   ```typescript
+   server: {
+     url: 'http://YOUR_LOCAL_IP:3000', // e.g., http://192.168.1.100:3000
+     cleartext: true,
+   }
    ```
 
-2. The changes will be synced automatically
+2. Run your Next.js dev server:
+   ```bash
+   npm run dev
+   ```
 
-For native changes (icons, splash screens, permissions):
+3. Sync and run the app:
+   ```bash
+   npm run cap:sync
+   npm run cap:run:android
+   ```
+
+### For Native Changes (icons, splash screens, permissions):
 
 1. Open the native project:
    ```bash
@@ -334,8 +352,9 @@ For native changes (icons, splash screens, permissions):
 
 ## 📝 Notes
 
-- The app uses Next.js static export mode for mobile builds
-- Server-side features are not available in the mobile app
-- Use environment variable `BUILD_MODE=mobile` to conditionally enable/disable features
+- The app uses a **server-based approach** - it loads your website from a configured URL
+- All server-side features (API routes, authentication, database) work normally
+- The mobile app is essentially a native wrapper around your web app
 - Safe area insets are automatically applied via CSS variables
 - Status bar color and style can be changed dynamically at runtime
+- For production, ensure your server URL is accessible and HTTPS is configured

@@ -6,7 +6,6 @@
     "dev": "next dev",
     "prebuild": "[ \"$VERCEL\" != \"1\" ] && npx convex codegen || echo 'Skipping convex codegen on Vercel'",
     "build": "prisma generate && next build",
-    "build:mobile": "BUILD_MODE=mobile prisma generate && next build && npx cap sync",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
@@ -14,8 +13,7 @@
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
     "cap:run:android": "npx cap run android",
-    "cap:run:ios": "npx cap run ios",
-    "mobile:dev": "BUILD_MODE=mobile next build && npx cap sync && npx cap run android"
+    "cap:run:ios": "npx cap run ios"
   },
   "dependencies": {
     "@arcjet/inspect": "^1.0.0-beta.14",
