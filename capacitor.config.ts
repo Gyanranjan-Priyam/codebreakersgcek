@@ -8,11 +8,11 @@ const config: CapacitorConfig = {
   // Server configuration - point to your deployed backend
   server: {
     // For development: Use your local development server
-    // url: 'http://localhost:3000',
+    // url: 'http://localhost:3000/login',
     // cleartext: true,
     
-    // For production: Use your deployed app URL
-    url: 'https://www.codebreakersgcek.tech',
+    // For production: Start at login page (skip homepage)
+    url: 'https://www.codebreakersgcek.tech/login',
     cleartext: false,
   },
   

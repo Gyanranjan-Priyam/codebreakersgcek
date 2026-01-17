@@ -6,6 +6,7 @@ import LenisProvider from "@/components/providers/lenis-provider";
 import { Analytics } from "@vercel/analytics/next";
 import { ConvexClientProvider } from "@/components/providers/convex-provider";
 import CapacitorProvider from "@/components/providers/capacitor-provider";
+import { MobileRedirect } from "@/components/mobile-redirect";
 
 
 const sourceCodePro = Source_Code_Pro({
@@ -171,6 +172,7 @@ export default function RootLayout({
         className={` ${sourceCodePro.variable} antialiased`}
       >
         <CapacitorProvider>
+          <MobileRedirect />
           <ConvexClientProvider>
             <LenisProvider>
               {children}

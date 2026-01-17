@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Script from "next/script";
 import TerminalLoader from "@/app/(homepage)/_components/terminal-loader/page";
 import { authClient } from "@/lib/auth-client";
+import { useIsNative } from "@/hooks/use-native";
 
 // Preload components but render them only after loading
 const Navbar = dynamic(() => import("@/components/homepage/Navbar"));
@@ -81,6 +83,9 @@ const structuredData = {
 };
 
 export default function Home() {
+  const router = useRouter();
+  const { isNative } = useIsNative();
+  
   const [isLoading, setIsLoading] = useState(() => {
     // Check if user has already visited in this session
     if (typeof window !== 'undefined') {
@@ -92,6 +97,13 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [shouldShowLoader, setShouldShowLoader] = useState(false);
+
+  // Redirect mobile users to login
+  useEffect(() => {
+    if (isNative) {
+      router.replace('/login');
+    }
+  }, [isNative, router]);
 
   // Delay showing loader to prevent flash on reload
   useEffect(() => {

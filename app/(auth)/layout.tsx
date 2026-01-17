@@ -14,17 +14,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <div className="relative flex min-h-svh flex-col items-center justify-center px-4 sm:px-6">
-
-            {/* Back button */}
-            <Link href="/">
-                <Button variant="outline" className="absolute left-4 top-4 z-20">
-                    <ArrowLeft className="mr-2" />
-                    Back
-                </Button>
-            </Link>
-
             <div className="flex w-full max-w-full flex-col justify-center gap-6">
-
                 {/* Logo Section */}
                 <Link href="/" className="flex items-center gap-2 self-center font-medium mt-8 mb-2">
                     <span className="text-2xl sm:text-3xl flex flex-col items-center text-center">
