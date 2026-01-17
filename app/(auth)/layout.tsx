@@ -16,7 +16,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="relative flex min-h-svh flex-col items-center justify-center px-4 sm:px-6">
             <div className="flex w-full max-w-full flex-col justify-center gap-6">
                 {/* Logo Section */}
-                <Link href="/" className="flex items-center gap-2 self-center font-medium mt-8 mb-2">
+                <Link href="/login" className="flex items-center gap-2 self-center font-medium mt-8 mb-2">
                     <span className="text-2xl sm:text-3xl flex flex-col items-center text-center">
                         <Image
                             src="/assets/logo.png"
