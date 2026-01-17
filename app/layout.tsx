@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import LenisProvider from "@/components/providers/lenis-provider";
 import { Analytics } from "@vercel/analytics/next";
 import { ConvexClientProvider } from "@/components/providers/convex-provider";
+import CapacitorProvider from "@/components/providers/capacitor-provider";
 
 
 const sourceCodePro = Source_Code_Pro({
@@ -18,6 +19,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Add viewport-fit for safe area insets on notched devices
+  viewportFit: 'cover',
 }
 
 export const metadata: Metadata = {
@@ -167,11 +170,13 @@ export default function RootLayout({
       <body
         className={` ${sourceCodePro.variable} antialiased`}
       >
-        <ConvexClientProvider>
-          <LenisProvider>
-            {children}
-          </LenisProvider>
-        </ConvexClientProvider>
+        <CapacitorProvider>
+          <ConvexClientProvider>
+            <LenisProvider>
+              {children}
+            </LenisProvider>
+          </ConvexClientProvider>
+        </CapacitorProvider>
         <Toaster position="top-center" richColors closeButton />
         <Analytics />
       </body>

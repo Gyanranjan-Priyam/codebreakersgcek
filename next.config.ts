@@ -62,7 +62,10 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   // Generate sitemap and robots.txt automatically
-  output: 'standalone',
+  // Change output to 'export' for Capacitor mobile app
+  output: process.env.BUILD_MODE === 'mobile' ? 'export' : 'standalone',
+  // Disable trailing slash for mobile builds
+  trailingSlash: process.env.BUILD_MODE === 'mobile' ? true : false,
   // Webpack configuration to inject environment variables
   webpack: (config, { isServer }) => {
     if (!isServer) {

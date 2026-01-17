@@ -57,6 +57,15 @@
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+  
+  /* Safe area insets for mobile devices */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  
+  /* Keyboard height (dynamically set by Capacitor) */
+  --keyboard-height: 0px;
 }
 
 .dark {
@@ -171,6 +180,48 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Mobile-specific styles for Capacitor */
+  body.capacitor {
+    /* Add padding for safe areas */
+    padding-top: var(--safe-area-inset-top);
+    padding-right: var(--safe-area-inset-right);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
+    
+    /* Prevent overscroll/bounce effect */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    
+    /* Ensure full height on mobile */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  
+  /* iOS-specific adjustments */
+  body.platform-ios {
+    /* iOS status bar is typically 44px (20px status + 24px notch on iPhone X+) */
+    --status-bar-height: 44px;
+  }
+  
+  /* Android-specific adjustments */
+  body.platform-android {
+    /* Android status bar is typically 24px */
+    --status-bar-height: 24px;
+  }
+  
+  /* Prevent text selection on mobile for better UX */
+  body.capacitor * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Allow text selection for input elements */
+  body.capacitor input,
+  body.capacitor textarea {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
 
