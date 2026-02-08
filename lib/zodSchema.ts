@@ -157,7 +157,6 @@ export const announcementSchema = z.object({
 export type AnnouncementSchemaType = z.infer<typeof announcementSchema>;
 
 export const formSchema = z.object({
-  profileImageKey: z.string().optional(),
   username: z.string().min(2, "Username must be at least 2 characters"),
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   middleName: z.string().optional(),
@@ -167,9 +166,6 @@ export const formSchema = z.object({
     .string()
     .min(10, "WhatsApp number must be at least 10 digits"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  aadhaarNumber: z
-    .string()
-    .min(12, "Aadhaar number must be at least 12 digits"),
   registration: z.string().min(2, "Registration number is required"),
   rollNumber: z.string().min(2, "Roll number is required"),
   branch: z.string().min(1, "Please select a branch"),

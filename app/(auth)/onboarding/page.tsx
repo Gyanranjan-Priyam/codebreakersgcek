@@ -38,11 +38,9 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen ">
-      <OnboardingForm 
-        userEmail={session.user.email} 
-        userName={session.user.name || ""}
-      />
-    </div>
+    <OnboardingForm 
+      userEmail={session.user.email} 
+      userName={session.user.name || ""}
+    />
   );
 }

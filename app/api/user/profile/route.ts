@@ -111,7 +111,6 @@ export async function POST(request: NextRequest) {
         aadhaarNumber: data.aadhaarNumber,
         state: data.state,
         district: data.district,
-        profileImageKey: (data as any).profileImageKey || null,
         
         // Personal Details
         username: data.username || null,

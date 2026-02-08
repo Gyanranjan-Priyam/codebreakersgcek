@@ -12,16 +12,8 @@ Disallow: /verify-request
 Disallow: /_next/
 Disallow: /auth/
 
-# Allow public pages
+# Allow public pages (homepage routes have been removed)
 Allow: /
-Allow: /events
-Allow: /team
-Allow: /contact
-Allow: /gallery
-Allow: /projects
-Allow: https://blogs.codebreakersgcek.tech
-Allow: /announcement
-Allow: /leaderboard
 Allow: /privacy
 Allow: /terms
 

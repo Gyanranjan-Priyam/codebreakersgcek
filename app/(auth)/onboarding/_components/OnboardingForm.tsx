@@ -34,8 +34,7 @@ import statesDistrictsData from "@/lib/new/states-districts.json";
 import { formSchema } from "@/lib/zodSchema";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle2, XCircle, AlertCircle, Upload } from "lucide-react";
-import { Uploader } from "@/components/file-uploader/Uploader";
+import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -61,7 +60,6 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      profileImageKey: "",
       username: "",
       firstName: userName ? userName.split(" ")[0] : "",
       middleName: "",
@@ -69,7 +67,6 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
       email: userEmail || "",
       phone: "",
       whatsappNumber: "",
-      aadhaarNumber: "",
       registration: "",
       rollNumber: "",
       branch: "",
@@ -198,60 +195,26 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
   };
 
   return (
-    <div className="container max-w-5xl mx-auto">
-      <Card className="w-full h-full p-3 sm:p-6 shadow-lg">
-        <CardHeader className="p-2 sm:p-4">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-2">
-              <CardTitle className="text-xl sm:text-2xl">Complete Your Profile</CardTitle>
-              <CardDescription className="text-sm sm:text-base mt-2">
-                Welcome to CodeBreakers Club!!! An official coding club of GCEK Bhawanipatna. To get started, please complete your profile with the details below. 
-                This information will be used for all your future reference.
-              </CardDescription>
-            </div>
-          </div>
+    <div className="w-full max-w-8xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <Card className="w-full shadow-lg">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-2xl sm:text-3xl font-bold">Complete Your Profile</CardTitle>
+          <CardDescription className="text-sm sm:text-base">
+            Welcome to CodeBreakers An official coding club of GCEK Bhawanipatna. To get started, please complete your profile with the details below. 
+            This information will be used for all your future reference.
+          </CardDescription>
         </CardHeader>
         <Separator/>
-        <CardContent className="px-1 sm:px-2">
+        <CardContent className="pt-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
-              {/* Profile Image Upload Section */}
-              <div className="mb-4 sm:mb-6 flex flex-col gap-4 sm:gap-6">
-                <h3 className="text-base sm:text-lg mb-1 sm:mb-2 font-medium leading-tight tracking-tighter">
-                  Profile Image
-                </h3>
-                <Separator className="mb-1" />
-                <FormField
-                  control={form.control}
-                  name="profileImageKey"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Upload Profile Picture</FormLabel>
-                      <FormControl>
-                        <div className="max-w-md">
-                          <Uploader
-                            value={field.value}
-                            onChange={field.onChange}
-                            fileTypeAccepted="image"
-                            disabled={isSubmitting}
-                            maxSize={500 * 1024}
-                          />
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Maximum file size: 500KB. Supported formats: JPG, PNG, WebP
-                          </p>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <Separator />
-              <div className="mb-4 sm:mb-6 flex flex-col gap-4 sm:gap-6">
-                <h3 className="text-base sm:text-lg mb-1 sm:mb-2 font-medium leading-tight tracking-tighter">
-                  Personal Information
-                </h3>
-                <Separator className="mb-1" />
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2">
+                    Personal Information
+                  </h3>
+                  <Separator />
+                </div>
                 <FormField
                   control={form.control}
                   name="username"
@@ -315,7 +278,7 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                   )}
                 />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="firstName"
@@ -390,7 +353,7 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                   )}
                 />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="phone"
@@ -426,34 +389,17 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                       </FormItem>
                     )}
                   />
-
-                  <FormField
-                    control={form.control}
-                    name="aadhaarNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Aadhaar Number</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter your Aadhaar number"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
               </div>
-              <Separator className="mt-4 sm:mt-7" />
-              <div className="flex flex-col gap-4 sm:gap-6">
-                <h3 className="text-base sm:text-lg mb-1 sm:mb-2 font-medium leading-tight tracking-tighter">
-                  Academic Information
-                </h3>
-                <Separator className="mb-1" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2">
+                    Academic Information
+                  </h3>
+                  <Separator />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="admissionYear"
@@ -546,9 +492,9 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                     </FormItem>
                   )}
                 />
-              </div>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-4 sm:gap-6">
+                <div className="space-y-4">
                 <FormField
                   control={form.control}
                   name="collegeName"
@@ -609,13 +555,16 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                     </FormItem>
                   )}
                 />
+                </div>
               </div>
-              <Separator className="mt-4 sm:mt-7" />
-              <div className="mt-4 sm:mt-6 mb-4 sm:mb-6 flex flex-col gap-4 sm:gap-6">
-                <h3 className="text-base sm:text-lg mb-1 sm:mb-2 font-medium leading-tight tracking-tighter">
-                  Address Information
-                </h3>
-                <Separator className="mb-1" />
+              
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2">
+                    Address Information
+                  </h3>
+                  <Separator />
+                </div>
                 <FormField
                   control={form.control}
                   name="address"
@@ -634,7 +583,7 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="postOffice"
@@ -672,7 +621,7 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="block"
@@ -776,8 +725,8 @@ export default function OnboardingForm({ userEmail, userName }: OnboardingFormPr
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4">
-                <Button type="submit" className="cursor-pointer w-full sm:w-auto" disabled={isSubmitting}>
+              <div className="flex justify-end pt-6">
+                <Button type="submit" size="lg" className="cursor-pointer w-full sm:w-auto" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
