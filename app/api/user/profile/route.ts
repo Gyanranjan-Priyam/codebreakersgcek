@@ -108,7 +108,6 @@ export async function POST(request: NextRequest) {
         email: data.email,
         mobileNumber: data.phone,
         whatsappNumber: data.whatsappNumber || null,
-        aadhaarNumber: data.aadhaarNumber,
         state: data.state,
         district: data.district,
         
