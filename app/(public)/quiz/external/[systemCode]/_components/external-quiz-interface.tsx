@@ -1,17 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, Phone, IdCard, Building2, BookOpen, Award, Timer, CheckCircle2 } from "lucide-react";
-import { submitQuizAttempt } from "../actions";
-import { blockUserFromQuizAction } from "../block-actions";
-import { setSystemAttemptingAction } from "@/app/admin/quizzes/actions";
-import { CloseWindowButton } from "./close-window-button";
-import { toast } from "sonner";
-import { getPusherClient } from "@/lib/pusher-client";
+import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, IdCard, BookOpen, Award, Timer, CheckCircle2, FileText } from "lucide-react";
+import { submitExternalQuizAttempt } from "@/app/admin/quizzes/actions";
+import { useRouter } from "next/navigation";
 
 interface Quiz {
   id: string;
@@ -22,6 +18,7 @@ interface Quiz {
   duration: number;
   pointsPerQuestion: number;
   questionsJson: string;
+  feedbackFormId?: string | null;
 }
 
 interface User {
@@ -30,52 +27,35 @@ interface User {
   email: string;
   registration?: string | null;
   username?: string | null;
-  mobile?: string | null;
-  branch?: string | null;
 }
 
 interface Question {
+  id: number;
   question: string;
   options: string[];
-  correctAnswer: number;
+  answer: string;
 }
 
-interface QuizProctorInterfaceProps {
+interface ExternalQuizInterfaceProps {
   quiz: Quiz;
   user: User;
-  hasExistingAttempt: boolean;
   assignedSet: string;
-  /** Optional custom submit handler — when provided, internal submitQuizAttempt is NOT called */
-  onSubmit?: (data: {
-    quizId: string;
-    quizDbId: string;
-    assignedSet: string;
-    answers: Record<number, number>;
-    tabSwitches: number;
-    questionsJson: string;
-  }) => Promise<{ status: "success" | "error"; message?: string; data?: { score: number; correctAnswers: number; totalQuestions: number; pointsEarned: number; tabSwitches: number; detailedResults?: any[] } }>;
-  /** Optional content shown inside the submitted card (replaces Close / View Achievements buttons) */
-  afterSubmitContent?: React.ReactNode;
-  /** Optional systemCode for external kiosk candidate sessions */
-  systemCode?: string;
-  /** Optional initial step for active or unblocked attempts */
-  initialStep?: 'user-info' | 'quiz-details' | 'quiz-started' | 'quiz-submitted';
+  systemCode: string;
+  isCompleted?: boolean;
 }
 
-type QuizStep = 'user-info' | 'quiz-details' | 'quiz-started' | 'quiz-submitted';
+type QuizStep = "user-info" | "quiz-details" | "quiz-started" | "quiz-submitted";
 
-export default function QuizProctorInterface({ 
-  quiz, 
-  user, 
-  hasExistingAttempt,
+export default function ExternalQuizInterface({
+  quiz,
+  user,
   assignedSet,
-  onSubmit,
-  afterSubmitContent,
   systemCode,
-  initialStep,
-}: QuizProctorInterfaceProps) {
-  const [currentStep, setCurrentStep] = useState<QuizStep>(initialStep || 'user-info');
-  const [selectedSet] = useState<string>(assignedSet); // Pre-selected with assigned set
+  isCompleted = false,
+}: ExternalQuizInterfaceProps) {
+  const router = useRouter();
+  const [currentStep, setCurrentStep] = useState<QuizStep>(isCompleted ? "quiz-submitted" : "user-info");
+  const [selectedSet] = useState<string>(assignedSet);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tabSwitches, setTabSwitches] = useState(0);
   const [showWarning, setShowWarning] = useState(false);
@@ -85,69 +65,10 @@ export default function QuizProctorInterface({
   const [blockedMessageTimer, setBlockedMessageTimer] = useState(5);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const blockedTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState(quiz.duration * 60); // Convert minutes to seconds
+  const [timeRemaining, setTimeRemaining] = useState(quiz.duration * 60);
   const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-
-  // Save question index to localStorage whenever it changes
-  useEffect(() => {
-    if (systemCode && currentQuestionIndex >= 0) {
-      try {
-        localStorage.setItem(`cb_qidx_${systemCode}`, String(currentQuestionIndex));
-      } catch (e) {}
-    }
-  }, [currentQuestionIndex, systemCode]);
-
-  // Restore saved question index & answers from localStorage if refreshing or unblocking
-  useEffect(() => {
-    if (systemCode) {
-      try {
-        const savedAnswers = localStorage.getItem(`cb_answers_${systemCode}`);
-        if (savedAnswers) {
-          setAnswers(JSON.parse(savedAnswers));
-        }
-        const savedIdx = localStorage.getItem(`cb_qidx_${systemCode}`);
-        if (savedIdx) {
-          const parsedIdx = parseInt(savedIdx, 10);
-          if (!isNaN(parsedIdx) && parsedIdx >= 0) {
-            setCurrentQuestionIndex(parsedIdx);
-          }
-        }
-      } catch (e) {}
-    }
-  }, [systemCode]);
-
-  // Real-time WebSockets unblock listener inside QuizProctorInterface
-  useEffect(() => {
-    if (!systemCode) return;
-    const pusher = getPusherClient();
-    if (!pusher) return;
-
-    const channelName = `system-${systemCode}`;
-    const channel = pusher.subscribe(channelName);
-
-    const handleUnblock = () => {
-      setIsBlocked(false);
-      setShowWarning(false);
-      setShowFullscreenWarning(false);
-      toast.success("You have been unblocked by admin! Resuming your exam...");
-    };
-
-    channel.bind("unblocked", handleUnblock);
-    channel.bind("status-changed", (data: { status?: string }) => {
-      if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
-        handleUnblock();
-      } else if (data?.status === "BLOCKED") {
-        setIsBlocked(true);
-      }
-    });
-
-    return () => {
-      channel.unbind_all();
-      pusher.unsubscribe(channelName);
-    };
-  }, [systemCode]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<{
     score: number;
@@ -155,26 +76,27 @@ export default function QuizProctorInterface({
     totalQuestions: number;
     pointsEarned: number;
     tabSwitches: number;
-    detailedResults?: Array<{
-      questionIndex: number;
-      question: string;
-      userAnswer: number;
-      correctAnswer: number;
-      isCorrect: boolean;
-      options: string[];
-    }>;
   } | null>(null);
 
-  // Parse questions to get set information
-  const questionsData = JSON.parse(quiz.questionsJson);
-  const availableSets = Object.keys(questionsData);
-  const getQuestionCount = (set: string) => {
-    return Array.isArray(questionsData[set]) ? questionsData[set].length : 0;
-  };
+  // Parse questions
+  let questionsData: Record<string, Question[]> = {};
+  try {
+    const raw = JSON.parse(quiz.questionsJson);
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+      questionsData = raw;
+    } else if (Array.isArray(raw)) {
+      questionsData = { A: raw };
+    }
+  } catch (e) {
+    console.error(e);
+  }
+
+  const getQuestionCount = (set: string) =>
+    Array.isArray(questionsData[set]) ? questionsData[set].length : 0;
 
   // Load questions for the assigned set when quiz starts
   useEffect(() => {
-    if (currentStep === 'quiz-started' && selectedSet) {
+    if (currentStep === "quiz-started" && selectedSet) {
       const questionsForSet = questionsData[selectedSet];
       if (Array.isArray(questionsForSet)) {
         setQuestions(questionsForSet as Question[]);
@@ -184,17 +106,15 @@ export default function QuizProctorInterface({
 
   // Timer countdown
   useEffect(() => {
-    if (currentStep !== 'quiz-started') return;
+    if (currentStep !== "quiz-started") return;
 
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Auto-submit when time runs out
           handleSubmitQuiz();
           return 0;
         }
-        // Show warning when 5 minutes remaining
         if (prev === 300) {
           setShowWarning(true);
           setTimeout(() => setShowWarning(false), 5000);
@@ -206,78 +126,76 @@ export default function QuizProctorInterface({
     return () => clearInterval(timer);
   }, [currentStep]);
 
-  // Format time as MM:SS
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Check if time is running low (less than 5 minutes)
   const isTimeLow = timeRemaining <= 300 && timeRemaining > 0;
 
   const handleAnswerSelect = (questionIndex: number, answerIndex: number) => {
-    setAnswers(prev => {
-      const next = { ...prev, [questionIndex]: answerIndex };
-      if (systemCode) {
-        try {
-          localStorage.setItem(`cb_answers_${systemCode}`, JSON.stringify(next));
-        } catch (e) {}
-      }
-      return next;
-    });
+    setAnswers((prev) => ({ ...prev, [questionIndex]: answerIndex }));
   };
 
   const handleSubmitQuiz = async () => {
-    if (isSubmitting || Object.keys(answers).length !== questions.length) return;
-    
+    if (isSubmitting) return;
+
     setIsSubmitting(true);
-    
+
     try {
-      const submitData = {
-        quizId: quiz.quizId,
-        quizDbId: quiz.id,
-        assignedSet: selectedSet,
-        answers,
-        tabSwitches,
-        questionsJson: quiz.questionsJson,
-      };
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
 
-      // Use custom onSubmit if provided (external quiz), otherwise fall back to internal action
-      const result = onSubmit
-        ? await onSubmit(submitData)
-        : await submitQuizAttempt(submitData);
+      const currentQuestions = questions.length > 0 ? questions : (questionsData[selectedSet] || []);
+      let correctCount = 0;
 
-      if (result.status === "success" && result.data) {
-        if (systemCode) {
-          try {
-            localStorage.removeItem(`cb_answers_${systemCode}`);
-            localStorage.removeItem(`cb_qidx_${systemCode}`);
-          } catch (e) {}
+      // Build answer map: questionIndex -> selected option string
+      const answersStringMap: Record<string, string> = {};
+      currentQuestions.forEach((q, idx) => {
+        const selectedOptionIndex = answers[idx];
+        if (selectedOptionIndex !== undefined) {
+          const selectedOption = q.options[selectedOptionIndex] || "";
+          answersStringMap[q.id.toString()] = selectedOption;
+          if (selectedOption.trim() === (q.answer || "").trim()) {
+            correctCount++;
+          }
         }
-        setSubmissionResult(result.data);
-        setCurrentStep('quiz-submitted');
-        // Exit fullscreen
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
-        }
+      });
+
+      const totalQ = currentQuestions.length;
+      const score = totalQ > 0 ? (correctCount / totalQ) * 100 : 0;
+      const points = correctCount * quiz.pointsPerQuestion;
+
+      const res = await submitExternalQuizAttempt({
+        systemCode,
+        answersJson: JSON.stringify(answersStringMap),
+        totalQuestions: totalQ,
+        correctAnswers: correctCount,
+        score,
+        pointsEarned: points,
+        setNumber: selectedSet.charCodeAt(0) - 64,
+      });
+
+      if (res.status === "success") {
+        setSubmissionResult({
+          score: Math.round(score * 10) / 10,
+          correctAnswers: correctCount,
+          totalQuestions: totalQ,
+          pointsEarned: points,
+          tabSwitches,
+        });
+        setCurrentStep("quiz-submitted");
+        localStorage.removeItem("cb_external_system_session");
       } else {
-        alert(result.message || "Failed to submit quiz. Please try again.");
+        alert(res.message || "Failed to submit quiz. Please try again.");
       }
     } catch (error) {
       console.error("Error submitting quiz:", error);
       alert("An error occurred while submitting the quiz. Please try again.");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleViewAchievements = () => {
-    if (window.opener && !window.opener.closed) {
-      window.opener.location.href = '/dashboard/achievements';
-      window.close();
-    } else {
-      window.location.href = '/dashboard/achievements';
     }
   };
 
@@ -299,83 +217,63 @@ export default function QuizProctorInterface({
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  // Prevent tab switching and detect visibility changes
+  // Tab switching / visibility monitoring
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && currentStep === 'quiz-started' && !isBlocked) {
-        setTabSwitches(prev => {
+      if (document.hidden && currentStep === "quiz-started" && !isBlocked) {
+        setTabSwitches((prev) => {
           const newCount = prev + 1;
-          
+
           if (newCount >= 3) {
-            // Third strike - block the quiz
             setIsBlocked(true);
             setShowWarning(true);
-            
-            // Call server action to record the block
-            blockUserFromQuizAction({
-              quizId: quiz.id,
-              quizIdentifier: quiz.quizId,
-              reason: `Exceeded maximum violations (${newCount} tab switches/visibility changes detected during quiz)`,
-              violationType: "TAB_SWITCH",
-              violationCount: newCount,
-              userId: user.id,
-              systemCode: systemCode || (user.username?.startsWith("SYS-") ? user.username : undefined),
-            }).catch(error => {
-              console.error("Failed to record quiz block:", error);
-            });
           } else {
-            // First and second warning
             setShowWarning(true);
             setTimeout(() => setShowWarning(false), 5000);
           }
-          
+
           return newCount;
         });
       }
     };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (currentStep === 'quiz-started') {
+      if (currentStep === "quiz-started") {
         e.preventDefault();
-        e.returnValue = '';
+        e.returnValue = "";
       }
     };
 
-    // Prevent right-click
     const handleContextMenu = (e: MouseEvent) => {
-      if (currentStep === 'quiz-started') {
-        e.preventDefault();
-      }
+      if (currentStep === "quiz-started") e.preventDefault();
     };
 
-    // Prevent certain keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (currentStep === 'quiz-started') {
-        // Prevent F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+      if (currentStep === "quiz-started") {
         if (
-          e.key === 'F12' ||
-          (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) ||
-          (e.ctrlKey && e.key === 'u')
+          e.key === "F12" ||
+          (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J")) ||
+          (e.ctrlKey && e.key === "u")
         ) {
           e.preventDefault();
         }
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [currentStep, isBlocked]);
 
-  // Request fullscreen
+  // Request / exit fullscreen helpers
   const enterFullscreen = async () => {
     try {
       await document.documentElement.requestFullscreen();
@@ -385,7 +283,6 @@ export default function QuizProctorInterface({
     }
   };
 
-  // Exit fullscreen
   const exitFullscreen = async () => {
     try {
       if (document.fullscreenElement) {
@@ -401,13 +298,11 @@ export default function QuizProctorInterface({
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
-      
-      if (!document.fullscreenElement && currentStep === 'quiz-started' && !isBlocked && !showFullscreenWarning) {
-        // Show the warning modal with countdown
+
+      if (!document.fullscreenElement && currentStep === "quiz-started" && !isBlocked && !showFullscreenWarning) {
         setShowFullscreenWarning(true);
         setFullscreenWarningTimer(10);
       } else if (document.fullscreenElement && showFullscreenWarning) {
-        // User returned to fullscreen - clear warning and timer
         if (countdownIntervalRef.current) {
           clearInterval(countdownIntervalRef.current);
           countdownIntervalRef.current = null;
@@ -417,44 +312,25 @@ export default function QuizProctorInterface({
       }
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [currentStep, isBlocked, showFullscreenWarning]);
 
-  // Handle fullscreen warning countdown
+  // Fullscreen warning countdown
   useEffect(() => {
     if (showFullscreenWarning && fullscreenWarningTimer > 0) {
       countdownIntervalRef.current = setInterval(() => {
         setFullscreenWarningTimer((prev) => {
           if (prev <= 1) {
-            // Time's up - block the user
             if (countdownIntervalRef.current) {
               clearInterval(countdownIntervalRef.current);
               countdownIntervalRef.current = null;
             }
-            
-            setTabSwitches(prevCount => prevCount + 1);
+            setTabSwitches((prevCount) => prevCount + 1);
             setIsBlocked(true);
             setShowFullscreenWarning(false);
             setShowWarning(false);
             setBlockedMessageTimer(5);
-            
-            // Call server action to record the block
-            blockUserFromQuizAction({
-              quizId: quiz.id,
-              quizIdentifier: quiz.quizId,
-              reason: `Failed to return to fullscreen within 10 seconds`,
-              violationType: "FULLSCREEN_EXIT",
-              violationCount: 1,
-              userId: user.id,
-              systemCode: systemCode || (user.username?.startsWith("SYS-") ? user.username : undefined),
-            }).catch(error => {
-              console.error("Failed to record quiz block:", error);
-            });
-            
             return 0;
           }
           return prev - 1;
@@ -470,9 +346,9 @@ export default function QuizProctorInterface({
     };
   }, [showFullscreenWarning]);
 
-  // Handle blocked message countdown and auto-close (only for internal dashboard users, not external kiosks)
+  // Blocked message countdown
   useEffect(() => {
-    if (isBlocked && blockedMessageTimer > 0 && !systemCode && !user.username?.startsWith("SYS-")) {
+    if (isBlocked && blockedMessageTimer > 0) {
       blockedTimerRef.current = setInterval(() => {
         setBlockedMessageTimer((prev) => {
           if (prev <= 1) {
@@ -480,14 +356,8 @@ export default function QuizProctorInterface({
               clearInterval(blockedTimerRef.current);
               blockedTimerRef.current = null;
             }
-            // Close the window after countdown
             setTimeout(() => {
-              if (window.opener && !window.opener.closed) {
-                window.opener.location.href = '/dashboard/activities/quizzes';
-                window.close();
-              } else {
-                window.location.href = '/dashboard/activities/quizzes';
-              }
+              router.push("/system-register");
             }, 100);
             return 0;
           }
@@ -502,21 +372,15 @@ export default function QuizProctorInterface({
         blockedTimerRef.current = null;
       }
     };
-  }, [isBlocked, systemCode, user.username]);
+  }, [isBlocked]);
 
   const handleStartQuiz = () => {
     enterFullscreen();
-    setCurrentStep('quiz-started');
-    const targetCode = systemCode || (user.username?.startsWith("SYS-") ? user.username : null);
-    if (targetCode) {
-      setSystemAttemptingAction(targetCode).catch((err) => {
-        console.error("Failed to set system status to ATTEMPTING:", err);
-      });
-    }
+    setCurrentStep("quiz-started");
   };
 
-  // Step 1: User Information
-  if (currentStep === 'user-info') {
+  // ── Step 1: User Information ──
+  if (currentStep === "user-info") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
         <Card className="max-w-2xl w-full">
@@ -525,7 +389,6 @@ export default function QuizProctorInterface({
             <CardDescription>Please confirm your details before proceeding to the quiz</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* User Information */}
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <UserIcon className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -543,32 +406,12 @@ export default function QuizProctorInterface({
                 </div>
               </div>
 
-              {user.mobile && (
-                <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                  <Phone className="h-5 w-5 text-muted-foreground shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Mobile Number</p>
-                    <p className="font-medium">{user.mobile}</p>
-                  </div>
-                </div>
-              )}
-
               {user.registration && (
                 <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                   <IdCard className="h-5 w-5 text-muted-foreground shrink-0" />
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Registration Number</p>
+                    <p className="text-xs text-muted-foreground">Assigned System / Kiosk</p>
                     <p className="font-medium">{user.registration}</p>
-                  </div>
-                </div>
-              )}
-
-              {user.branch && (
-                <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                  <Building2 className="h-5 w-5 text-muted-foreground shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Branch</p>
-                    <p className="font-medium">{user.branch}</p>
                   </div>
                 </div>
               )}
@@ -581,8 +424,8 @@ export default function QuizProctorInterface({
               </AlertDescription>
             </Alert>
 
-            <Button 
-              onClick={() => setCurrentStep('quiz-details')}
+            <Button
+              onClick={() => setCurrentStep("quiz-details")}
               className="w-full text-lg py-6 cursor-pointer bg-primary hover:bg-primary/90 text-white"
               size="lg"
             >
@@ -594,8 +437,8 @@ export default function QuizProctorInterface({
     );
   }
 
-  // Step 2: Quiz Details and Set Selection
-  if (currentStep === 'quiz-details') {
+  // ── Step 2: Quiz Details ──
+  if (currentStep === "quiz-details") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
         <Card className="max-w-3xl w-full">
@@ -604,7 +447,6 @@ export default function QuizProctorInterface({
             <CardDescription>{quiz.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Quiz Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <Clock className="h-5 w-5 text-primary shrink-0" />
@@ -625,46 +467,42 @@ export default function QuizProctorInterface({
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <BookOpen className="h-5 w-5 text-primary shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Available Sets</p>
-                  <p className="font-semibold">{availableSets.length} set{availableSets.length > 1 ? 's' : ''}</p>
+                  <p className="text-xs text-muted-foreground">Assigned Set</p>
+                  <p className="font-semibold">Set {selectedSet}</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <IdCard className="h-5 w-5 text-primary shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  {hasExistingAttempt ? (
-                    <Badge variant="secondary">Retaking Quiz</Badge>
-                  ) : (
-                    <Badge variant="default">First Attempt</Badge>
-                  )}
+                  <p className="text-xs text-muted-foreground">Questions</p>
+                  <p className="font-semibold">{getQuestionCount(selectedSet)} questions</p>
                 </div>
               </div>
             </div>
 
-            {/* Set Selection - Display Only (Pre-assigned) */}
+            {/* Assigned Set Info */}
             <div className="space-y-3">
               <label className="text-sm font-medium">Your Assigned Set</label>
               <div className="p-6 border-2 border-primary bg-primary/10 rounded-lg">
                 <div className="text-center">
                   <div className="text-3xl font-bold mb-2">Set {selectedSet}</div>
                   <p className="text-sm text-muted-foreground">
-                    This set has been randomly assigned to you
+                    This set has been assigned to you by the administrator
                   </p>
                   <div className="text-xs text-muted-foreground mt-2">
-                    {getQuestionCount(selectedSet)} question{getQuestionCount(selectedSet) !== 1 ? 's' : ''}
+                    {getQuestionCount(selectedSet)} question{getQuestionCount(selectedSet) !== 1 ? "s" : ""}
                   </div>
                 </div>
               </div>
               <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                 <p className="text-sm">
-                  <strong>Total Points:</strong> {getQuestionCount(selectedSet)} questions × {quiz.pointsPerQuestion} points = <strong>{getQuestionCount(selectedSet) * quiz.pointsPerQuestion} points</strong>
+                  <strong>Total Points:</strong> {getQuestionCount(selectedSet)} questions × {quiz.pointsPerQuestion} points ={" "}
+                  <strong>{getQuestionCount(selectedSet) * quiz.pointsPerQuestion} points</strong>
                 </p>
               </div>
             </div>
 
-            {/* Instructions */}
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -675,22 +513,21 @@ export default function QuizProctorInterface({
                   <li>Any suspicious activity will be recorded</li>
                   <li>You cannot pause the quiz once started</li>
                   <li>Make sure you have a stable internet connection</li>
-                  <li>Your set has been randomly assigned by the system</li>
+                  <li>Your set has been assigned by the administrator</li>
                 </ul>
               </AlertDescription>
             </Alert>
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
-              <Button 
-                onClick={() => setCurrentStep('user-info')}
+              <Button
+                onClick={() => setCurrentStep("user-info")}
                 variant="outline"
                 className="flex-1 cursor-pointer"
                 size="lg"
               >
                 Back
               </Button>
-              <Button 
+              <Button
                 onClick={handleStartQuiz}
                 className="flex-1 bg-green-600 cursor-pointer hover:bg-green-700 text-white text-lg py-6"
                 size="lg"
@@ -704,45 +541,11 @@ export default function QuizProctorInterface({
     );
   }
 
-  // Step 4: Quiz Submitted - Thank You Page
-  if (currentStep === 'quiz-submitted') {
-    const isExternalQuiz = !!systemCode || user.username?.startsWith("SYS-");
-
-    if (isExternalQuiz) {
-      return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <div className="max-w-md w-full space-y-4 text-center p-6 border rounded-xl bg-card shadow-lg">
-            <div className="w-16 h-16 rounded-full bg-green-600/10 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
-            </div>
-            <h1 className="text-2xl font-bold">Quiz Submitted Successfully</h1>
-            <p className="text-muted-foreground text-sm">
-              Your responses have been recorded for system <strong>{user.registration || systemCode}</strong>.
-            </p>
-            <div className="p-3 bg-muted rounded-lg text-xs text-muted-foreground space-y-1 text-left">
-              <div><strong>Quiz:</strong> {quiz.title}</div>
-              <div><strong>Set:</strong> Set {selectedSet}</div>
-              <div><strong>Participant:</strong> {user.name}</div>
-              <div><strong>Submitted At:</strong> {new Date().toLocaleString()}</div>
-            </div>
-            {afterSubmitContent ? (
-              afterSubmitContent
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Official scorecards and results will be reviewed and published by the administrator.
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (!submissionResult) return null;
-
+  // ── Step 4: Quiz Submitted ──
+  if (currentStep === "quiz-submitted" && submissionResult) {
     return (
       <div className="min-h-screen bg-linear-to-br from-background to-muted p-4 py-8">
         <div className="container mx-auto max-w-4xl space-y-6">
-          {/* Header Card */}
           <Card>
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
@@ -752,16 +555,15 @@ export default function QuizProctorInterface({
               </div>
               <CardTitle className="text-3xl">Quiz Completed!</CardTitle>
               <CardDescription className="text-base mt-2">
-                Your answers have been submitted and evaluated
+                Your answers have been submitted and recorded
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Score Summary */}
               <div className="p-6 bg-muted rounded-lg">
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold">Your Results</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="text-center p-4 bg-background rounded-lg">
                     <p className="text-sm text-muted-foreground">Score</p>
@@ -785,13 +587,12 @@ export default function QuizProctorInterface({
                   <Alert variant="destructive" className="mt-4">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>Note:</strong> {submissionResult.tabSwitches} violation{submissionResult.tabSwitches !== 1 ? 's' : ''} detected during the quiz.
+                      <strong>Note:</strong> {submissionResult.tabSwitches} violation{submissionResult.tabSwitches !== 1 ? "s" : ""} detected during the quiz.
                     </AlertDescription>
                   </Alert>
                 )}
               </div>
 
-              {/* Quiz Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="flex items-center justify-between text-sm p-3 bg-muted rounded-lg">
                   <span className="text-muted-foreground">Quiz:</span>
@@ -813,123 +614,23 @@ export default function QuizProctorInterface({
             </CardContent>
           </Card>
 
-          {/* Detailed Results */}
-          {submissionResult.detailedResults && submissionResult.detailedResults.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Answer Review</CardTitle>
-                <CardDescription>
-                  Review your answers and see the correct solutions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {submissionResult.detailedResults.map((result, index) => (
-                    <div 
-                      key={result.questionIndex} 
-                      className={`p-4 rounded-lg border-2 ${
-                        result.isCorrect 
-                          ? 'border-green-600 bg-green-600/5' 
-                          : 'border-red-600 bg-red-600/5'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                          result.isCorrect 
-                            ? 'bg-green-600 text-white' 
-                            : 'bg-red-600 text-white'
-                        }`}>
-                          {result.isCorrect ? '✓' : '✗'}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">Question {result.questionIndex + 1}</h4>
-                            <Badge variant={result.isCorrect ? "default" : "destructive"}>
-                              {result.isCorrect ? 'Correct' : 'Incorrect'}
-                            </Badge>
-                          </div>
-                          <p className="text-sm mb-3">{result.question}</p>
-                          
-                          <div className="space-y-2">
-                            {result.options.map((option, oIndex) => {
-                              const isUserAnswer = result.userAnswer === oIndex;
-                              const isCorrectAnswer = result.correctAnswer === oIndex;
-                              
-                              return (
-                                <div 
-                                  key={oIndex}
-                                  className={`p-3 rounded-lg border text-sm ${
-                                    isCorrectAnswer
-                                      ? 'border-green-600 bg-green-600/10'
-                                      : isUserAnswer && !result.isCorrect
-                                      ? 'border-red-600 bg-red-600/10'
-                                      : 'border-muted bg-background'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">{String.fromCharCode(65 + oIndex)}.</span>
-                                    <span className="flex-1">{option}</span>
-                                    {isCorrectAnswer && (
-                                      <Badge variant="outline" className="border-green-600 text-green-600 text-xs">
-                                        Correct Answer
-                                      </Badge>
-                                    )}
-                                    {isUserAnswer && !result.isCorrect && (
-                                      <Badge variant="outline" className="border-red-600 text-red-600 text-xs">
-                                        Your Answer
-                                      </Badge>
-                                    )}
-                                    {isUserAnswer && result.isCorrect && (
-                                      <Badge variant="outline" className="border-green-600 text-green-600 text-xs">
-                                        Your Answer
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {!result.isCorrect && (
-                            <div className="mt-3 p-2 bg-muted rounded text-xs">
-                              <span className="text-muted-foreground">
-                                You selected: <strong>{String.fromCharCode(65 + result.userAnswer)}</strong> | 
-                                Correct answer: <strong>{String.fromCharCode(65 + result.correctAnswer)}</strong>
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Action Buttons */}
           <Card>
-            <CardContent className="p-6">
-              {afterSubmitContent ? (
-                afterSubmitContent
-              ) : (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <CloseWindowButton 
-                    redirectTo="/dashboard/activities/quizzes"
-                    variant="outline"
-                    className="flex-1"
-                    size="lg"
-                  >
-                    Close Window
-                  </CloseWindowButton>
-                  <Button 
-                    onClick={handleViewAchievements}
-                    className="flex-1"
-                    size="lg"
-                  >
-                    View Achievements
-                  </Button>
-                </div>
+            <CardContent className="p-6 space-y-4">
+              <Alert>
+                <AlertDescription>
+                  Your results will be reviewed and published by the administrator. An official scorecard will be emailed to <strong>{user.email}</strong> once released.
+                </AlertDescription>
+              </Alert>
+              {quiz.feedbackFormId && (
+                <Button
+                  asChild
+                  className="w-full font-bold bg-primary text-primary-foreground hover:opacity-90 rounded-xl"
+                >
+                  <a href={`/forms/${quiz.feedbackFormId}`} target="_blank" rel="noopener noreferrer">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Fill Feedback Form
+                  </a>
+                </Button>
               )}
             </CardContent>
           </Card>
@@ -938,7 +639,37 @@ export default function QuizProctorInterface({
     );
   }
 
-  // Step 3: Quiz Started
+  // Fallback for completed state without result (already submitted before)
+  if (currentStep === "quiz-submitted" && !submissionResult) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="p-8 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="h-10 w-10 text-white" />
+            </div>
+            <CardTitle className="text-2xl">Quiz Already Submitted</CardTitle>
+            <p className="text-muted-foreground text-sm">
+              Your responses have been recorded. Results will be published by the administrator.
+            </p>
+            {quiz.feedbackFormId && (
+              <Button
+                asChild
+                className="w-full mt-4 font-bold bg-primary text-primary-foreground hover:opacity-90 rounded-xl"
+              >
+                <a href={`/forms/${quiz.feedbackFormId}`} target="_blank" rel="noopener noreferrer">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Fill Feedback Form
+                </a>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 3: Quiz Active (Proctored) ──
   return (
     <div className="min-h-screen bg-background">
       {/* Fullscreen Exit Warning Modal */}
@@ -952,7 +683,6 @@ export default function QuizProctorInterface({
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Countdown Timer */}
               <Alert variant="destructive" className="border-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -979,7 +709,6 @@ export default function QuizProctorInterface({
                 </ul>
               </div>
 
-              {/* Action Button */}
               <Button
                 onClick={enterFullscreen}
                 className="w-full bg-green-600 hover:bg-green-700 text-white cursor-pointer"
@@ -1014,7 +743,7 @@ export default function QuizProctorInterface({
                   Your quiz has been blocked due to violation of exam rules.
                 </AlertDescription>
               </Alert>
-              
+
               <div className="space-y-2">
                 <p className="font-semibold">Violation Details:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -1029,43 +758,17 @@ export default function QuizProctorInterface({
                   <strong>What happens now?</strong>
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Your quiz attempt has been terminated and the violation has been recorded. 
-                  The administrators have been notified and will review your case. 
-                  You must contact your instructor or administrator to unblock your quiz access.
+                  Your quiz attempt has been terminated. The violation has been recorded.
+                  Please contact the exam administrator to resolve this issue.
                 </p>
               </div>
 
-              {/* For external kiosk candidates: Keep in page until unblocked */}
-              {systemCode || user.username?.startsWith("SYS-") ? (
-                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive flex items-center justify-center gap-2 font-medium">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
-                  </span>
-                  Waiting for administrator unblock... Your screen will automatically update once unblocked.
-                </div>
-              ) : (
-                <>
-                  {/* Auto-close timer for internal members */}
-                  <Alert className="border-primary">
-                    <Clock className="h-4 w-4" />
-                    <AlertDescription className="text-sm">
-                      Window will close automatically in <strong>{blockedMessageTimer} second{blockedMessageTimer !== 1 ? 's' : ''}</strong>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="text-center pt-4">
-                    <CloseWindowButton
-                      redirectTo="/dashboard/activities/quizzes"
-                      variant="destructive"
-                      className="w-full"
-                      size="lg"
-                    >
-                      Close Now
-                    </CloseWindowButton>
-                  </div>
-                </>
-              )}
+              <Alert className="border-primary">
+                <Clock className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  Returning to registration page in <strong>{blockedMessageTimer} second{blockedMessageTimer !== 1 ? "s" : ""}</strong>
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </div>
@@ -1076,9 +779,9 @@ export default function QuizProctorInterface({
         <Alert variant="destructive" className="fixed top-4 left-1/2 -translate-x-1/2 w-auto max-w-md z-50">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            {tabSwitches === 1 && 'Warning 1/3: Tab switch detected! Two more violations will block the quiz.'}
-            {tabSwitches === 2 && 'Warning 2/3: Second violation! One more and the quiz will be blocked.'}
-            {timeRemaining === 300 && tabSwitches === 0 && '5 minutes remaining! Please complete your quiz.'}
+            {tabSwitches === 1 && "Warning 1/3: Tab switch detected! Two more violations will block the quiz."}
+            {tabSwitches === 2 && "Warning 2/3: Second violation! One more and the quiz will be blocked."}
+            {timeRemaining === 300 && tabSwitches === 0 && "5 minutes remaining! Please complete your quiz."}
           </AlertDescription>
         </Alert>
       )}
@@ -1089,30 +792,28 @@ export default function QuizProctorInterface({
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-xl font-bold">{quiz.title}</h1>
-              <p className="text-sm text-muted-foreground">{user.name} - Set {selectedSet}</p>
+              <p className="text-sm text-muted-foreground">{user.name} — Set {selectedSet}</p>
             </div>
             <div className="flex items-center gap-4">
               {/* Timer */}
               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 ${
-                isTimeLow ? 'border-destructive bg-destructive/10' : 'border-primary bg-primary/10'
+                isTimeLow ? "border-destructive bg-destructive/10" : "border-primary bg-primary/10"
               }`}>
-                <Timer className={`h-5 w-5 ${isTimeLow ? 'text-destructive' : 'text-primary'}`} />
-                <span className={`text-lg font-bold ${isTimeLow ? 'text-destructive' : 'text-primary'}`}>
+                <Timer className={`h-5 w-5 ${isTimeLow ? "text-destructive" : "text-primary"}`} />
+                <span className={`text-lg font-bold ${isTimeLow ? "text-destructive" : "text-primary"}`}>
                   {formatTime(timeRemaining)}
                 </span>
               </div>
 
               {tabSwitches > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="flex items-center gap-1"
-                >
+                <Badge variant="destructive" className="flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
-                  {tabSwitches === 1 && 'Warning 1/3'}
-                  {tabSwitches === 2 && 'Warning 2/3'}
-                  {tabSwitches >= 3 && 'BLOCKED'}
+                  {tabSwitches === 1 && "Warning 1/3"}
+                  {tabSwitches === 2 && "Warning 2/3"}
+                  {tabSwitches >= 3 && "BLOCKED"}
                 </Badge>
               )}
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -1171,7 +872,7 @@ export default function QuizProctorInterface({
 
               {/* Current Question */}
               {currentQuestion && (
-                <Card className={answers[currentQuestionIndex] !== undefined ? 'border-primary' : ''}>
+                <Card className={answers[currentQuestionIndex] !== undefined ? "border-primary" : ""}>
                   <CardHeader>
                     <CardTitle className="text-xl">
                       Question {currentQuestionIndex + 1}
@@ -1179,7 +880,7 @@ export default function QuizProctorInterface({
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <p className="text-lg font-medium leading-relaxed">{currentQuestion.question}</p>
-                    
+
                     <div className="space-y-3">
                       {currentQuestion.options.map((option, oIndex) => (
                         <button
@@ -1187,15 +888,15 @@ export default function QuizProctorInterface({
                           onClick={() => handleAnswerSelect(currentQuestionIndex, oIndex)}
                           className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                             answers[currentQuestionIndex] === oIndex
-                              ? 'border-primary bg-primary/10'
-                              : 'border-muted hover:border-muted-foreground/50'
+                              ? "border-primary bg-primary/10"
+                              : "border-muted hover:border-muted-foreground/50"
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
                               answers[currentQuestionIndex] === oIndex
-                                ? 'border-primary bg-primary'
-                                : 'border-muted-foreground'
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground"
                             }`}>
                               {answers[currentQuestionIndex] === oIndex && (
                                 <div className="w-3 h-3 rounded-full bg-white" />
@@ -1231,7 +932,7 @@ export default function QuizProctorInterface({
                     >
                       ← Previous
                     </Button>
-                    
+
                     <div className="text-sm text-muted-foreground">
                       {currentQuestionIndex + 1} / {questions.length}
                     </div>
@@ -1243,7 +944,7 @@ export default function QuizProctorInterface({
                         size="lg"
                         className="bg-green-600 hover:bg-green-700 cursor-pointer"
                       >
-                        {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+                        {isSubmitting ? "Submitting..." : "Submit Quiz"}
                       </Button>
                     ) : (
                       <Button
@@ -1259,7 +960,7 @@ export default function QuizProctorInterface({
               </Card>
             </div>
 
-            {/* Right Sidebar - Question Navigator */}
+            {/* Right Sidebar — Question Navigator */}
             <div className="lg:col-span-1">
               <Card className="sticky top-24">
                 <CardHeader>
@@ -1277,10 +978,10 @@ export default function QuizProctorInterface({
                         className={`
                           aspect-square rounded-lg border-2 font-semibold text-sm transition-all
                           ${currentQuestionIndex === index
-                            ? 'border-primary bg-primary text-primary-foreground cursor-pointer'
+                            ? "border-primary bg-primary text-primary-foreground cursor-pointer"
                             : answers[index] !== undefined
-                            ? 'border-green-600 bg-green-600/10 text-green-600 cursor-pointer'
-                            : 'border-muted hover:border-muted-foreground/50 cursor-pointer'
+                            ? "border-green-600 bg-green-600/10 text-green-600 cursor-pointer"
+                            : "border-muted hover:border-muted-foreground/50 cursor-pointer"
                           }
                         `}
                       >
@@ -1288,7 +989,7 @@ export default function QuizProctorInterface({
                       </button>
                     ))}
                   </div>
-                  
+
                   <div className="mt-4 pt-4 border-t space-y-2">
                     <div className="flex items-center gap-2 text-xs">
                       <div className="w-4 h-4 rounded border-2 border-primary bg-primary"></div>
@@ -1311,7 +1012,7 @@ export default function QuizProctorInterface({
                       className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
                       size="sm"
                     >
-                      {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+                      {isSubmitting ? "Submitting..." : "Submit Quiz"}
                     </Button>
                     {Object.keys(answers).length !== questions.length && (
                       <p className="text-xs text-muted-foreground text-center mt-2">

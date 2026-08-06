@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Edit, Trash2, Eye, ToggleLeft, ToggleRight, BarChart3 } from "lucide-react";
+import { Globe, Users, MoreHorizontal, Edit, Trash2, Eye, ToggleLeft, ToggleRight, BarChart3, Copy, Monitor } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -43,6 +43,8 @@ interface Quiz {
   sets: number;
   duration: number;
   isActive: boolean;
+  targetAudience?: string;
+  accessCode?: string | null;
   createdAt: Date;
   _count?: {
     attempts: number;
@@ -96,12 +98,12 @@ export default function QuizzesTable({ quizzes }: QuizzesTableProps) {
 
   return (
     <>
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-xl border border-border/60 overflow-x-auto shadow-sm">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/40">
             <TableRow>
-              <TableHead className="min-w-[100px]">Quiz ID</TableHead>
-              <TableHead className="min-w-[200px]">Title</TableHead>
+              <TableHead className="min-w-[120px]">Quiz ID</TableHead>
+              <TableHead className="min-w-[200px]">Title & Audience</TableHead>
               <TableHead className="min-w-20">Sets</TableHead>
               <TableHead className="min-w-[100px]">Duration</TableHead>
               <TableHead className="min-w-[100px]">Status</TableHead>
@@ -113,10 +115,26 @@ export default function QuizzesTable({ quizzes }: QuizzesTableProps) {
           <TableBody>
             {quizzes.map((quiz) => (
               <TableRow key={quiz.id}>
-                <TableCell className="font-mono text-sm">
+                <TableCell className="font-mono text-sm font-semibold">
                   {quiz.quizId}
                 </TableCell>
-                <TableCell className="font-medium">{quiz.title}</TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <div className="font-medium text-sm">{quiz.title}</div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={quiz.targetAudience === "EXTERNAL" ? "secondary" : "outline"} className="text-[10px] px-2 py-0.5">
+                        {quiz.targetAudience === "EXTERNAL" ? (
+                          <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> External</span>
+                        ) : (
+                          <span className="flex items-center gap-1"><Users className="h-3 w-3" /> Internal</span>
+                        )}
+                      </Badge>
+                      {quiz.targetAudience === "EXTERNAL" && quiz.accessCode && (
+                        <Badge variant="outline" className="text-[10px] font-mono px-2">{quiz.accessCode}</Badge>
+                      )}
+                    </div>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{quiz.sets} set{quiz.sets > 1 ? "s" : ""}</Badge>
                 </TableCell>
@@ -158,17 +176,32 @@ export default function QuizzesTable({ quizzes }: QuizzesTableProps) {
                           View Results
                         </Link>
                       </DropdownMenuItem>
+                      {quiz.targetAudience === "EXTERNAL" && (
+                        <>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/quizzes/${quiz.quizId}/systems`}>
+                              <Monitor className="h-4 w-4 mr-2" />
+                              System Registration
+                            </Link>
+                          </DropdownMenuItem>
+                          {quiz.accessCode && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                navigator.clipboard.writeText(quiz.accessCode!);
+                                toast.success(`Code ${quiz.accessCode} copied`);
+                              }}
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy Access Code
+                            </DropdownMenuItem>
+                          )}
+                        </>
+                      )}
                       <DropdownMenuItem onClick={() => handleToggleStatus(quiz)}>
                         {quiz.isActive ? (
-                          <>
-                            <ToggleLeft className="h-4 w-4 mr-2" />
-                            Deactivate
-                          </>
+                          <><ToggleLeft className="h-4 w-4 mr-2" />Deactivate</>
                         ) : (
-                          <>
-                            <ToggleRight className="h-4 w-4 mr-2" />
-                            Activate
-                          </>
+                          <><ToggleRight className="h-4 w-4 mr-2" />Activate</>
                         )}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />

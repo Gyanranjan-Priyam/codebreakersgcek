@@ -1,21 +1,9 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-
-export default async function QuizRootLayout({
+export default function QuizRootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Ensure user is authenticated
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
-    return redirect('/login');
-  }
-
-  // No layout wrapper - completely independent
+  // Pass-through layout: Internal member quizzes enforce auth inside their own page.tsx,
+  // allowing external kiosk routes (/quiz/system-register, /quiz/external/...) to remain 100% public.
   return <>{children}</>;
 }

@@ -411,24 +411,51 @@ model EventParticipation {
 }
 
 model Quiz {
-  id               String         @id @default(cuid())
-  quizId           String         @unique // CODEBREAKER-QUIZZES-randomstring
-  title            String
-  description      String         @db.Text // Description and rules
-  sets             Int            @default(1) // Number of sets (1-8)
-  duration         Int            // Duration in minutes
-  pointsPerQuestion Int           @default(1) // Points awarded per correct answer
-  startDateTime    DateTime?      // Quiz start date and time
-  endDateTime      DateTime?      // Quiz end date and time
-  questionsJson    String         @db.Text // JSON string of questions
-  isActive         Boolean        @default(true)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  createdBy        String         // Admin user ID who created this
-  attempts         QuizAttempt[]
-  setAssignments   QuizSetAssignment[]
+  id                String               @id @default(cuid())
+  quizId            String               @unique // CODEBREAKER-QUIZZES-randomstring
+  title             String
+  description       String               @db.Text // Description and rules
+  sets              Int                  @default(1) // Number of sets (1-8)
+  duration          Int                  // Duration in minutes
+  pointsPerQuestion Int                  @default(1) // Points awarded per correct answer
+  startDateTime     DateTime?            // Quiz start date and time
+  endDateTime       DateTime?            // Quiz end date and time
+  questionsJson     String               @db.Text // JSON string of questions
+  isActive          Boolean              @default(true)
+  targetAudience    String               @default("INTERNAL") // "INTERNAL" | "EXTERNAL"
+  accessCode        String?              // 6-digit access code for external quiz
+  formId            String?              // Linked registration form ID
+  feedbackFormId    String?              // Optional feedback form ID
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  createdBy         String               // Admin user ID who created this
+  attempts          QuizAttempt[]
+  setAssignments    QuizSetAssignment[]
+  externalSystems   ExternalQuizSystem[]
 
   @@map("quiz")
+}
+
+model ExternalQuizSystem {
+  id                  String    @id @default(cuid())
+  quizId              String
+  systemNumber        String    // e.g., "SYS-001", "System 1"
+  systemCode          String    @unique // Unique identifier token for kiosk session
+  assignedResponseId  String?   // FormResponse.id
+  assignedStudentName String?
+  assignedStudentEmail String?
+  assignedSet         String?   // A, B, C, etc.
+  status              String    @default("REGISTERED") // "REGISTERED" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
+  attemptId           String?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@map("external_quiz_system")
 }
 
 model QuizSetAssignment {
@@ -445,19 +472,24 @@ model QuizSetAssignment {
 }
 
 model QuizAttempt {
-  id             String    @id @default(cuid())
-  quizId         String
-  userId         String
-  setNumber      Int       // Which set (A, B, C, etc.)
-  score          Int       @default(0)
-  totalQuestions Int
-  correctAnswers Int       @default(0)
-  pointsEarned   Int       @default(0)
-  startedAt      DateTime  @default(now())
-  completedAt    DateTime?
-  answersJson    String?   @db.Text // JSON string of user's answers
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  quizId           String
+  userId           String    // User ID for internal or identifier (e.g., ext_id) for external participants
+  participantName  String?   // For external participants
+  participantEmail String?   // For external participants
+  externalSystemId String?   // Linked ExternalQuizSystem ID
+  setNumber        Int       // Which set (1 for A, 2 for B, etc.)
+  score            Int       @default(0)
+  totalQuestions   Int
+  correctAnswers   Int       @default(0)
+  pointsEarned     Int       @default(0)
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  answersJson      String?   @db.Text // JSON string of user's answers
+  isPublished      Boolean   @default(false)
+  publishedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 

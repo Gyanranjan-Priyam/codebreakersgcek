@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
 import { revalidatePath } from "next/cache";
+import { triggerPusherEvent } from "@/lib/pusher-server";
 
 export interface QuizData {
   id: string;
@@ -16,6 +17,9 @@ export interface QuizData {
   endDateTime: Date | null;
   questionsJson: string;
   isActive: boolean;
+  targetAudience: string;
+  accessCode: string | null;
+  formId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +60,9 @@ export async function getQuizById(id: string) {
   try {
     const quiz = await prisma.quiz.findUnique({
       where: { id },
+      include: {
+        externalSystems: true,
+      },
     });
 
     if (!quiz) {
@@ -84,6 +91,11 @@ export async function getQuizByQuizId(quizId: string) {
   try {
     const quiz = await prisma.quiz.findUnique({
       where: { quizId },
+      include: {
+        externalSystems: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
     });
 
     if (!quiz) {
@@ -117,6 +129,10 @@ export async function createQuiz(data: {
   endDateTime: Date | null;
   questionsJson: string;
   createdBy: string;
+  targetAudience?: string;
+  accessCode?: string | null;
+  formId?: string | null;
+  feedbackFormId?: string | null;
 }) {
   await requireAdmin();
   
@@ -125,9 +141,7 @@ export async function createQuiz(data: {
     try {
       const questions = JSON.parse(data.questionsJson);
       
-      // Check if it's an object with sets (e.g., {"A": [...], "B": [...]})
       if (typeof questions === 'object' && !Array.isArray(questions)) {
-        // Validate each set
         for (const setKey of Object.keys(questions)) {
           if (!Array.isArray(questions[setKey])) {
             return {
@@ -136,7 +150,6 @@ export async function createQuiz(data: {
             };
           }
           
-          // Validate each question in the set
           for (const q of questions[setKey]) {
             if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
               return {
@@ -146,10 +159,7 @@ export async function createQuiz(data: {
             }
           }
         }
-      } 
-      // Also support old format: single array of questions
-      else if (Array.isArray(questions)) {
-        // Validate each question
+      } else if (Array.isArray(questions)) {
         for (const q of questions) {
           if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
             return {
@@ -171,7 +181,6 @@ export async function createQuiz(data: {
       };
     }
 
-    // Check if quizId already exists
     const existingQuiz = await prisma.quiz.findUnique({
       where: { quizId: data.quizId },
     });
@@ -195,6 +204,10 @@ export async function createQuiz(data: {
         endDateTime: data.endDateTime,
         questionsJson: data.questionsJson,
         createdBy: data.createdBy,
+        targetAudience: data.targetAudience || "INTERNAL",
+        accessCode: data.accessCode || null,
+        formId: data.formId || null,
+        feedbackFormId: data.feedbackFormId || null,
       },
     });
 
@@ -226,18 +239,19 @@ export async function updateQuiz(
     endDateTime: Date | null;
     questionsJson: string;
     isActive: boolean;
+    targetAudience?: string;
+    accessCode?: string | null;
+    formId?: string | null;
+    feedbackFormId?: string | null;
   }
 ) {
   await requireAdmin();
   
   try {
-    // Validate questions JSON
     try {
       const questions = JSON.parse(data.questionsJson);
       
-      // Check if it's an object with sets (e.g., {"A": [...], "B": [...]})
       if (typeof questions === 'object' && !Array.isArray(questions)) {
-        // Validate each set
         for (const setKey of Object.keys(questions)) {
           if (!Array.isArray(questions[setKey])) {
             return {
@@ -246,7 +260,6 @@ export async function updateQuiz(
             };
           }
           
-          // Validate each question in the set
           for (const q of questions[setKey]) {
             if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
               return {
@@ -256,10 +269,7 @@ export async function updateQuiz(
             }
           }
         }
-      } 
-      // Also support old format: single array of questions
-      else if (Array.isArray(questions)) {
-        // Validate each question
+      } else if (Array.isArray(questions)) {
         for (const q of questions) {
           if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
             return {
@@ -293,10 +303,15 @@ export async function updateQuiz(
         endDateTime: data.endDateTime,
         questionsJson: data.questionsJson,
         isActive: data.isActive,
+        targetAudience: data.targetAudience,
+        accessCode: data.accessCode,
+        formId: data.formId,
+        feedbackFormId: data.feedbackFormId,
       },
     });
 
     revalidatePath("/admin/quizzes");
+    revalidatePath(`/admin/quizzes/${quiz.quizId}`);
 
     return {
       status: "success" as const,
@@ -359,3 +374,762 @@ export async function toggleQuizStatus(id: string, isActive: boolean) {
     };
   }
 }
+
+// ----------------------------------------------------
+// EXTERNAL QUIZ SYSTEM ACTIONS & REAL-TIME MANAGEMENT
+// ----------------------------------------------------
+
+export async function registerExternalSystem(accessCode: string, systemNumber: string) {
+  try {
+    const cleanCode = accessCode.trim();
+    const cleanSysNumber = systemNumber.trim();
+
+    if (!cleanCode || !cleanSysNumber) {
+      return { status: "error" as const, message: "Quiz Access Code and System Number are required" };
+    }
+
+    const quiz = await prisma.quiz.findFirst({
+      where: {
+        accessCode: cleanCode,
+        targetAudience: "EXTERNAL",
+        isActive: true,
+      },
+    });
+
+    if (!quiz) {
+      return { status: "error" as const, message: "Invalid or inactive 6-digit Quiz Access Code" };
+    }
+
+    // Check existing systems to compute alternating set for conjugate system
+    const existing = await prisma.externalQuizSystem.findMany({
+      where: { quizId: quiz.id },
+      select: { systemNumber: true },
+    });
+
+    const allSysNumbers = Array.from(new Set([...existing.map((s) => s.systemNumber), cleanSysNumber]));
+    allSysNumbers.sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    const sortedIndex = allSysNumbers.indexOf(cleanSysNumber);
+    const numSets = quiz.sets || 1;
+    const autoAssignedSet = String.fromCharCode(65 + (sortedIndex % numSets));
+
+    const systemCode = `SYS-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const system = await prisma.externalQuizSystem.create({
+      data: {
+        quizId: quiz.id,
+        systemNumber: cleanSysNumber,
+        systemCode,
+        assignedSet: autoAssignedSet,
+        status: "REGISTERED",
+      },
+    });
+
+    triggerPusherEvent(`quiz-${quiz.id}`, "system-updated", { systemCode: system.systemCode, quizId: quiz.id });
+    triggerPusherEvent(`quiz-${quiz.quizId}`, "system-updated", { systemCode: system.systemCode, quizId: quiz.quizId });
+
+    return {
+      status: "success" as const,
+      message: "System registered successfully",
+      data: {
+        systemCode: system.systemCode,
+        systemNumber: system.systemNumber,
+        quizTitle: quiz.title,
+        quizId: quiz.quizId,
+      },
+    };
+  } catch (error) {
+    console.error("Error registering external system:", error);
+    return { status: "error" as const, message: "Failed to register system" };
+  }
+}
+
+export async function getExternalSystems(quizId: string) {
+  try {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { sets: true },
+    });
+    const numSets = quiz?.sets || 1;
+
+    const systems = await prisma.externalQuizSystem.findMany({
+      where: { quizId },
+    });
+
+    // Natural alphanumeric sorting by systemNumber (e.g. 1, 2, 10, 32, 37)
+    systems.sort((a, b) =>
+      a.systemNumber.localeCompare(b.systemNumber, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    // Auto-compute alternating sets for conjugate systems if not explicitly set
+    const processedSystems = systems.map((sys, idx) => ({
+      ...sys,
+      assignedSet: sys.assignedSet || String.fromCharCode(65 + (idx % numSets)),
+    }));
+
+    return { status: "success" as const, data: processedSystems };
+  } catch (error) {
+    console.error("Error fetching external systems:", error);
+    return { status: "error" as const, message: "Failed to fetch external systems" };
+  }
+}
+
+export async function assignStudentToSystem({
+  systemId,
+  systemCode,
+  formResponseId,
+  studentName,
+  studentEmail,
+  assignedSet = "A",
+}: {
+  systemId?: string;
+  systemCode?: string;
+  formResponseId?: string;
+  studentName: string;
+  studentEmail: string;
+  assignedSet?: string;
+}) {
+  await requireAdmin();
+
+  try {
+    let whereClause: any = {};
+    if (systemId) {
+      whereClause = { id: systemId };
+    } else if (systemCode) {
+      whereClause = { systemCode };
+    } else {
+      return { status: "error" as const, message: "System ID or System Code is required" };
+    }
+
+    const system = await prisma.externalQuizSystem.update({
+      where: whereClause,
+      data: {
+        assignedResponseId: formResponseId || null,
+        assignedStudentName: studentName.trim(),
+        assignedStudentEmail: studentEmail.trim().toLowerCase(),
+        assignedSet,
+        status: "ASSIGNED",
+      },
+    });
+
+    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
+    triggerPusherEvent(`system-${system.systemCode}`, "status-changed", { status: "ASSIGNED", assignedStudentName: system.assignedStudentName, assignedSet: system.assignedSet });
+
+    revalidatePath(`/admin/quizzes/${system.quizId}`);
+
+    return { status: "success" as const, message: "Student assigned to system successfully", data: system };
+  } catch (error) {
+    console.error("Error assigning student to system:", error);
+    return { status: "error" as const, message: "Failed to assign student" };
+  }
+}
+
+export async function unassignStudentFromSystem(systemId: string) {
+  await requireAdmin();
+
+  try {
+    const system = await prisma.externalQuizSystem.update({
+      where: { id: systemId },
+      data: {
+        assignedResponseId: null,
+        assignedStudentName: null,
+        assignedStudentEmail: null,
+        assignedSet: null,
+        status: "REGISTERED",
+      },
+    });
+
+    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
+    triggerPusherEvent(`system-${system.systemCode}`, "status-changed", { status: "REGISTERED" });
+
+    revalidatePath(`/admin/quizzes/${system.quizId}`);
+
+    return { status: "success" as const, message: "Student unassigned successfully", data: system };
+  } catch (error) {
+    console.error("Error unassigning student:", error);
+    return { status: "error" as const, message: "Failed to unassign student" };
+  }
+}
+
+export async function startSystemQuiz(systemId: string) {
+  await requireAdmin();
+
+  try {
+    const system = await prisma.externalQuizSystem.update({
+      where: { id: systemId },
+      data: {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+      },
+    });
+
+    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
+    triggerPusherEvent(`system-${system.systemCode}`, "status-changed", { status: "IN_PROGRESS" });
+    triggerPusherEvent(`system-${system.systemCode}`, "quiz-started", { systemCode: system.systemCode });
+
+    revalidatePath(`/admin/quizzes/${system.quizId}`);
+
+    return { status: "success" as const, message: "Quiz started for system", data: system };
+  } catch (error) {
+    console.error("Error starting system quiz:", error);
+    return { status: "error" as const, message: "Failed to start quiz" };
+  }
+}
+
+export async function startAllSystems(quizId: string) {
+  await requireAdmin();
+
+  try {
+    await prisma.externalQuizSystem.updateMany({
+      where: {
+        quizId,
+        status: "ASSIGNED",
+      },
+      data: {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+      },
+    });
+
+    triggerPusherEvent(`quiz-${quizId}`, "system-updated", { quizId });
+    triggerPusherEvent(`quiz-${quizId}`, "quiz-started-all", { quizId });
+
+    revalidatePath(`/admin/quizzes/${quizId}`);
+
+    return { status: "success" as const, message: "Started quiz for all assigned systems" };
+  } catch (error) {
+    console.error("Error starting all systems:", error);
+    return { status: "error" as const, message: "Failed to start all systems" };
+  }
+}
+
+export async function getSystemState(systemCode: string) {
+  try {
+    const system = await prisma.externalQuizSystem.findUnique({
+      where: { systemCode },
+      include: {
+        quiz: {
+          select: {
+            id: true,
+            quizId: true,
+            title: true,
+            description: true,
+            duration: true,
+            pointsPerQuestion: true,
+            questionsJson: true,
+            sets: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!system) {
+      return { status: "error" as const, message: "System session not found" };
+    }
+
+    return { status: "success" as const, data: system };
+  } catch (error) {
+    console.error("Error fetching system state:", error);
+    return { status: "error" as const, message: "Failed to fetch system state" };
+  }
+}
+
+export async function submitExternalQuizAttempt({
+  systemCode,
+  answersJson,
+  totalQuestions,
+  correctAnswers,
+  score,
+  pointsEarned,
+  setNumber = 1,
+}: {
+  systemCode: string;
+  answersJson: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  score: number;
+  pointsEarned: number;
+  setNumber?: number;
+}) {
+  try {
+    const system = await prisma.externalQuizSystem.findUnique({
+      where: { systemCode },
+      include: { quiz: true },
+    });
+
+    if (!system || !system.assignedStudentName || !system.assignedStudentEmail) {
+      return { status: "error" as const, message: "Invalid system session or unassigned student" };
+    }
+
+    const userId = `ext_${system.id}`;
+
+    const attempt = await prisma.quizAttempt.create({
+      data: {
+        quizId: system.quizId,
+        userId,
+        participantName: system.assignedStudentName,
+        participantEmail: system.assignedStudentEmail,
+        externalSystemId: system.id,
+        setNumber,
+        score,
+        totalQuestions,
+        correctAnswers,
+        pointsEarned,
+        answersJson,
+        startedAt: system.startedAt || new Date(),
+        completedAt: new Date(),
+      },
+    });
+
+    await prisma.externalQuizSystem.update({
+      where: { id: system.id },
+      data: {
+        status: "COMPLETED",
+        completedAt: new Date(),
+        attemptId: attempt.id,
+      },
+    });
+
+    return { status: "success" as const, message: "Quiz submitted successfully", attemptId: attempt.id };
+  } catch (error) {
+    console.error("Error submitting external quiz attempt:", error);
+    return { status: "error" as const, message: "Failed to submit quiz attempt" };
+  }
+}
+
+export async function publishStudentResult(attemptId: string) {
+  await requireAdmin();
+
+  try {
+    const { sendQuizResultEmail } = await import("@/lib/mailer");
+
+    const attempt = await prisma.quizAttempt.findUnique({
+      where: { id: attemptId },
+      include: {
+        quiz: {
+          select: {
+            title: true,
+            questionsJson: true,
+          },
+        },
+      },
+    });
+
+    if (!attempt) {
+      return { status: "error" as const, message: "Attempt not found" };
+    }
+
+    let recipientEmail = attempt.participantEmail;
+    let recipientName = attempt.participantName || "Student";
+
+    if (!recipientEmail && attempt.userId && !attempt.userId.startsWith("ext_")) {
+      const user = await prisma.user.findUnique({
+        where: { id: attempt.userId },
+        select: { email: true, name: true },
+      });
+      if (user) {
+        recipientEmail = user.email;
+        recipientName = user.name;
+      }
+    }
+
+    if (!recipientEmail) {
+      return { status: "error" as const, message: "Student email address not found" };
+    }
+
+    // Build answers breakdown
+    let answersBreakdown: Array<{
+      question: string;
+      userAnswer: string;
+      correctAnswer: string;
+      isCorrect: boolean;
+    }> = [];
+
+    try {
+      const parsedAnswers = JSON.parse(attempt.answersJson || "{}");
+      const allQuestions = JSON.parse(attempt.quiz.questionsJson || "{}");
+
+      let questionsList: any[] = [];
+      const setLetter = String.fromCharCode(64 + attempt.setNumber);
+
+      if (typeof allQuestions === "object" && !Array.isArray(allQuestions)) {
+        questionsList = allQuestions[setLetter] || allQuestions["A"] || [];
+      } else if (Array.isArray(allQuestions)) {
+        questionsList = allQuestions;
+      }
+
+      let userAnswersObj: Record<string, string> = {};
+      
+      // Handle internal format: { answers: [{ questionIndex, answerIndex }] }
+      if (parsedAnswers && parsedAnswers.answers && Array.isArray(parsedAnswers.answers)) {
+        parsedAnswers.answers.forEach((ans: any) => {
+          const q = questionsList[ans.questionIndex];
+          if (q && q.options && typeof ans.answerIndex === 'number') {
+            userAnswersObj[q.id.toString()] = q.options[ans.answerIndex] || "";
+          }
+        });
+      } else {
+        // Handle external format: { "qId": "Answer String" }
+        userAnswersObj = parsedAnswers;
+      }
+
+      answersBreakdown = questionsList.map((q: any) => {
+        const uAns = userAnswersObj[q.id.toString()] || "";
+        return {
+          question: q.question,
+          userAnswer: uAns,
+          correctAnswer: q.answer,
+          isCorrect: uAns.toString().trim() === q.answer.toString().trim(),
+        };
+      });
+    } catch (parseErr) {
+      console.error("Error parsing answers for breakdown:", parseErr);
+    }
+
+    const emailResult = await sendQuizResultEmail({
+      to: recipientEmail,
+      recipientName,
+      quizTitle: attempt.quiz.title,
+      score: attempt.score,
+      totalQuestions: attempt.totalQuestions,
+      correctAnswers: attempt.correctAnswers,
+      pointsEarned: attempt.pointsEarned,
+      answersBreakdown,
+    });
+
+    if (!emailResult.success) {
+      return { status: "error" as const, message: "Failed to send email to student" };
+    }
+
+    const updated = await prisma.quizAttempt.update({
+      where: { id: attemptId },
+      data: {
+        isPublished: true,
+        publishedAt: new Date(),
+      },
+    });
+
+    revalidatePath(`/admin/quizzes/results/${attempt.quizId}`);
+
+    return { status: "success" as const, message: `Results published and emailed to ${recipientEmail}`, data: updated };
+  } catch (error) {
+    console.error("Error publishing student result:", error);
+    return { status: "error" as const, message: "Failed to publish result" };
+  }
+}
+
+export async function publishAllResults(quizId: string) {
+  await requireAdmin();
+
+  try {
+    const attempts = await prisma.quizAttempt.findMany({
+      where: { 
+        quizId,
+        isPublished: false,
+        completedAt: { not: null }
+      },
+      select: { id: true },
+    });
+
+    if (attempts.length === 0) {
+      return { status: "error" as const, message: "No unpublished, completed attempts found." };
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const attempt of attempts) {
+      const res = await publishStudentResult(attempt.id);
+      if (res.status === "success") {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    revalidatePath(`/admin/quizzes/results/${quizId}`);
+
+    return { 
+      status: "success" as const, 
+      message: `Published results: ${successCount} sent, ${failCount} failed.`, 
+      data: { successCount, failCount } 
+    };
+  } catch (error) {
+    console.error("Error publishing all results:", error);
+    return { status: "error" as const, message: "Failed to publish all results" };
+  }
+}
+
+/**
+ * Fetch Student Details (Name & Email) by Response ID from FormResponse
+ */
+export async function getStudentDetailsByResponseId(responseId: string) {
+  try {
+    if (!responseId || !responseId.trim()) {
+      return { status: "error" as const, message: "Response ID is required" };
+    }
+
+    const cleanId = responseId.trim();
+
+    // Query FormResponse by id or partial id match
+    let formResponse = await prisma.formResponse.findUnique({
+      where: { id: cleanId },
+      include: { form: true },
+    });
+
+    if (!formResponse) {
+      // Try search by ID prefix or containing cleanId
+      formResponse = await prisma.formResponse.findFirst({
+        where: {
+          OR: [
+            { id: { contains: cleanId, mode: "insensitive" } },
+          ],
+        },
+        include: { form: true },
+      });
+    }
+
+    if (!formResponse) {
+      return { status: "error" as const, message: `No form response found matching Response ID '${cleanId}'` };
+    }
+
+    const answersObj = (formResponse.answers || {}) as Record<string, unknown>;
+    let studentName = "";
+    let studentEmail = "";
+
+    for (const [k, v] of Object.entries(answersObj)) {
+      if (typeof v === "string") {
+        const valStr = v.trim();
+        const keyLower = k.toLowerCase();
+
+        if (!studentEmail && (keyLower.includes("email") || (valStr.includes("@") && valStr.includes(".")))) {
+          studentEmail = valStr;
+        }
+        if (!studentName && (keyLower.includes("name") || keyLower.includes("candidate") || keyLower.includes("student"))) {
+          studentName = valStr;
+        }
+      }
+    }
+
+    // Fallback search if name or email not identified by key name
+    if (!studentName || !studentEmail) {
+      for (const [_, v] of Object.entries(answersObj)) {
+        if (typeof v === "string") {
+          const valStr = v.trim();
+          if (!studentEmail && valStr.includes("@") && valStr.includes(".")) {
+            studentEmail = valStr;
+          } else if (!studentName && valStr.length > 2 && !valStr.includes("@") && !/\d{5,}/.test(valStr)) {
+            studentName = valStr;
+          }
+        }
+      }
+    }
+
+    return {
+      status: "success" as const,
+      message: "Student details fetched successfully",
+      data: {
+        responseId: formResponse.id,
+        formTitle: formResponse.form?.title || "Form Response",
+        studentName: studentName || `Candidate (${formResponse.id.slice(0, 6)})`,
+        studentEmail: studentEmail || "",
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching student by Response ID:", error);
+    return { status: "error" as const, message: "Failed to fetch student details" };
+  }
+}
+
+/**
+ * Combined monitor data fetch (systems + blocked members) to optimize server load
+ */
+export async function getQuizMonitorData(quizId: string) {
+  try {
+    const [quiz, systems, blocks] = await Promise.all([
+      prisma.quiz.findUnique({
+        where: { id: quizId },
+        select: { sets: true },
+      }),
+      prisma.externalQuizSystem.findMany({
+        where: { quizId },
+      }),
+      prisma.quizBlock.findMany({
+        where: { quizId },
+        orderBy: { blockedAt: "desc" },
+      }),
+    ]);
+
+    const numSets = quiz?.sets || 1;
+
+    systems.sort((a, b) =>
+      a.systemNumber.localeCompare(b.systemNumber, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    const processedSystems = systems.map((sys, idx) => ({
+      ...sys,
+      assignedSet: sys.assignedSet || String.fromCharCode(65 + (idx % numSets)),
+    }));
+
+    const userIds = blocks.map((b) => b.userId).filter((id) => !id.startsWith("ext_"));
+    const users =
+      userIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const blockedMembersMap = new Map<string, any>();
+
+    blocks.forEach((block) => {
+      const extSys = systems.find(
+        (s) => `ext_${s.id}` === block.userId || s.id === block.userId || s.systemCode === block.userId
+      );
+
+      let name = "Candidate";
+      let email = "";
+      let systemNumber = "";
+
+      if (extSys) {
+        name = extSys.assignedStudentName || `Kiosk ${extSys.systemNumber}`;
+        email = extSys.assignedStudentEmail || "";
+        systemNumber = extSys.systemNumber;
+      } else {
+        const u = userMap.get(block.userId);
+        if (u) {
+          name = u.name || "Member";
+          email = u.email || "";
+        }
+      }
+
+      blockedMembersMap.set(block.userId, {
+        id: block.id,
+        quizId: block.quizId,
+        userId: block.userId,
+        reason: block.reason,
+        violationType: block.violationType,
+        violationCount: block.violationCount,
+        blockedAt: block.blockedAt.toISOString(),
+        name,
+        email,
+        systemNumber,
+      });
+    });
+
+    // Also include any systems explicitly marked as BLOCKED
+    systems.forEach((sys) => {
+      if (sys.status === "BLOCKED") {
+        const uId = `ext_${sys.id}`;
+        if (!blockedMembersMap.has(uId) && !blockedMembersMap.has(sys.id) && !blockedMembersMap.has(sys.systemCode)) {
+          blockedMembersMap.set(uId, {
+            id: sys.id,
+            quizId,
+            userId: uId,
+            reason: "Multiple proctoring violations detected",
+            violationType: "SECURITY_VIOLATION",
+            violationCount: 1,
+            blockedAt: new Date().toISOString(),
+            name: sys.assignedStudentName || `Kiosk ${sys.systemNumber}`,
+            email: sys.assignedStudentEmail || "",
+            systemNumber: sys.systemNumber,
+          });
+        }
+      }
+    });
+
+    const blockedMembers = Array.from(blockedMembersMap.values());
+
+    return {
+      status: "success" as const,
+      data: {
+        systems: processedSystems,
+        blockedMembers,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching quiz monitor data:", error);
+    return { status: "error" as const, message: "Failed to fetch quiz monitor data" };
+  }
+}
+
+export async function setSystemAttemptingAction(systemCode: string) {
+  try {
+    const system = await prisma.externalQuizSystem.update({
+      where: { systemCode },
+      data: { status: "ATTEMPTING" },
+    });
+
+    const { triggerPusherEvent } = await import("@/lib/pusher-server");
+    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode });
+    triggerPusherEvent(`system-${systemCode}`, "status-changed", { status: "ATTEMPTING" });
+
+    return { status: "success" as const };
+  } catch (error) {
+    console.error("Error setting system status to ATTEMPTING:", error);
+    return { status: "error" as const, message: "Failed to update status" };
+  }
+}
+
+export async function unblockQuizCandidate(quizId: string, userId: string) {
+  await requireAdmin();
+
+  try {
+    const rawId = userId.replace("ext_", "");
+
+    // Find external system by ID, raw ID, or systemCode
+    const sys = await prisma.externalQuizSystem.findFirst({
+      where: {
+        OR: [
+          { id: rawId },
+          { id: userId },
+          { systemCode: userId },
+          { systemCode: rawId },
+        ],
+      },
+    });
+
+    // Delete matching QuizBlocks
+    await prisma.quizBlock.deleteMany({
+      where: {
+        quizId,
+        OR: [
+          { userId },
+          { userId: rawId },
+          { userId: `ext_${rawId}` },
+          ...(sys ? [{ userId: sys.id }, { userId: sys.systemCode }, { userId: `ext_${sys.id}` }] : []),
+        ],
+      },
+    });
+
+    const { triggerPusherEvent } = await import("@/lib/pusher-server");
+
+    if (sys) {
+      await prisma.externalQuizSystem.update({
+        where: { id: sys.id },
+        data: { status: "ATTEMPTING" },
+      });
+
+      triggerPusherEvent(`system-${sys.systemCode}`, "unblocked", { systemCode: sys.systemCode });
+      triggerPusherEvent(`system-${sys.systemCode}`, "status-changed", { status: "ATTEMPTING" });
+      triggerPusherEvent(`quiz-${sys.quizId}`, "system-updated", { systemCode: sys.systemCode });
+    }
+
+    triggerPusherEvent(`quiz-${quizId}`, "blocked-updated", { quizId, userId });
+    triggerPusherEvent(`quiz-${quizId}`, "system-updated", { quizId });
+
+    revalidatePath(`/admin/quizzes/${quizId}`);
+
+    return { status: "success" as const, message: "Candidate unblocked successfully" };
+  } catch (error) {
+    console.error("Error unblocking candidate:", error);
+    return { status: "error" as const, message: "Failed to unblock candidate" };
+  }
+}
+
+

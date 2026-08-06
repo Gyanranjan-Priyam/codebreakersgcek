@@ -15,49 +15,49 @@ export const mailer = nodemailer.createTransport({
 // Convert TipTap JSON content to HTML for emails
 const convertTipTapJSONToHTML = (content: JSONContent): string => {
   if (!content) return '';
-  
+
   let html = '';
-  
+
   switch (content.type) {
     case 'doc':
       html = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       break;
-    
+
     case 'paragraph':
       const paragraphContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       const textAlign = content.attrs?.textAlign;
       const style = textAlign ? ` style="text-align: ${textAlign}; margin: 12px 0;"` : ' style="margin: 12px 0;"';
       html = paragraphContent ? `<p${style}>${paragraphContent}</p>` : `<p${style}></p>`;
       break;
-    
+
     case 'heading':
       const headingContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       const level = content.attrs?.level || 1;
       const headingTextAlign = content.attrs?.textAlign;
-      const headingStyle = headingTextAlign 
-        ? ` style="text-align: ${headingTextAlign}; margin: 20px 0 12px 0; color: #1f2937;"` 
+      const headingStyle = headingTextAlign
+        ? ` style="text-align: ${headingTextAlign}; margin: 20px 0 12px 0; color: #1f2937;"`
         : ' style="margin: 20px 0 12px 0; color: #1f2937;"';
       html = `<h${level}${headingStyle}>${headingContent}</h${level}>`;
       break;
-    
+
     case 'bulletList':
       const bulletItems = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       html = `<ul style="margin: 16px 0; padding-left: 24px;">${bulletItems}</ul>`;
       break;
-    
+
     case 'orderedList':
       const orderedItems = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       html = `<ol style="margin: 16px 0; padding-left: 24px;">${orderedItems}</ol>`;
       break;
-    
+
     case 'listItem':
       const listItemContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       html = `<li style="margin: 4px 0;">${listItemContent}</li>`;
       break;
-    
+
     case 'text':
       let textContent = content.text || '';
-      
+
       // Apply marks (formatting)
       if (content.marks) {
         content.marks.forEach(mark => {
@@ -80,24 +80,24 @@ const convertTipTapJSONToHTML = (content: JSONContent): string => {
           }
         });
       }
-      
+
       html = textContent;
       break;
-    
+
     case 'hardBreak':
       html = '<br>';
       break;
-    
+
     case 'codeBlock':
       const codeContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       html = `<pre style="background-color: #f3f4f6; padding: 12px; border-radius: 6px; overflow-x: auto; font-family: monospace; margin: 16px 0;"><code>${codeContent}</code></pre>`;
       break;
-    
+
     case 'blockquote':
       const quoteContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
       html = `<blockquote style="border-left: 4px solid #e5e7eb; padding-left: 16px; margin: 16px 0; font-style: italic; color: #6b7280;">${quoteContent}</blockquote>`;
       break;
-    
+
     default:
       // For unknown types, try to render content if it exists
       if (content.content) {
@@ -107,7 +107,7 @@ const convertTipTapJSONToHTML = (content: JSONContent): string => {
       }
       break;
   }
-  
+
   return html;
 };
 
@@ -273,14 +273,14 @@ export const sendVerificationEmail = async ({
 }) => {
   try {
     const html = generateVerificationEmailHTML(otp);
-    
+
     const info = await mailer.sendMail({
       from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
       to,
       subject: 'Verify your email address',
       html,
     });
-    
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Failed to send email:', error);
@@ -349,7 +349,7 @@ export const sendMemberInvitationEmail = async ({
   try {
     const html = generateMemberPortalEmailHTML({
       memberName,
-      title: "You're invited to CodeBreakers",
+      title: "Congratulation!!! You're invited to CodeBreakers",
       message:
         "Your member profile has been created. Use the link below to sign in to your CodeBreakers dashboard and continue your access setup.",
       ctaLabel: "Sign in to your dashboard",
@@ -359,7 +359,7 @@ export const sendMemberInvitationEmail = async ({
     const info = await mailer.sendMail({
       from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
       to,
-      subject: "You're invited to join CodeBreakers",
+      subject: "Congratulation!!! You're invited to join CodeBreakers",
       html,
     });
 
@@ -582,7 +582,7 @@ export const sendConfirmationEmailWithAttachment = async ({
       participantEmail: to,
       registrationDetails,
     });
-    
+
     const mailOptions: any = {
       from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
       to,
@@ -600,9 +600,9 @@ export const sendConfirmationEmailWithAttachment = async ({
         }
       ];
     }
-    
+
     const info = await mailer.sendMail(mailOptions);
-    
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Failed to send confirmation email with attachment:', error);
@@ -642,14 +642,14 @@ export const sendConfirmationEmail = async ({
       participantEmail: to,
       registrationDetails,
     });
-    
+
     const info = await mailer.sendMail({
       from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
       to,
       subject: `🎉 Registration Confirmed - ${eventTitle}`,
       html,
     });
-    
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Failed to send confirmation email:', error);
@@ -682,8 +682,8 @@ const generateAnnouncementEmailHTML = ({
   isUpdate?: boolean;
 }) => {
   // Convert description to HTML if it's JSON content, otherwise use as string
-  const descriptionHTML = typeof description === 'string' 
-    ? description 
+  const descriptionHTML = typeof description === 'string'
+    ? description
     : convertTipTapJSONToHTML(description);
 
   return `<!DOCTYPE html>
@@ -1013,7 +1013,7 @@ export const sendAnnouncementNotification = async ({
       hasImages: attachments ? attachments.some(att => att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) : false,
       isUpdate,
     });
-    
+
     const mailOptions: any = {
       from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
       bcc: recipients, // Use BCC to protect recipient privacy
@@ -1025,9 +1025,9 @@ export const sendAnnouncementNotification = async ({
     if (attachments && attachments.length > 0) {
       mailOptions.attachments = attachments;
     }
-    
+
     const info = await mailer.sendMail(mailOptions);
-    
+
     return { success: true, messageId: info.messageId, recipientCount: recipients.length };
   } catch (error) {
     console.error('Failed to send announcement notification:', error);
@@ -1063,9 +1063,9 @@ export const sendEmail = async ({
     if (attachments && attachments.length > 0) {
       mailOptions.attachments = attachments;
     }
-    
+
     const info = await mailer.sendMail(mailOptions);
-    
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Failed to send email:', error);
@@ -1271,7 +1271,7 @@ export const sendPaymentConfirmationEmail = async ({
       paymentAmount,
       registrationDetails,
     });
-    
+
     const mailOptions = {
       from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
       to,
@@ -1285,9 +1285,9 @@ export const sendPaymentConfirmationEmail = async ({
         }
       ]
     };
-    
+
     const info = await mailer.sendMail(mailOptions);
-    
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Failed to send payment confirmation email:', error);
@@ -1299,8 +1299,8 @@ export const sendPaymentConfirmationEmail = async ({
 export const generateWelcomeEmailHTML = ({
   firstName = "there",
   companyName = "CodeBreakers",
-  getStartedUrl = "https://codebreakers.in",
-  supportEmail = "contact.gyanranjan@gmail.com",
+  getStartedUrl = "https://codebreakersgcek.tech",
+  supportEmail = "contact.gcekbhawanipatna@gmail.com",
   companyAddress = "GCEK, Bhawanipatna, Odisha",
 }: {
   firstName?: string;
@@ -1643,6 +1643,217 @@ export const sendFormResponseInvoiceEmail = async ({
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error("Failed to send form response invoice email:", error);
+    return { success: false, error };
+  }
+};
+
+// Generate Quiz Result Email HTML
+const generateQuizResultHTML = ({
+  recipientName,
+  quizTitle,
+  score,
+  totalQuestions,
+  correctAnswers,
+  pointsEarned,
+  answersBreakdown,
+}: {
+  recipientName: string;
+  quizTitle: string;
+  score: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  pointsEarned: number;
+  answersBreakdown: Array<{
+    question: string;
+    userAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+  }>;
+}) => {
+  const percentage = score;
+  const isPassed = percentage >= 50;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Result - ${quizTitle}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FFFFFF;font-family:'Inter',Arial,sans-serif;color:#262523;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#FFFFFF;">
+    <tr>
+      <td align="center" style="padding:0;">
+        <table width="640" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #E3DFD6;">
+
+          <!-- Letterhead -->
+          <tr>
+            <td style="padding:28px 40px 20px 40px;border-bottom:2px solid #262523;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td valign="middle">
+                    <img src="https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png" alt="CodeBreakers" style="max-width:110px;height:auto;display:block;" />
+                  </td>
+                  <td valign="middle" align="right">
+                    <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#867F73;">Government College of Engineering Kalahandi</div>
+                    <div style="font-size:10px;color:#A9A296;margin-top:2px;">CodeBreakers Assessment Cell</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Document title -->
+          <tr>
+            <td style="padding:24px 40px 4px 40px;">
+              <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#867F73;">Result Statement</div>
+              <div style="font-size:20px;font-weight:700;color:#262523;margin-top:4px;">${quizTitle}</div>
+            </td>
+          </tr>
+
+          <!-- Candidate info -->
+          <tr>
+            <td style="padding:16px 40px 24px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-top:1px solid #E3DFD6;border-bottom:1px solid #E3DFD6;">
+                <tr>
+                  <td style="padding:10px 0;font-size:11px;color:#867F73;width:35%;">Candidate Name</td>
+                  <td style="padding:10px 0;font-size:12px;font-weight:600;color:#262523;">${recipientName}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;font-size:11px;color:#867F73;border-top:1px solid #F0EEE9;">Assessment</td>
+                  <td style="padding:10px 0;font-size:12px;font-weight:600;color:#262523;border-top:1px solid #F0EEE9;">${quizTitle}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;font-size:11px;color:#867F73;border-top:1px solid #F0EEE9;">Result Status</td>
+                  <td style="padding:10px 0;font-size:12px;font-weight:700;color:${isPassed ? '#256D45' : '#B23A2F'};border-top:1px solid #F0EEE9;">${isPassed ? 'PASS' : 'NOT CLEARED'}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Score table -->
+          <tr>
+            <td style="padding:0 40px 8px 40px;">
+              <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#867F73;margin-bottom:10px;">Score Summary</div>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #E3DFD6;">
+                <tr style="background:#FAF9F6;">
+                  <td style="padding:9px 14px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:#4A4742;border-right:1px solid #E3DFD6;">Metric</td>
+                  <td align="right" style="padding:9px 14px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:#4A4742;">Value</td>
+                </tr>
+                <tr>
+                  <td style="padding:11px 14px;font-size:12px;color:#4A4742;border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;">Total Questions</td>
+                  <td align="right" style="padding:11px 14px;font-size:12px;font-weight:600;color:#262523;border-top:1px solid #E3DFD6;">${totalQuestions}</td>
+                </tr>
+                <tr>
+                  <td style="padding:11px 14px;font-size:12px;color:#4A4742;border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;">Correct Answers</td>
+                  <td align="right" style="padding:11px 14px;font-size:12px;font-weight:600;color:#262523;border-top:1px solid #E3DFD6;">${correctAnswers}</td>
+                </tr>
+                <tr>
+                  <td style="padding:11px 14px;font-size:12px;color:#4A4742;border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;">Points Earned</td>
+                  <td align="right" style="padding:11px 14px;font-size:12px;font-weight:600;color:#262523;border-top:1px solid #E3DFD6;">${pointsEarned}</td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 14px;font-size:12px;font-weight:700;color:#262523;border-top:1px solid #262523;border-right:1px solid #E3DFD6;">Final Percentage</td>
+                  <td align="right" style="padding:12px 14px;font-size:14px;font-weight:800;color:${isPassed ? '#256D45' : '#B23A2F'};border-top:1px solid #262523;">${percentage.toFixed(1)}%</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Question breakdown -->
+          <tr>
+            <td style="padding:28px 40px 8px 40px;">
+              <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#867F73;margin-bottom:10px;">Question-wise Breakdown</div>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #E3DFD6;">
+                <tr style="background:#FAF9F6;">
+                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:6%;border-right:1px solid #E3DFD6;">#</td>
+                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:44%;border-right:1px solid #E3DFD6;">Question</td>
+                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:25%;border-right:1px solid #E3DFD6;">Your Answer</td>
+                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:25%;">Correct Answer</td>
+                </tr>
+                ${answersBreakdown.map((item, idx) => `
+                <tr>
+                  <td style="padding:10px 12px;font-size:11px;color:#4A4742;border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;vertical-align:top;">${idx + 1}</td>
+                  <td style="padding:10px 12px;font-size:11px;color:#262523;border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;vertical-align:top;">${item.question}</td>
+                  <td style="padding:10px 12px;font-size:11px;font-weight:600;color:${item.isCorrect ? '#256D45' : '#B23A2F'};border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;vertical-align:top;">${item.userAnswer || 'Not answered'}</td>
+                  <td style="padding:10px 12px;font-size:11px;font-weight:600;color:#262523;border-top:1px solid #E3DFD6;vertical-align:top;">${item.isCorrect ? '—' : item.correctAnswer}</td>
+                </tr>
+                `).join('')}
+              </table>
+            </td>
+          </tr>
+
+          <!-- Note -->
+          <tr>
+            <td style="padding:24px 40px 8px 40px;">
+              <p style="margin:0;font-size:11px;color:#867F73;line-height:1.6;">
+                This statement is generated automatically by the CodeBreakers Admin Portal and does not require a signature. For discrepancies, please contact the assessment cell within 7 days of receipt.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px;border-top:1px solid #E3DFD6;">
+              <span style="font-size:10px;color:#A9A296;">&copy; 2026 CodeBreakers &middot; Government College of Engineering Kalahandi</span>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+};
+
+// Send Quiz Result Email Function
+export const sendQuizResultEmail = async ({
+  to,
+  recipientName = "Participant",
+  quizTitle = "Quiz",
+  score = 0,
+  totalQuestions = 0,
+  correctAnswers = 0,
+  pointsEarned = 0,
+  answersBreakdown = [],
+}: {
+  to: string;
+  recipientName?: string;
+  quizTitle?: string;
+  score?: number;
+  totalQuestions?: number;
+  correctAnswers?: number;
+  pointsEarned?: number;
+  answersBreakdown?: Array<{
+    question: string;
+    userAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+  }>;
+}) => {
+  try {
+    const html = generateQuizResultHTML({
+      recipientName,
+      quizTitle,
+      score,
+      totalQuestions,
+      correctAnswers,
+      pointsEarned,
+      answersBreakdown,
+    });
+
+    const mailOptions = {
+      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      to,
+      subject: `🏆 Your Quiz Results - ${quizTitle} (${score.toFixed(1)}%)`,
+      html,
+    };
+
+    const info = await mailer.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Failed to send quiz result email:", error);
     return { success: false, error };
   }
 };

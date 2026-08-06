@@ -24,35 +24,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { createQuiz } from "../../actions";
 import { generateQuizId } from "../../utils";
-import { Loader2, CheckCircle2, XCircle, Eye } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Users,
+  Globe,
+  Key,
+  FileText,
+  RefreshCw,
+  BookOpen,
+  Clock,
+  Award,
+  Calendar,
+  AlertTriangle,
+  Eye,
+} from "lucide-react";
 
 const formSchema = z.object({
   quizId: z.string().min(1, "Quiz ID is required"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
+  targetAudience: z.enum(["INTERNAL", "EXTERNAL"]),
+  accessCode: z.string().optional(),
+  formId: z.string().optional(),
+  feedbackFormId: z.string().optional(),
   sets: z.number().min(1).max(8),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   pointsPerQuestion: z.number().min(1, "Points must be at least 1"),
   startDateTime: z.date(),
   endDateTime: z.date(),
   questionsJson: z.string().optional(),
-}).refine((data) => {
-  return data.endDateTime > data.startDateTime;
-}, {
+}).refine((data) => data.endDateTime > data.startDateTime, {
   message: "End date must be after start date",
   path: ["endDateTime"],
 });
@@ -61,17 +79,20 @@ type FormData = z.infer<typeof formSchema>;
 
 interface CreateQuizFormProps {
   userId: string;
+  forms?: Array<{ id: string; formId: string; title: string }>;
+  initialAudience?: "INTERNAL" | "EXTERNAL";
 }
 
-export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
+export default function CreateQuizForm({ userId, forms = [], initialAudience = "INTERNAL" }: CreateQuizFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedQuizId, setGeneratedQuizId] = useState("");
   const [setQuestions, setSetQuestions] = useState<Record<string, any[]>>({});
   const [currentSet, setCurrentSet] = useState("A");
   const [jsonError, setJsonError] = useState<string | null>(null);
-  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
-  const [previewSet, setPreviewSet] = useState<string>("");
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewSet, setPreviewSet] = useState<string>("ALL");
+
+  const generate6DigitCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -79,110 +100,86 @@ export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
       quizId: "",
       title: "",
       description: "",
+      targetAudience: initialAudience,
+      accessCode: generate6DigitCode(),
+      formId: "",
+      feedbackFormId: "",
       sets: 1,
       duration: 30,
       pointsPerQuestion: 1,
       startDateTime: new Date(),
-      endDateTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      endDateTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       questionsJson: "",
     },
   });
 
-  // Generate quiz ID on mount
   useEffect(() => {
     const id = generateQuizId();
-    setGeneratedQuizId(id);
     form.setValue("quizId", id);
   }, []);
 
-  // Watch sets value to initialize set questions
+  const watchAudience = form.watch("targetAudience");
   const watchSets = form.watch("sets");
-  
+  const watchTitle = form.watch("title");
+  const watchDescription = form.watch("description");
+  const watchDuration = form.watch("duration");
+  const watchPoints = form.watch("pointsPerQuestion");
+  const watchAccessCode = form.watch("accessCode");
+
   useEffect(() => {
-    const sets = watchSets;
     const newSetQuestions: Record<string, any[]> = {};
-    for (let i = 0; i < sets; i++) {
-      const setLetter = String.fromCharCode(65 + i); // A, B, C, etc.
-      if (!setQuestions[setLetter]) {
-        newSetQuestions[setLetter] = [];
-      } else {
-        newSetQuestions[setLetter] = setQuestions[setLetter];
-      }
+    for (let i = 0; i < watchSets; i++) {
+      const setLetter = String.fromCharCode(65 + i);
+      newSetQuestions[setLetter] = setQuestions[setLetter] || [];
     }
     setSetQuestions(newSetQuestions);
     setCurrentSet("A");
   }, [watchSets]);
 
-  // Validate and update questions for current set
   const validateAndUpdateSet = (jsonString: string, setLetter: string) => {
-    if (!jsonString.trim()) {
-      setJsonError(null);
-      return;
-    }
-
+    if (!jsonString.trim()) { setJsonError(null); return; }
     try {
       const parsed = JSON.parse(jsonString);
-      
-      if (!Array.isArray(parsed)) {
-        setJsonError("Questions must be an array");
-        return;
-      }
-
-      // Validate structure
-      const isValid = parsed.every((q: any) => 
-        q.id && 
-        q.question && 
-        Array.isArray(q.options) && 
-        q.options.length > 0 &&
-        q.answer !== undefined
-      );
-
-      if (!isValid) {
-        setJsonError("Each question must have: id, question, options array, and answer");
-        return;
-      }
-
-      // Update set questions
-      setSetQuestions(prev => ({
-        ...prev,
-        [setLetter]: parsed
-      }));
+      if (!Array.isArray(parsed)) { setJsonError("Questions must be an array"); return; }
+      const isValid = parsed.every((q: any) => q.id && q.question && Array.isArray(q.options) && q.options.length > 0 && q.answer !== undefined);
+      if (!isValid) { setJsonError("Each question must have: id, question, options array, and answer"); return; }
+      setSetQuestions(prev => ({ ...prev, [setLetter]: parsed }));
       setJsonError(null);
-      toast.success(`Questions updated for Set ${setLetter}`);
-    } catch (error) {
+      toast.success(`Set ${setLetter}: ${parsed.length} questions validated`);
+    } catch {
       setJsonError("Invalid JSON format");
     }
   };
 
-  // Combine all sets into questionsJson
   const combineAllSets = () => {
-    const allQuestions: any = {};
-    Object.keys(setQuestions).forEach(setLetter => {
-      if (setQuestions[setLetter].length > 0) {
-        allQuestions[setLetter] = setQuestions[setLetter];
-      }
-    });
-    return JSON.stringify(allQuestions);
+    const all: any = {};
+    Object.keys(setQuestions).forEach(k => { if (setQuestions[k].length > 0) all[k] = setQuestions[k]; });
+    return JSON.stringify(all);
   };
 
   const onSubmit = async (data: FormData) => {
-    // Validate that all sets have questions
-    const totalQuestions = Object.values(setQuestions).reduce((sum, questions) => sum + questions.length, 0);
-    
-    if (totalQuestions === 0) {
-      toast.error("Please add questions for at least one set");
-      return;
-    }
-
+    const total = Object.values(setQuestions).reduce((s, q) => s + q.length, 0);
+    if (total === 0) { toast.error("Please add questions for at least one set"); return; }
     setIsLoading(true);
+
     const questionsJson = combineAllSets();
-    
+
     const result = await createQuiz({
-      ...data,
+      quizId: data.quizId,
+      title: data.title,
+      description: data.description,
+      targetAudience: data.targetAudience,
+      accessCode: data.targetAudience === "EXTERNAL" ? data.accessCode : undefined,
+      sets: data.sets,
+      duration: data.duration,
+      pointsPerQuestion: data.pointsPerQuestion,
+      startDateTime: data.startDateTime,
+      endDateTime: data.endDateTime,
       questionsJson,
       createdBy: userId,
+      formId: data.targetAudience === "EXTERNAL" ? (data.formId === "none" ? null : data.formId) : null,
+      feedbackFormId: data.targetAudience === "EXTERNAL" ? (data.feedbackFormId === "none" ? null : data.feedbackFormId) : null,
     });
-
     if (result.status === "success") {
       toast.success("Quiz created successfully");
       router.push("/admin/quizzes");
@@ -192,145 +189,218 @@ export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
     setIsLoading(false);
   };
 
+  const totalQuestions = Object.values(setQuestions).reduce((s, q) => s + q.length, 0);
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Quiz ID */}
-        <FormField
-          control={form.control}
-          name="quizId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Quiz ID</FormLabel>
-              <FormControl>
-                <Input {...field} disabled className="font-mono bg-muted" />
-              </FormControl>
-              <FormDescription>
-                Auto-generated unique identifier for this quiz
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-4xl mx-auto w-full">
+        {/* Audience display banner */}
+        <div className="flex items-center justify-between gap-4 p-4 border rounded-xl bg-muted/40">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+              {watchAudience === "EXTERNAL" ? <Globe className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+            </div>
+            <div>
+              <div className="font-semibold text-base flex items-center gap-2">
+                <span>{watchAudience === "EXTERNAL" ? "External / Venue Kiosk Quiz" : "Internal Club Members Quiz"}</span>
+                <Badge variant="outline" className="text-[10px]">Selected</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {watchAudience === "EXTERNAL" ? "6-digit access code + venue kiosk student assignment" : "Standard quiz for registered CodeBreakers club members"}
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsPreviewOpen(true)}
+            className="cursor-pointer shrink-0"
+          >
+            <Eye className="h-4 w-4 mr-1.5" />
+            Preview Quiz
+          </Button>
+        </div>
 
-        {/* Title */}
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Title</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="e.g., JavaScript Basics Quiz" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* External-only config */}
+        {watchAudience === "EXTERNAL" && (
+          <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Key className="h-4 w-4" />
+              External Configuration
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="accessCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>6-Digit Access Code</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input {...field} maxLength={6} className="font-mono text-lg tracking-widest text-center" />
+                      </FormControl>
+                      <Button type="button" variant="outline" size="icon" onClick={() => form.setValue("accessCode", generate6DigitCode())}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <FormDescription className="text-xs">Kiosks enter this to register</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="formId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5" /> Registration Form (Optional)
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select form..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None (manual entry)</SelectItem>
+                        {forms.map((f) => (
+                          <SelectItem key={f.id} value={f.formId}>{f.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">Use response IDs to auto-assign participants</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="feedbackFormId"
+                render={({ field }) => (
+                  <FormItem className="col-span-1 sm:col-span-2">
+                    <FormLabel className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-primary" /> Feedback Form (Optional)
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select feedback form..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None (No Feedback Form)</SelectItem>
+                        {forms.map((f) => (
+                          <SelectItem key={f.id} value={f.formId}>{f.title} ({f.formId})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">A button will be shown after students complete the quiz to fill this feedback form</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Description */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description / Rules</FormLabel>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  placeholder="Enter quiz description and rules..."
-                  rows={4}
-                />
-              </FormControl>
-              <FormDescription>
-                Provide instructions and rules for taking this quiz
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <Separator />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Sets */}
+        {/* Basic details */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="sets"
+            name="quizId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Number of Sets</FormLabel>
-                <Select
-                  onValueChange={(value) => field.onChange(parseInt(value))}
-                  defaultValue={field.value?.toString() || "1"}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select sets" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                      <SelectItem key={num} value={num.toString()}>
-                        {num} {num === 1 ? "Set" : "Sets"} (A{num > 1 ? `-${String.fromCharCode(64 + num)}` : ""})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormDescription>
-                  Number of question sets (A, B, C, etc.)
-                </FormDescription>
-                <FormMessage />
+                <FormLabel>System Quiz ID</FormLabel>
+                <FormControl>
+                  <Input {...field} disabled className="font-mono text-sm text-muted-foreground" />
+                </FormControl>
+                <FormDescription className="text-xs">Auto-generated identifier</FormDescription>
               </FormItem>
             )}
           />
-
-          {/* Duration */}
           <FormField
             control={form.control}
-            name="duration"
+            name="title"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Duration (minutes)</FormLabel>
+                <FormLabel>Quiz Title *</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    min={1}
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
-                  />
+                  <Input {...field} placeholder="e.g., Annual Tech Quiz 2026" />
                 </FormControl>
-                <FormDescription>
-                  Time limit for completing the quiz
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Points Per Question */}
-          <FormField
-            control={form.control}
-            name="pointsPerQuestion"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Points Per Question</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min={1}
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
-                  />
-                </FormControl>
-                <FormDescription>
-                  Points awarded for each correct answer
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        {/* Start and End Date Time */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description / Rules *</FormLabel>
+              <FormControl>
+                <Textarea {...field} placeholder="Enter quiz instructions, proctoring rules, timing constraints..." rows={3} />
+              </FormControl>
+              <FormDescription className="text-xs">Displayed to candidates before starting</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Config row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border border-border rounded-lg bg-muted/20">
+          <FormField
+            control={form.control}
+            name="sets"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Question Sets</FormLabel>
+                <Select onValueChange={(v) => field.onChange(parseInt(v))} defaultValue={field.value?.toString() || "1"}>
+                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <SelectItem key={n} value={n.toString()}>{n} Set{n > 1 ? "s" : ""} (A{n > 1 ? `-${String.fromCharCode(64+n)}` : ""})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="duration"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Duration (Minutes)</FormLabel>
+                <FormControl>
+                  <Input type="number" min={1} {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="pointsPerQuestion"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Points / Question</FormLabel>
+                <FormControl>
+                  <Input type="number" min={1} {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Dates */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -341,19 +411,14 @@ export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
                 <FormControl>
                   <Input
                     type="datetime-local"
-                    required
                     value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
                     onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
                   />
                 </FormControl>
-                <FormDescription>
-                  When the quiz becomes available
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-
           <FormField
             control={form.control}
             name="endDateTime"
@@ -363,42 +428,33 @@ export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
                 <FormControl>
                   <Input
                     type="datetime-local"
-                    required
                     value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
                     onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
                   />
                 </FormControl>
-                <FormDescription>
-                  When the quiz closes
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        {/* Set Tabs for Questions */}
+        {/* Question Sets */}
         {watchSets > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-4 pt-2 border-t border-border">
             <div>
-              <h3 className="text-lg font-semibold mb-2">Question Sets</h3>
-              <p className="text-sm text-muted-foreground">
-                Add questions for each set. Each set will be assigned to different members.
-              </p>
+              <h3 className="text-base font-semibold">Question Sets</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Paste JSON for each set, then click Validate.</p>
             </div>
 
             <Tabs value={currentSet} onValueChange={setCurrentSet}>
               <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${watchSets}, 1fr)` }}>
                 {Array.from({ length: watchSets }, (_, i) => {
-                  const setLetter = String.fromCharCode(65 + i);
-                  const hasQuestions = setQuestions[setLetter]?.length > 0;
+                  const s = String.fromCharCode(65 + i);
                   return (
-                    <TabsTrigger key={setLetter} value={setLetter} className="relative">
-                      Set {setLetter}
-                      {hasQuestions && (
-                        <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
-                          {setQuestions[setLetter].length}
-                        </Badge>
+                    <TabsTrigger key={s} value={s}>
+                      Set {s}
+                      {setQuestions[s]?.length > 0 && (
+                        <Badge variant="secondary" className="ml-1.5 h-5 px-1 text-[10px]">{setQuestions[s].length}</Badge>
                       )}
                     </TabsTrigger>
                   );
@@ -406,103 +462,41 @@ export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
               </TabsList>
 
               {Array.from({ length: watchSets }, (_, i) => {
-                const setLetter = String.fromCharCode(65 + i);
+                const s = String.fromCharCode(65 + i);
                 return (
-                  <TabsContent key={setLetter} value={setLetter} className="space-y-4">
-                    <Card className="p-4">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium">Questions for Set {setLetter}</h4>
-                          {setQuestions[setLetter]?.length > 0 && (
-                            <Badge variant="default">
-                              {setQuestions[setLetter].length} question{setQuestions[setLetter].length > 1 ? "s" : ""}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <Textarea
-                          placeholder={`[\n  {\n    "id": 1,\n    "question": "What is 2+2?",\n    "options": ["3", "4", "5", "6"],\n    "answer": "4"\n  }\n]`}
-                          rows={8}
-                          className="font-mono text-sm"
-                          defaultValue={setQuestions[setLetter]?.length > 0 ? JSON.stringify(setQuestions[setLetter], null, 2) : ""}
-                          id={`questions-${setLetter}`}
-                        />
-
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              const textarea = document.getElementById(`questions-${setLetter}`) as HTMLTextAreaElement;
-                              validateAndUpdateSet(textarea.value, setLetter);
-                            }}
-                            variant="secondary"
-                            className="flex-1"
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Update Questions for Set {setLetter}
-                          </Button>
-
-                          {setQuestions[setLetter]?.length > 0 && (
-                            <Button
-                              type="button"
-                              onClick={() => {
-                                setPreviewSet(setLetter);
-                                setPreviewDialogOpen(true);
-                              }}
-                              variant="outline"
-                              className="flex-1"
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              Preview ({setQuestions[setLetter].length})
-                            </Button>
-                          )}
-                        </div>
-
-                        {jsonError && currentSet === setLetter && (
-                          <div className="flex items-center gap-2 text-destructive text-sm">
-                            <XCircle className="h-4 w-4" />
-                            {jsonError}
-                          </div>
-                        )}
-
-                        {/* Quick Preview - First 2 questions */}
-                        {setQuestions[setLetter]?.length > 0 && (
-                          <div className="border rounded-lg p-3 bg-muted/50">
-                            <h5 className="font-medium text-sm mb-2 flex items-center justify-between">
-                              <span>Quick Preview</span>
-                              <Badge variant="secondary" className="text-xs">
-                                {setQuestions[setLetter].length} total
-                              </Badge>
-                            </h5>
-                            <div className="space-y-2">
-                              {setQuestions[setLetter].slice(0, 2).map((question: any, index: number) => (
-                                <div key={index} className="border-l-2 border-primary pl-3 py-1">
-                                  <p className="font-medium text-sm">
-                                    {question.id}. {question.question}
-                                  </p>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {question.options.map((opt: string, i: number) => (
-                                      <Badge
-                                        key={i}
-                                        variant={opt === question.answer ? "default" : "outline"}
-                                        className="text-xs"
-                                      >
-                                        {opt}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                              {setQuestions[setLetter].length > 2 && (
-                                <p className="text-xs text-muted-foreground text-center pt-1">
-                                  Click Preview button to see all {setQuestions[setLetter].length} questions
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </Card>
+                  <TabsContent key={s} value={s} className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">JSON for Set {s}</span>
+                      {setQuestions[s]?.length > 0 && (
+                        <Badge variant="outline" className="text-xs border-green-600 text-green-600">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />{setQuestions[s].length} validated
+                        </Badge>
+                      )}
+                    </div>
+                    <Textarea
+                      id={`questions-${s}`}
+                      placeholder={`[\n  {\n    "id": 1,\n    "question": "Sample question?",\n    "options": ["A", "B", "C", "D"],\n    "answer": "A"\n  }\n]`}
+                      rows={8}
+                      className="font-mono text-sm"
+                      defaultValue={setQuestions[s]?.length > 0 ? JSON.stringify(setQuestions[s], null, 2) : ""}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        const el = document.getElementById(`questions-${s}`) as HTMLTextAreaElement;
+                        validateAndUpdateSet(el.value, s);
+                      }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Validate Set {s}
+                    </Button>
+                    {jsonError && currentSet === s && (
+                      <Alert variant="destructive">
+                        <XCircle className="h-4 w-4" />
+                        <AlertDescription>{jsonError}</AlertDescription>
+                      </Alert>
+                    )}
                   </TabsContent>
                 );
               })}
@@ -510,91 +504,185 @@ export default function CreateQuizForm({ userId }: CreateQuizFormProps) {
           </div>
         )}
 
-        {/* Questions JSON - Hidden field for form submission */}
-        <FormField
-          control={form.control}
-          name="questionsJson"
-          render={({ field }) => (
-            <FormItem className="hidden">
-              <FormControl>
-                <Input {...field} type="hidden" />
-              </FormControl>
-            </FormItem>
-          )}
-        />
+        <FormField control={form.control} name="questionsJson" render={({ field }) => (
+          <FormItem className="hidden"><FormControl><Input {...field} type="hidden" /></FormControl></FormItem>
+        )} />
 
-        <div className="flex gap-4">
+        {/* Submit Bar */}
+        <div className="flex items-center justify-between gap-3 pt-6 border-t border-border">
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/admin/quizzes")}
-            disabled={isLoading}
+            onClick={() => setIsPreviewOpen(true)}
+            className="cursor-pointer"
           >
-            Cancel
+            <Eye className="h-4 w-4 mr-1.5" />
+            Preview Quiz
           </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Create Quiz
-          </Button>
-        </div>
-      </form>
 
-      {/* Full Preview Dialog */}
-      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Preview Questions - Set {previewSet}</DialogTitle>
-            <DialogDescription>
-              Review all {setQuestions[previewSet]?.length || 0} questions for Set {previewSet}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {setQuestions[previewSet]?.map((question: any, index: number) => (
-              <Card key={index} className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Badge variant="outline" className="mt-0.5">
-                      Q{question.id}
-                    </Badge>
-                    <p className="font-medium flex-1">{question.question}</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-12">
-                    {question.options.map((opt: string, i: number) => (
-                      <div
-                        key={i}
-                        className={`p-2 rounded-lg border-2 ${
-                          opt === question.answer
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-muted/50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={opt === question.answer ? "default" : "outline"}
-                            className="text-xs"
-                          >
-                            {String.fromCharCode(65 + i)}
-                          </Badge>
-                          <span className="text-sm">{opt}</span>
-                          {opt === question.answer && (
-                            <CheckCircle2 className="h-4 w-4 ml-auto text-primary" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="ml-12 text-sm text-muted-foreground">
-                    Correct Answer: <span className="font-medium text-primary">{question.answer}</span>
-                  </div>
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="outline" onClick={() => router.push("/admin/quizzes")} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create Quiz
+            </Button>
+          </div>
+        </div>
+
+        {/* ── RIGHT SIDEBAR LIVE PREVIEW SHEET WITH LENIS SCROLL FIX ── */}
+        <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+          <SheetContent side="right" className="sm:max-w-xl w-full p-0 flex h-dvh max-h-screen flex-col overflow-hidden bg-background border-l shadow-2xl">
+            <div className="shrink-0 border-b bg-card">
+              <SheetHeader className="px-6 pt-6 pb-4">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-primary" />
+                  <SheetTitle className="text-lg">Quiz Live Preview</SheetTitle>
                 </div>
-              </Card>
-            ))}
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button onClick={() => setPreviewDialogOpen(false)}>Close</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+                <SheetDescription className="text-xs">
+                  Real-time preview of quiz details, settings, and parsed question sets.
+                </SheetDescription>
+              </SheetHeader>
+            </div>
+
+            {/* Scrollable Body Container with Lenis Prevent */}
+            <div 
+              data-lenis-prevent 
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 space-y-6"
+              onWheel={(e) => e.stopPropagation()}
+              onTouchMoveCapture={(e) => e.stopPropagation()}
+            >
+              {/* Header Info */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant={watchAudience === "EXTERNAL" ? "secondary" : "outline"}>
+                    {watchAudience === "EXTERNAL" ? <><Globe className="h-3 w-3 mr-1" />External Kiosk</> : <><Users className="h-3 w-3 mr-1" />Internal Members</>}
+                  </Badge>
+                  {watchAudience === "EXTERNAL" && watchAccessCode && (
+                    <Badge variant="outline" className="font-mono text-xs">
+                      Access Code: {watchAccessCode}
+                    </Badge>
+                  )}
+                </div>
+                <h3 className="text-xl font-bold">{watchTitle || "Untitled Quiz"}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                  {watchDescription || "No description provided yet."}
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Quick Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Duration</p>
+                  <p className="text-base font-bold">{watchDuration || 0} mins</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Sets</p>
+                  <p className="text-base font-bold">{watchSets}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Points/Q</p>
+                  <p className="text-base font-bold">{watchPoints || 1}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Questions</p>
+                  <p className="text-base font-bold">{totalQuestions}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Detailed Question Sets Preview */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                    <span>Question Sets Breakdown</span>
+                    <span className="text-xs text-muted-foreground font-normal">{totalQuestions} total questions</span>
+                  </h4>
+                  {watchSets > 1 && (
+                    <Select value={previewSet} onValueChange={setPreviewSet}>
+                      <SelectTrigger className="w-[110px] h-8 text-xs font-medium bg-muted/30">
+                        <SelectValue placeholder="All Sets" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Sets</SelectItem>
+                        {Array.from({ length: watchSets }).map((_, i) => {
+                          const sLetter = String.fromCharCode(65 + i);
+                          return <SelectItem key={sLetter} value={sLetter}>Set {sLetter}</SelectItem>;
+                        })}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                {Object.keys(setQuestions).length === 0 || totalQuestions === 0 ? (
+                  <div className="p-8 text-center border-2 border-dashed rounded-xl bg-muted/30">
+                    <p className="text-sm text-muted-foreground">No questions added yet.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Add and validate question JSON in the form to see preview.</p>
+                  </div>
+                ) : (
+                  Object.keys(setQuestions)
+                    .filter((sLetter) => previewSet === "ALL" || previewSet === sLetter)
+                    .map((sLetter) => {
+                    const setList = setQuestions[sLetter] || [];
+                    return (
+                      <Card key={sLetter} className="overflow-hidden border">
+                        <CardHeader className="p-4 bg-muted/50 border-b">
+                          <CardTitle className="text-sm flex items-center justify-between">
+                            <span>Set {sLetter}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {setList.length} Question{setList.length !== 1 ? 's' : ''}
+                            </Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-4">
+                          {setList.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">No questions in this set.</p>
+                          ) : (
+                            setList.map((qItem: any, qIdx: number) => (
+                              <div key={qIdx} className="p-3 border rounded-lg bg-card space-y-2 text-xs">
+                                <p className="font-semibold text-sm">
+                                  Q{qIdx + 1}. {qItem.question}
+                                </p>
+                                {Array.isArray(qItem.options) && (
+                                  <div className="space-y-1 pl-2">
+                                    {qItem.options.map((opt: string, optIdx: number) => (
+                                      <div
+                                        key={optIdx}
+                                        className={`p-2 rounded border flex items-center justify-between ${
+                                          qItem.answer === optIdx
+                                            ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
+                                            : "border-border bg-background text-muted-foreground"
+                                        }`}
+                                      >
+                                        <span>
+                                          {String.fromCharCode(65 + optIdx)}. {opt}
+                                        </span>
+                                        {qItem.answer === optIdx && (
+                                          <Badge variant="outline" className="text-[10px] border-green-600 text-green-600">
+                                            Answer
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </form>
     </Form>
   );
 }

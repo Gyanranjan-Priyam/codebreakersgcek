@@ -10,71 +10,109 @@ interface BlockUserFromQuizParams {
   reason: string;
   violationType: string;
   violationCount: number;
+  userId?: string;
+  systemCode?: string;
 }
 
 export async function blockUserFromQuizAction(params: BlockUserFromQuizParams) {
   try {
-    const user = await getCurrentUser();
-    
-    if (!user) {
+    let targetUserId = params.userId || "";
+    let systemObj: any = null;
+
+    // Check if this is an external candidate
+    if (params.systemCode || targetUserId.startsWith("ext_")) {
+      if (params.systemCode) {
+        systemObj = await prisma.externalQuizSystem.findUnique({
+          where: { systemCode: params.systemCode },
+        });
+      } else if (targetUserId.startsWith("ext_")) {
+        const sysId = targetUserId.replace("ext_", "");
+        systemObj = await prisma.externalQuizSystem.findUnique({
+          where: { id: sysId },
+        });
+      }
+
+      if (systemObj) {
+        targetUserId = `ext_${systemObj.id}`;
+      }
+    }
+
+    // Fallback for internal user if no targetUserId established
+    if (!targetUserId) {
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        targetUserId = currentUser.id;
+      }
+    }
+
+    if (!targetUserId) {
       return {
         status: "error" as const,
-        message: "User not authenticated",
+        message: "User identifier not authenticated or found",
       };
     }
 
-    // Check if already blocked for this quiz
-    const existingBlock = await prisma.quizBlock.findUnique({
+    // Upsert quiz block record so repeat calls don't error out
+    await prisma.quizBlock.upsert({
       where: {
         quizId_userId: {
           quizId: params.quizId,
-          userId: user.id,
+          userId: targetUserId,
         },
       },
-    });
-
-    if (existingBlock) {
-      return {
-        status: "error" as const,
-        message: "User is already blocked from this quiz",
-      };
-    }
-
-    // Create quiz block record
-    await prisma.quizBlock.create({
-      data: {
+      create: {
         quizId: params.quizId,
-        userId: user.id,
+        userId: targetUserId,
+        reason: params.reason,
+        violationType: params.violationType,
+        violationCount: params.violationCount,
+      },
+      update: {
         reason: params.reason,
         violationType: params.violationType,
         violationCount: params.violationCount,
       },
     });
 
-    // Also mark user as globally banned
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        banned: true,
-        banReason: `Blocked from quiz "${params.quizIdentifier}" - ${params.reason}`,
-        banExpires: null, // Permanent ban unless admin unbans
-      },
-    });
+    // If external system candidate, update system status to BLOCKED and trigger Pusher WebSockets
+    if (systemObj || targetUserId.startsWith("ext_")) {
+      if (systemObj) {
+        await prisma.externalQuizSystem.update({
+          where: { id: systemObj.id },
+          data: { status: "BLOCKED" },
+        });
 
-    // Revalidate relevant paths
+        const { triggerPusherEvent } = await import("@/lib/pusher-server");
+        triggerPusherEvent(`quiz-${params.quizId}`, "blocked-updated", { quizId: params.quizId });
+        triggerPusherEvent(`quiz-${params.quizId}`, "system-updated", { quizId: params.quizId, systemCode: systemObj.systemCode });
+        triggerPusherEvent(`quiz-${params.quizIdentifier}`, "blocked-updated", { quizId: params.quizIdentifier });
+        triggerPusherEvent(`quiz-${params.quizIdentifier}`, "system-updated", { quizId: params.quizIdentifier, systemCode: systemObj.systemCode });
+        triggerPusherEvent(`system-${systemObj.systemCode}`, "status-changed", { status: "BLOCKED" });
+      }
+    } else {
+      // Internal user -> update global ban status
+      await prisma.user.update({
+        where: { id: targetUserId },
+        data: {
+          banned: true,
+          banReason: `Blocked from quiz "${params.quizIdentifier}" - ${params.reason}`,
+          banExpires: null,
+        },
+      });
+    }
+
     revalidatePath("/admin/quizzes/blocked-members");
-    revalidatePath("/dashboard/activities/quizzes");
-    revalidatePath(`/quiz/${params.quizIdentifier}`);
+    revalidatePath(`/admin/quizzes/${params.quizIdentifier}`);
 
     return {
       status: "success" as const,
-      message: "User has been blocked from this quiz",
+      message: "Candidate has been blocked from quiz",
     };
   } catch (error) {
-    console.error("Error blocking user from quiz:", error);
+    console.error("Error blocking candidate from quiz:", error);
     return {
       status: "error" as const,
-      message: "Failed to block user from quiz",
+      message: "Failed to block candidate from quiz",
     };
   }
 }

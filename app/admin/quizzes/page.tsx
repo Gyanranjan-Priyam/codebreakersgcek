@@ -4,6 +4,7 @@ import { Plus, ShieldBan } from "lucide-react";
 import Link from "next/link";
 import { getAllQuizzes } from "./actions";
 import QuizzesTable from "./_components/quizzes-table";
+import CreateQuizModalButton from "./_components/create-quiz-modal-button";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -41,12 +42,7 @@ export default async function AdminQuizzesPage() {
                 Blocked Members
               </Link>
             </Button>
-            <Button asChild className="w-full sm:w-auto">
-              <Link href="/admin/quizzes/create">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Quiz
-              </Link>
-            </Button>
+            <CreateQuizModalButton />
           </div>
         </CardHeader>
         <CardContent>

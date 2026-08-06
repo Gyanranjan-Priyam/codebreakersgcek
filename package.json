@@ -100,6 +100,8 @@
     "pdf-lib": "^1.17.1",
     "postprocessing": "^6.38.0",
     "prisma": "^6.19.0",
+    "pusher": "^5.3.4",
+    "pusher-js": "^8.6.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.1",
     "react-day-picker": "^9.11.1",

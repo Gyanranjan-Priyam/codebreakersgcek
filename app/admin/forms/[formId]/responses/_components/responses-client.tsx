@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { getPusherClient } from "@/lib/pusher-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -247,6 +248,30 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
   const [singleDeleteId, setSingleDeleteId] = useState<string | null>(null);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // 0ms Real-time WebSockets subscription for instant form responses
+  useEffect(() => {
+    const pusher = getPusherClient();
+    if (!pusher) return;
+
+    const channel1 = pusher.subscribe(`form-${form.id}`);
+    const channel2 = pusher.subscribe(`form-${form.formId}`);
+
+    const handleNewResponse = () => {
+      toast.info("New form response received in real-time!");
+      router.refresh();
+    };
+
+    channel1.bind("response-submitted", handleNewResponse);
+    channel2.bind("response-submitted", handleNewResponse);
+
+    return () => {
+      channel1.unbind_all();
+      channel2.unbind_all();
+      pusher.unsubscribe(`form-${form.id}`);
+      pusher.unsubscribe(`form-${form.formId}`);
+    };
+  }, [form.id, form.formId, router]);
 
   // Build ordered field list (questions and sub-questions in exact form order)
   const fieldMap = useMemo(() => {

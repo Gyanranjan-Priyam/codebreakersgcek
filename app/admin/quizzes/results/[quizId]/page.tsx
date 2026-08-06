@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
+import { PublishResultButton } from "./_components/publish-result-button";
+import { PublishAllResultsButton } from "./_components/publish-all-results-button";
 export default async function QuizResultsPage({ params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
   const result = await getQuizByQuizId(quizId);
@@ -243,11 +244,14 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
 
       {/* Results Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>All Attempts</CardTitle>
-          <CardDescription>
-            Detailed results for all quiz attempts
-          </CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
+          <div>
+            <CardTitle>All Attempts</CardTitle>
+            <CardDescription>
+              Detailed results for all quiz attempts
+            </CardDescription>
+          </div>
+          {attempts.length > 0 && <PublishAllResultsButton quizId={quiz.id} />}
         </CardHeader>
         <CardContent>
           {attempts.length === 0 ? (
@@ -268,6 +272,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                     <TableHead>Points Earned</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -277,10 +282,10 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                     return (
                       <TableRow key={attempt.id}>
                         <TableCell className="font-medium">
-                          {user?.name || "Unknown User"}
+                          {attempt.participantName || user?.name || "Unknown User"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {user?.email || "N/A"}
+                          {attempt.participantEmail || user?.email || "N/A"}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">Set {setLetter}</Badge>
@@ -302,8 +307,23 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                             {attempt.completedAt ? "Completed" : "In Progress"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {new Date(attempt.createdAt).toLocaleString()}
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(attempt.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end items-center gap-2">
+                            <PublishResultButton
+                              attemptId={attempt.id}
+                              isPublished={attempt.isPublished}
+                              publishedAt={attempt.publishedAt}
+                              size="sm"
+                            />
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/admin/quizzes/results/${quiz.quizId}/${attempt.id}`}>
+                                View Details
+                              </Link>
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

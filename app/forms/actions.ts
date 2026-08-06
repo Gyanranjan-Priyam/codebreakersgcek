@@ -95,6 +95,9 @@ export async function submitFormResponse(input: {
       },
     });
 
+    const { triggerPusherEvent } = await import("@/lib/pusher-server");
+    triggerPusherEvent(`form-${form.id}`, "response-submitted", { responseId: response.id, formId: form.id });
+
     // Trigger submission confirmation email asynchronously if recipient email is present
     let recipientEmail = "";
     let recipientName = "";
