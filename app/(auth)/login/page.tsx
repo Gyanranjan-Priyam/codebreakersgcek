@@ -1,8 +1,8 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { LoginForm } from "./_components/LoginForm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -15,38 +15,20 @@ export default async function LoginPage() {
         headers: await headers(),
     });
 
-    if(session) {
-        // If user is admin, redirect to admin dashboard
-        if (session.user.role === "admin") {
-            return redirect("/admin");
-        }
-
-        // Check if user has completed their profile
-        const user = await prisma.user.findUnique({
+    if (session) {
+        const dbUser = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                name: true,
-                email: true,
-                mobileNumber: true,
-                aadhaarNumber: true,
-                state: true,
-                district: true,
-            },
+            select: { id: true, role: true, banned: true },
         });
 
-        // Check if profile is complete (has essential fields)
-        const isProfileComplete = !!(
-            user?.name &&
-            user?.email &&
-            user?.mobileNumber &&
-            user?.aadhaarNumber &&
-            user?.state &&
-            user?.district
-        );
+        if (!dbUser || dbUser.banned) {
+            await auth.api.signOut({ headers: await headers() });
+            return redirect("/unauthorized");
+        }
 
-        // If profile is not complete, redirect to onboarding
-        if (!isProfileComplete) {
-            return redirect("/onboarding");
+        // If user is admin, redirect to admin dashboard
+        if (dbUser.role === "admin") {
+            return redirect("/admin");
         }
 
         // Otherwise, redirect to user dashboard
@@ -54,5 +36,5 @@ export default async function LoginPage() {
     }
     return (
         <LoginForm />
-    )
+    );
 }

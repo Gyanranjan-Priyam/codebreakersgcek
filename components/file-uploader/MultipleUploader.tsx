@@ -115,6 +115,26 @@ export function MultipleUploader({
         
         setUploadingFiles(prev => [...prev, uploadingFile]);
         
+        // Server-side direct upload fallback helper
+        const uploadDirectly = async () => {
+            const formData = new FormData();
+            formData.append('file', file);
+            const directRes = await fetch('/api/s3/upload-direct', {
+                method: 'POST',
+                body: formData,
+            });
+            if (!directRes.ok) {
+                throw new Error('Direct server upload failed');
+            }
+            const data = await directRes.json();
+            if (!data.key) throw new Error('No key returned from server upload');
+            
+            setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
+            const newValue = [...value, data.key];
+            onChange?.(newValue);
+            toast.success(`${file.name} uploaded successfully`);
+        };
+
         try {
             // Get pre-signed URL from server
             const response = await fetch('/api/s3/upload', {
@@ -130,55 +150,60 @@ export function MultipleUploader({
             });
 
             if (!response.ok) {
-                throw new Error('Failed to get upload URL');
+                await uploadDirectly();
+                return;
             }
 
             const { preSignedUrl, key } = await response.json();
 
-            // Upload to S3 with progress tracking
-            const xhr = new XMLHttpRequest();
+            // Upload to S3 with progress tracking wrapped in a Promise
+            await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
 
-            xhr.upload.addEventListener('progress', (event) => {
-                if (event.lengthComputable) {
-                    const progress = Math.round((event.loaded / event.total) * 100);
-                    setUploadingFiles(prev => 
-                        prev.map(f => f.id === uploadId ? { ...f, progress } : f)
-                    );
-                }
+                xhr.upload.addEventListener('progress', (event) => {
+                    if (event.lengthComputable) {
+                        const progress = Math.round((event.loaded / event.total) * 100);
+                        setUploadingFiles(prev => 
+                            prev.map(f => f.id === uploadId ? { ...f, progress } : f)
+                        );
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
+                        const newValue = [...value, key];
+                        onChange?.(newValue);
+                        toast.success(`${file.name} uploaded successfully`);
+                        resolve();
+                    } else {
+                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    reject(new Error('Network error during file upload'));
+                });
+
+                xhr.addEventListener('abort', () => {
+                    reject(new Error('Upload aborted'));
+                });
+
+                xhr.open('PUT', preSignedUrl);
+                xhr.setRequestHeader('Content-Type', file.type);
+                xhr.send(file);
             });
 
-            xhr.addEventListener('load', () => {
-                if (xhr.status === 200 || xhr.status === 204) {
-                    // Remove from uploading files
-                    setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
-                    
-                    // Add to uploaded files
-                    const newValue = [...value, key];
-                    onChange?.(newValue);
-                    
-                    toast.success(`${file.name} uploaded successfully`);
-                } else {
-                    throw new Error('Upload failed');
-                }
-            });
-
-            xhr.addEventListener('error', () => {
-                throw new Error('Upload failed');
-            });
-
-            xhr.open('PUT', preSignedUrl);
-            xhr.setRequestHeader('Content-Type', file.type);
-            xhr.send(file);
-
-        } catch (error) {
-            console.error('Upload error:', error);
-            toast.error(`Failed to upload ${file.name}`);
-            
-            // Remove from uploading files
-            setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
-            
-            // Clean up object URL
-            URL.revokeObjectURL(objectUrl);
+        } catch (presignedErr) {
+            console.warn('Presigned upload failed or blocked by CORS. Trying server direct upload fallback...', presignedErr);
+            try {
+                await uploadDirectly();
+            } catch (fallbackErr) {
+                console.error('All upload attempts failed:', fallbackErr);
+                toast.error(`Failed to upload ${file.name}`);
+                setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
+                URL.revokeObjectURL(objectUrl);
+            }
         }
     }, [value, onChange]);
 

@@ -32,6 +32,7 @@ model User {
   
   // Personal Details (Extended)
   username        String?         @unique
+  cbUserId        String?         @unique
   firstName       String?
   middleName      String?
   lastName        String?
@@ -70,6 +71,9 @@ model User {
   projectReviews  ProjectReview[]
   resourceFolders ResourceFolder[]  @relation("ResourceFolderCreator")
   resources       Resource[]        @relation("ResourceUploader")
+  createdForms    Form[]            @relation("FormCreator")
+  formResponsesSubmitted FormResponse[] @relation("FormResponseSubmitter")
+  formResponsesVerified FormResponse[] @relation("FormResponseVerifier")
 
   @@unique([email])
   @@map("user")
@@ -561,5 +565,43 @@ model Resource {
   @@index([type])
   @@index([order])
   @@map("resource")
+}
+
+model Form {
+  id          String        @id
+  formId      String        @unique
+  title       String
+  description String?
+  definition  Json
+  isPublished Boolean       @default(false)
+  publishedAt DateTime?
+  createdById String?
+  createdBy   User?         @relation("FormCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  responses   FormResponse[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+
+  @@index([isPublished])
+  @@map("form")
+}
+
+model FormResponse {
+  id            String   @id
+  formId        String
+  form          Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers       Json
+  transactionId String?
+  paymentStatus String   @default("pending")
+  verifiedAt    DateTime?
+  verifiedById  String?
+  verifiedBy    User?    @relation("FormResponseVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  submittedById String?
+  submittedBy   User?    @relation("FormResponseSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([formId])
+  @@index([paymentStatus])
+  @@map("form_response")
 }
 

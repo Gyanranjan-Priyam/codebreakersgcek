@@ -32,6 +32,7 @@ import {
   TrendingUp,
   Award,
   Target,
+  Hash,
 } from "lucide-react";
 import { toggleMemberBan, deleteMember } from "../../actions";
 import { format } from "date-fns";
@@ -40,6 +41,7 @@ import EmailComposeSidebar from "./email-compose-sidebar";
 interface MemberSidebarProps {
   member: {
     id: string;
+    cbUserId: string | null;
     name: string;
     email: string;
     username: string | null;
@@ -208,6 +210,20 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
           <CardTitle className="text-lg">Member Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {member.cbUserId && (
+            <>
+              <div className="flex items-start gap-3">
+                <Hash className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">CB User ID</p>
+                  <p className="text-sm font-medium font-mono">{member.cbUserId}</p>
+                </div>
+              </div>
+
+              <Separator />
+            </>
+          )}
+
           {/* Joining Date */}
           <div className="flex items-start gap-3">
             <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />

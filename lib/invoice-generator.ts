@@ -20,248 +20,221 @@ interface InvoiceDetails {
 }
 
 export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffer> {
-  const pdf = new jsPDF();
-  
+  // A4 paper dimensions: 210mm x 297mm
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
 
-  const primaryColor: [number, number, number] = [41, 98, 255]; // Professional blue
-  const darkText: [number, number, number] = [33, 33, 33];
-  const grayText: [number, number, number] = [102, 102, 102];
-  const lightGray: [number, number, number] = [189, 189, 189];
-  const borderColor: [number, number, number] = [229, 229, 229];
-
-  const margin = 25;
   const pageWidth = 210;
-  const contentWidth = pageWidth - (margin * 2);
-  
-  // Header Section
-  let yPos = margin;
-  
-  // Company Name - Left Side
-  pdf.setFontSize(20);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...darkText);
-  pdf.text('CodeBreakers 2025', margin, yPos);
-  
-  yPos += 8;
-  pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...grayText);
-  pdf.text('Government College of Engineering Kalahandi', margin, yPos);
-  
-  // Company Details - Right Side
+  const margin = 18;
   const rightX = pageWidth - margin;
-  let rightY = margin;
-  
-  pdf.setFontSize(9);
-  pdf.setTextColor(...grayText);
-  pdf.text('Bhawanipatna, Kalahandi - 766003', rightX, rightY, { align: 'right' });
-  rightY += 5;
-  pdf.text('Odisha, India', rightX, rightY, { align: 'right' });
-  rightY += 5;
-  pdf.text('CodeBreakers.gcekbhawanipatna@gmail.com', rightX, rightY, { align: 'right' });
-  rightY += 5;
-  pdf.text('+91-XXXXXXXXXX', rightX, rightY, { align: 'right' });
-  
-  // Divider Line
-  yPos = 55;
-  pdf.setDrawColor(...borderColor);
-  pdf.setLineWidth(0.5);
-  pdf.line(margin, yPos, pageWidth - margin, yPos);
-  
-  // Invoice Title and Details
-  yPos = 70;
-  pdf.setFontSize(28);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...darkText);
-  pdf.text('INVOICE', margin, yPos);
-  
-  // Invoice Meta - Right Side
-  let metaY = 70;
-  const metaLabelX = 120; // Moved left to create more gap
-  const metaValueX = rightX;
-  
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...grayText);
-  pdf.text('Invoice Number', metaLabelX, metaY);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...darkText);
-  pdf.text(details.invoiceNumber, metaValueX, metaY, { align: 'right' });
-  
-  metaY += 6;
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...grayText);
-  pdf.text('Invoice Date', metaLabelX, metaY);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...darkText);
-  pdf.text(details.paymentVerifiedDate.toLocaleDateString('en-IN'), metaValueX, metaY, { align: 'right' });
-  
-  metaY += 6;
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...grayText);
-  pdf.text('Status', metaLabelX, metaY);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(34, 197, 94);
-  pdf.text('PAID', metaValueX, metaY, { align: 'right' });
-  
-  // Billing Information Section
-  yPos = 95;
-  
-  // Left Column - Bill To
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...grayText);
-  pdf.text('BILL TO', margin, yPos);
-  
-  yPos += 7;
-  pdf.setFontSize(11);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...darkText);
-  pdf.text(details.fullName, margin, yPos);
-  
-  yPos += 6;
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...grayText);
-  const collegeText = pdf.splitTextToSize(details.collegeName, 85);
-  pdf.text(collegeText, margin, yPos);
-  yPos += collegeText.length * 5;
-  
-  pdf.text(`${details.district}, ${details.state}`, margin, yPos);
-  yPos += 5;
-  pdf.text(details.email, margin, yPos);
-  yPos += 5;
-  pdf.text(details.mobileNumber, margin, yPos);
-  
-  // Right Column - Event Details
-  const rightColX = 115;
-  let eventY = 95;
-  
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...grayText);
-  pdf.text('EVENT DETAILS', rightColX, eventY);
-  
-  eventY += 7;
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...darkText);
-  
-  const eventInfo = [
-    ['Event', details.eventTitle],
-    ['Date', details.eventDate],
-    ['Venue', details.eventVenue],
-    ['Registration ID', details.registrationId]
-  ];
-  
-  eventInfo.forEach(([label, value]) => {
-    pdf.setTextColor(...grayText);
-    pdf.text(label, rightColX, eventY);
-    pdf.setTextColor(...darkText);
-    const valueText = pdf.splitTextToSize(value, 65);
-    pdf.text(valueText, rightColX + 25, eventY);
-    eventY += Math.max(5, valueText.length * 5);
-  });
-  
-  // Payment Details Table
-  yPos = 155;
-  
-  // Table Header
-  pdf.setDrawColor(...borderColor);
-  pdf.setLineWidth(0.5);
-  pdf.line(margin, yPos, pageWidth - margin, yPos);
-  
-  yPos += 8;
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...grayText);
-  pdf.text('DESCRIPTION', margin, yPos);
-  pdf.text('AMOUNT', pageWidth - margin, yPos, { align: 'right' });
-  
-  yPos += 3;
-  pdf.line(margin, yPos, pageWidth - margin, yPos);
-  
-  // Table Content
-  yPos += 8;
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...darkText);
-  const descText = pdf.splitTextToSize(`Registration Fee - ${details.eventTitle}`, contentWidth - 40);
-  pdf.text(descText, margin, yPos);
-  pdf.text(`₹${details.paymentAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-  
-  yPos += Math.max(8, descText.length * 5);
-  pdf.setDrawColor(...borderColor);
-  pdf.line(margin, yPos, pageWidth - margin, yPos);
-  
-  // Subtotal
-  yPos += 8;
-  pdf.setFontSize(9);
-  pdf.setTextColor(...grayText);
-  pdf.text('Subtotal', margin, yPos);
-  pdf.setTextColor(...darkText);
-  pdf.text(`₹${details.paymentAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-  
-  yPos += 6;
-  pdf.setTextColor(...grayText);
-  pdf.text('Tax (Inclusive)', margin, yPos);
-  pdf.setTextColor(...darkText);
-  pdf.text('₹0.00', pageWidth - margin, yPos, { align: 'right' });
-  
-  yPos += 8;
-  pdf.setDrawColor(...borderColor);
-  pdf.line(margin, yPos, pageWidth - margin, yPos);
-  
-  // Total
-  yPos += 8;
-  pdf.setFontSize(11);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...darkText);
-  pdf.text('TOTAL', margin, yPos);
-  pdf.text(`₹${details.paymentAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-  
-  yPos += 3;
-  pdf.setLineWidth(1);
-  pdf.line(margin, yPos, pageWidth - margin, yPos);
-  
-  // Payment Information
-  yPos += 15;
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...grayText);
-  pdf.text('PAYMENT INFORMATION', margin, yPos);
-  
-  yPos += 8;
-  pdf.setFont('helvetica', 'normal');
-  
-  const paymentDetails = [
-    ['Payment Method', details.paymentMethod],
-    ['Transaction ID', details.transactionId || 'N/A'],
-    ['Payment Date', details.paymentDate.toLocaleDateString('en-IN')],
-    ['Verified Date', details.paymentVerifiedDate.toLocaleDateString('en-IN')]
-  ];
-  
-  paymentDetails.forEach(([label, value]) => {
-    pdf.setTextColor(...grayText);
-    pdf.text(label, margin, yPos);
-    pdf.setTextColor(...darkText);
-    pdf.text(value, margin + 40, yPos);
-    yPos += 5;
-  });
+  const formattedAmount = `Rs. ${(details.paymentAmount || 0).toFixed(2)}`;
 
-  // Footer
-  const footerY = 277;
-  pdf.setDrawColor(...borderColor);
-  pdf.setLineWidth(0.5);
-  pdf.line(margin, footerY, pageWidth - margin, footerY);
-  
-  pdf.setFontSize(8);
+  // Paper Card Background Fill (#FAF9F5 -> RGB: 250, 249, 245)
+  pdf.setFillColor(250, 249, 245);
+  pdf.rect(10, 10, 190, 277, 'F');
+  pdf.setDrawColor(231, 229, 222);
+  pdf.setLineWidth(0.4);
+  pdf.rect(10, 10, 190, 277, 'S');
+
+  // VERIFIED Watermark Stamp (Top Right Rotated)
+  pdf.setDrawColor(22, 163, 74);
+  pdf.setTextColor(22, 163, 74);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(18);
+  pdf.text('VERIFIED', 145, 28, { angle: -12 });
+
+  // 1. Header Left: CodeBreakers
+  let yPos = margin + 5;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(16);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text('CodeBreakers', margin + 5, yPos);
+
+  yPos += 5;
   pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(...grayText);
-  pdf.text('Thank you for your participation in CodeBreakers 2025', pageWidth / 2, footerY + 5, { align: 'center' });
-  pdf.setFontSize(7);
-  pdf.text('This is a computer-generated invoice and does not require a signature', pageWidth / 2, footerY + 9, { align: 'center' });
-  
-  // Convert to buffer
+  pdf.setFontSize(9);
+  pdf.setTextColor(87, 83, 78);
+  pdf.text('GCEK Bhawanipatna', margin + 5, yPos);
+
+  // Header Right: INVOICE & PAID & APPROVED
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(22);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text('INVOICE', rightX - 5, margin + 5, { align: 'right' });
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(22, 163, 74);
+  pdf.text('(v) PAID & APPROVED', rightX - 5, margin + 11, { align: 'right' });
+
+  // Divider Line 1
+  yPos = 38;
+  pdf.setDrawColor(231, 229, 222);
+  pdf.setLineWidth(0.4);
+  pdf.line(margin + 5, yPos, rightX - 5, yPos);
+
+  // 2. Metadata Grid (Courier Monospace)
+  yPos += 8;
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(8);
+  pdf.setTextColor(120, 113, 108);
+  pdf.text('REFERENCE NUMBER', margin + 5, yPos);
+  pdf.text('PAYMENT METHOD', rightX - 55, yPos);
+
+  yPos += 5;
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text(details.invoiceNumber, margin + 5, yPos);
+  pdf.setFont('courier', 'normal');
+  pdf.text(details.paymentMethod || 'UPI', rightX - 55, yPos);
+
+  yPos += 7;
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(8);
+  pdf.setTextColor(120, 113, 108);
+  pdf.text('DATE ISSUED', margin + 5, yPos);
+  pdf.text('TRANSACTION ID', rightX - 55, yPos);
+
+  yPos += 5;
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text(details.eventDate, margin + 5, yPos);
+  pdf.setFont('courier', 'bold');
+  pdf.text(details.transactionId || 'N/A', rightX - 55, yPos);
+
+  // Divider Line 2
+  yPos += 8;
+  pdf.setDrawColor(231, 229, 222);
+  pdf.line(margin + 5, yPos, rightX - 5, yPos);
+
+  // 3. FROM and BILL TO
+  yPos += 8;
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(8);
+  pdf.setTextColor(120, 113, 108);
+  pdf.text('FROM', margin + 5, yPos);
+  pdf.text('BILL TO', rightX - 65, yPos);
+
+  yPos += 5;
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text('CodeBreakers', margin + 5, yPos);
+  pdf.text(details.fullName || 'Participant', rightX - 65, yPos);
+
+  yPos += 5;
+  pdf.setFont('courier', 'normal');
+  pdf.setTextColor(68, 64, 60);
+  pdf.text('Government College of Engineering Kalahandi', margin + 5, yPos);
+  pdf.text(details.email || '', rightX - 65, yPos);
+
+  yPos += 5;
+  pdf.text('Bhawanipatna, Odisha 766002', margin + 5, yPos);
+  if (details.collegeName && details.collegeName !== 'N/A') {
+    pdf.text(details.collegeName.slice(0, 35), rightX - 65, yPos);
+  }
+
+  yPos += 5;
+  pdf.text('Tax ID: CB-1029384756', margin + 5, yPos);
+
+  // Divider Line 3
+  yPos += 8;
+  pdf.setDrawColor(231, 229, 222);
+  pdf.line(margin + 5, yPos, rightX - 5, yPos);
+
+  // 4. Items Table Header (Gray Bar)
+  yPos += 10;
+  pdf.setFillColor(231, 229, 222); // #E7E5DE
+  pdf.roundedRect(margin + 5, yPos, rightX - margin - 10, 8, 2, 2, 'F');
+
+  yPos += 5.5;
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(8);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text('DESCRIPTION', margin + 9, yPos);
+  pdf.text('UNITS', 125, yPos, { align: 'right' });
+  pdf.text('UNIT COST', 155, yPos, { align: 'right' });
+  pdf.text('LINE TOTAL', rightX - 9, yPos, { align: 'right' });
+
+  // Item Row
+  yPos += 9;
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text(`${details.eventTitle} Registration Fee`, margin + 9, yPos);
+  pdf.setFont('courier', 'normal');
+  pdf.text('1', 125, yPos, { align: 'right' });
+  pdf.text(formattedAmount, 155, yPos, { align: 'right' });
+  pdf.setFont('courier', 'bold');
+  pdf.text(formattedAmount, rightX - 9, yPos, { align: 'right' });
+
+  // 5. Status Left & Totals Right Section
+  yPos += 16;
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(120, 113, 108);
+  pdf.text(`Form ID: `, margin + 5, yPos);
+  pdf.setFont('courier', 'bold');
+  pdf.setTextColor(12, 10, 9);
+  pdf.text(details.registrationId || 'N/A', margin + 25, yPos);
+
+  yPos += 5;
+  pdf.setFont('courier', 'normal');
+  pdf.setTextColor(120, 113, 108);
+  pdf.text(`Status: `, margin + 5, yPos);
+  pdf.setFont('courier', 'bold');
+  pdf.setTextColor(22, 163, 74);
+  pdf.text('Payment Verified & Certificate Issued', margin + 25, yPos);
+
+  // Right side Summary Table
+  let sumY = yPos - 5;
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(68, 64, 60);
+  pdf.text('Net Amount:', 125, sumY);
+  pdf.text(formattedAmount, rightX - 5, sumY, { align: 'right' });
+
+  sumY += 5;
+  pdf.text('Discount:', 125, sumY);
+  pdf.text('Rs. 0.00', rightX - 5, sumY, { align: 'right' });
+
+  sumY += 5;
+  pdf.setDrawColor(12, 10, 9);
+  pdf.setLineWidth(0.8);
+  pdf.line(125, sumY, rightX - 5, sumY);
+
+  sumY += 5;
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(12, 10, 9);
+  pdf.text('TOTAL AMOUNT PAID:', 125, sumY);
+  pdf.text(`${formattedAmount} (PAID)`, rightX - 5, sumY, { align: 'right' });
+
+  sumY += 3;
+  pdf.line(125, sumY, rightX - 5, sumY);
+
+  // 6. Footer
+  const footerY = 270;
+  pdf.setLineWidth(0.4);
+  pdf.setDrawColor(231, 229, 222);
+  pdf.line(margin + 5, footerY, rightX - 5, footerY);
+
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(8);
+  pdf.setTextColor(120, 113, 108);
+  pdf.text('contact.gyanranjan@gmail.com', margin + 5, footerY + 5);
+  pdf.text('CodeBreakers • GCEK Bhawanipatna', margin + 5, footerY + 9);
+
+  pdf.text('Prepared for prompt processing.', rightX - 5, footerY + 5, { align: 'right' });
+  pdf.setFont('courier', 'bold');
+  pdf.setTextColor(12, 10, 9);
+  pdf.text('Issued by CodeBreakers Team', rightX - 5, footerY + 9, { align: 'right' });
+
   const pdfOutput = pdf.output('arraybuffer');
   return Buffer.from(pdfOutput);
 }

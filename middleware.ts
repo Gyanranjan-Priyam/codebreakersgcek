@@ -27,7 +27,6 @@ export async function middleware(request: NextRequest) {
   // - auth.api.getSession() in server components
   // - Admin layout protection
   // - Callback route checks
-  // - Onboarding page guards
 
   return NextResponse.next();
 }

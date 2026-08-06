@@ -12,6 +12,34 @@ export async function GET() {
         return redirect("/login");
     }
 
+    // Verify that the logged in user actually exists in database (pre-added by admin) and is not banned
+    const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { id: true, role: true, banned: true, profileComplete: true, emailVerified: true },
+    });
+
+    if (!dbUser) {
+        await auth.api.signOut({ headers: await headers() });
+        return redirect("/unauthorized");
+    }
+
+    if (dbUser.banned) {
+        await auth.api.signOut({ headers: await headers() });
+        return redirect("/login?error=banned");
+    }
+
+    // Switch member status from Pending to Active upon successful login
+    if (!dbUser.profileComplete || !dbUser.emailVerified) {
+        await prisma.user.update({
+            where: { id: dbUser.id },
+            data: {
+                profileComplete: true,
+                emailVerified: true,
+                updatedAt: new Date(),
+            },
+        });
+    }
+
     // Auto-save GitHub username if user logged in with GitHub
     try {
         const githubAccount = await prisma.account.findFirst({
@@ -66,19 +94,6 @@ export async function GET() {
     // If user is admin, redirect to admin dashboard
     if (session.user.role === "admin") {
         return redirect("/admin");
-    }
-
-    // Check if user has completed their profile
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-            profileComplete: true,
-        },
-    });
-
-    // If profile is not complete, redirect to onboarding
-    if (!user || !user.profileComplete) {
-        return redirect("/onboarding");
     }
 
     // Otherwise, redirect to user dashboard

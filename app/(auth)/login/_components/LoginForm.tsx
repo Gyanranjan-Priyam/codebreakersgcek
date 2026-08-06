@@ -2,12 +2,13 @@
 
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { Loader2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { Loader2, ShieldAlert, Mail } from "lucide-react";
+import { useState, useTransition, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { checkLoginPermission } from "../actions";
 
 // Google Logo SVG Component
 const GoogleLogo = ({ className }: { className?: string }) => (
@@ -35,13 +36,25 @@ const DiscordLogo = ({ className }: { className?: string }) => (
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [googlePending, startGoogleTransition] = useTransition();
   const [githubPending, startGithubTransition] = useTransition();
   const [discordPending, startDiscordTransition] = useTransition();
   const [emailPending, startEmailTransition] = useTransition();
   const [email, setEmail] = useState("");
+  const [unauthorizedError, setUnauthorizedError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam === "unauthorized" || errorParam === "not_registered") {
+      setUnauthorizedError("Unauthorized Access: Only registered members added by an admin can log in. If you are a member, please contact the administrator.");
+    } else if (errorParam === "banned") {
+      setUnauthorizedError("Account Banned: Your account access has been restricted. Please contact the administrator.");
+    }
+  }, [searchParams]);
 
   async function signInWithGoogle() {
+    setUnauthorizedError(null);
     startGoogleTransition(async () => {
       await authClient.signIn.social({
         provider: "google",
@@ -50,8 +63,8 @@ export function LoginForm() {
           onSuccess: () => {
             toast.success("Redirecting for signed in with Google!");
           },
-          onError: () => {
-            toast.error("Internal Server Error");
+          onError: (ctx) => {
+            toast.error(ctx.error.message || "Unauthorized access or error signing in.");
           },
         },
       });
@@ -59,6 +72,7 @@ export function LoginForm() {
   }
 
   async function signInWithGithub() {
+    setUnauthorizedError(null);
     startGithubTransition(async () => {
       await authClient.signIn.social({
         provider: "github",
@@ -67,8 +81,8 @@ export function LoginForm() {
           onSuccess: () => {
             toast.success("Redirecting for signed in with GitHub!");
           },
-          onError: () => {
-            toast.error("Internal Server Error");
+          onError: (ctx) => {
+            toast.error(ctx.error.message || "Unauthorized access or error signing in.");
           },
         },
       });
@@ -76,6 +90,7 @@ export function LoginForm() {
   }
 
   async function signInWithDiscord() {
+    setUnauthorizedError(null);
     startDiscordTransition(async () => {
       await authClient.signIn.social({
         provider: "discord",
@@ -84,8 +99,8 @@ export function LoginForm() {
           onSuccess: () => {
             toast.success("Redirecting for signed in with Discord!");
           },
-          onError: () => {
-            toast.error("Internal Server Error");
+          onError: (ctx) => {
+            toast.error(ctx.error.message || "Unauthorized access or error signing in.");
           },
         },
       });
@@ -93,21 +108,35 @@ export function LoginForm() {
   }
 
   function signInWithEmail() {
+    setUnauthorizedError(null);
     if (!email) {
       toast.error("Please enter your email");
       return;
     }
+
     startEmailTransition(async () => {
+      // Step 1: Validate member registration permission
+      const permResult = await checkLoginPermission(email);
+
+      if (!permResult.allowed) {
+        setUnauthorizedError(permResult.message);
+        toast.error("Unauthorized Access: Only registered members can log in.");
+        return;
+      }
+
+      // Step 2: Send OTP if member is valid and permitted
       await authClient.emailOtp.sendVerificationOtp({
         email: email,
         type: "sign-in",
         fetchOptions: {
           onSuccess: () => {
             toast.success("Verification email sent!");
-            router.push(`/verify-request?email=${email}`);
+            router.push(`/verify-request?email=${encodeURIComponent(email)}`);
           },
-          onError: () => {
-            toast.error("Error sending verification email");
+          onError: (ctx) => {
+            const msg = ctx.error.message || "Error sending verification email";
+            setUnauthorizedError(msg);
+            toast.error(msg);
           },
         },
       });
@@ -134,6 +163,34 @@ export function LoginForm() {
       <h1 className="text-2xl sm:text-3xl font-semibold text-center mb-8 text-foreground">
         Welcome to CodeBreakers
       </h1>
+
+      {/* Unauthorized Error Alert Card */}
+      {unauthorizedError && (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold text-destructive">Unauthorized Access</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                {unauthorizedError}
+              </p>
+            </div>
+          </div>
+          <div className="pt-1">
+            <Button
+              asChild
+              variant="destructive"
+              size="sm"
+              className="w-full text-xs font-medium rounded-lg shadow-sm"
+            >
+              <a href="mailto:admin@codebreakersgcek.com?subject=Member%20Access%20Help%20Request">
+                <Mail className="w-4 h-4 mr-1.5" />
+                If you are a member, contact with admin
+              </a>
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* OAuth Buttons */}
       <div className="space-y-3">
@@ -212,7 +269,10 @@ export function LoginForm() {
       <div className="space-y-4">
         <Input
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (unauthorizedError) setUnauthorizedError(null);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               signInWithEmail();
@@ -233,7 +293,7 @@ export function LoginForm() {
           {emailPending ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Sending...</span>
+              <span>Checking & Sending...</span>
             </>
           ) : (
             <span>Continue</span>

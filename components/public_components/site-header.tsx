@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { useNotification } from "./notification-context";
 import { Badge } from "@/components/ui/badge";
 
+import { ThemeSelectorDropdown } from "@/components/ui/theme-selector-dropdown";
+
 export function SiteHeader() {
   const pathname = usePathname();
   const { toggleNotification, unreadCount } = useNotification();
@@ -100,7 +102,8 @@ export function SiteHeader() {
         )}
         <h1 className="text-base font-medium">{pageTitle}</h1>
       </div>
-      <div className="mr-6">
+      <div className="mr-6 flex items-center gap-2">
+        <ThemeSelectorDropdown />
         <div className="relative">
           <Button 
             variant="ghost" 

@@ -1,24 +1,78 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
+import {
+  sendMemberInvitationEmail,
+  sendMemberWelcomeEmail,
+} from "@/lib/mailer";
+import { env } from "@/lib/env";
+import { z } from "zod";
+
+const CB_USER_ID_PREFIX = "CB-";
+const CB_USER_ID_DIGITS = 5;
+
+function parseCbUserId(value: string | null | undefined) {
+  if (!value) return 0;
+
+  const match = value.match(/^CB-(\d+)$/);
+  if (!match) return 0;
+
+  return Number.parseInt(match[1] ?? "0", 10) || 0;
+}
+
+async function generateCbUserId() {
+  const latest = await prisma.user.findFirst({
+    where: {
+      cbUserId: {
+        startsWith: CB_USER_ID_PREFIX,
+      },
+    },
+    orderBy: {
+      cbUserId: "desc",
+    },
+    select: {
+      cbUserId: true,
+    },
+  });
+
+  const nextNumber = parseCbUserId(latest?.cbUserId) + 1;
+  return `${CB_USER_ID_PREFIX}${String(nextNumber).padStart(CB_USER_ID_DIGITS, "0")}`;
+}
 
 export interface MemberData {
   id: string;
+  cbUserId: string | null;
   name: string;
   email: string;
   username: string | null;
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
   registration: string | null;
   rollNumber: string | null;
   branch: string | null;
   mobileNumber: string | null;
+  whatsappNumber: string | null;
   collegeName: string | null;
   state: string | null;
   district: string | null;
   createdAt: Date;
   emailVerified: boolean;
   banned: boolean | null;
+  profileComplete: boolean;
 }
+
+const createMemberSchema = z.object({
+  firstName: z.string().min(2, "First name is required"),
+  middleName: z.string().optional(),
+  lastName: z.string().min(2, "Last name is required"),
+  email: z.string().email("Valid email is required"),
+  mobileNumber: z.string().min(10, "Mobile number is required"),
+  whatsappNumber: z.string().min(10, "WhatsApp number is required"),
+  branch: z.string().min(1, "Branch is required"),
+});
 
 export async function getAllMembers() {
   await requireAdmin();
@@ -26,24 +80,29 @@ export async function getAllMembers() {
   try {
     const members = await prisma.user.findMany({
       where: {
-        profileComplete: true, // Only show completed profiles
         role: { not: "admin" }, // Exclude admin users
       },
       select: {
         id: true,
+        cbUserId: true,
         name: true,
         email: true,
         username: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
         registration: true,
         rollNumber: true,
         branch: true,
         mobileNumber: true,
+        whatsappNumber: true,
         collegeName: true,
         state: true,
         district: true,
         createdAt: true,
         emailVerified: true,
         banned: true,
+        profileComplete: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -63,6 +122,124 @@ export async function getAllMembers() {
   }
 }
 
+export async function createMember(input: {
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  mobileNumber: string;
+  whatsappNumber: string;
+  branch: string;
+}) {
+  await requireAdmin();
+
+  try {
+    const validation = createMemberSchema.safeParse(input);
+
+    if (!validation.success) {
+      return {
+        status: "error" as const,
+        message: validation.error.issues[0]?.message || "Invalid member data",
+      };
+    }
+
+    const data = validation.data;
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const fullName = [data.firstName.trim(), data.middleName?.trim(), data.lastName.trim()]
+      .filter(Boolean)
+      .join(" ");
+
+    const existingMember = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+
+    if (existingMember) {
+      return {
+        status: "error" as const,
+        message: "A member with this email already exists",
+      };
+    }
+
+    let member;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const cbUserId = await generateCbUserId();
+
+      try {
+        member = await prisma.user.create({
+          data: {
+            id: randomUUID(),
+            cbUserId,
+            name: fullName,
+            email: normalizedEmail,
+            firstName: data.firstName.trim(),
+            middleName: data.middleName?.trim() || null,
+            lastName: data.lastName.trim(),
+            mobileNumber: data.mobileNumber.trim(),
+            whatsappNumber: data.whatsappNumber.trim(),
+            branch: data.branch,
+            role: "member",
+            emailVerified: false,
+            profileComplete: false,
+          },
+          select: {
+            id: true,
+            cbUserId: true,
+            name: true,
+            email: true,
+          },
+        });
+        break;
+      } catch (error) {
+        if (error instanceof Error && "code" in error && (error as { code?: string }).code === "P2002") {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    if (!member) {
+      return {
+        status: "error" as const,
+        message: "Failed to assign a unique CB user ID",
+      };
+    }
+
+    const appUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+
+    const emailResults = await Promise.allSettled([
+      sendMemberInvitationEmail({
+        to: normalizedEmail,
+        memberName: fullName,
+        loginUrl: `${appUrl}/login`,
+      }),
+      sendMemberWelcomeEmail({
+        to: normalizedEmail,
+        memberName: fullName,
+        dashboardUrl: `${appUrl}/login`,
+      }),
+    ]);
+
+    const emailFailures = emailResults.filter((result) => result.status === "rejected");
+
+    return {
+      status: "success" as const,
+      message:
+        emailFailures.length > 0
+          ? "Member added, but one or more emails could not be sent"
+          : "Member added successfully and invitation emails sent",
+      data: member,
+    };
+  } catch (error) {
+    console.error("Error creating member:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to add member",
+    };
+  }
+}
+
 export async function getMemberBySlugId(slugId: string) {
   await requireAdmin();
   
@@ -75,12 +252,14 @@ export async function getMemberBySlugId(slugId: string) {
       where: {
         OR: [
           { id: normalizedSlugId },
+          { cbUserId: { equals: normalizedSlugId, mode: 'insensitive' } },
           { username: { equals: normalizedSlugId, mode: 'insensitive' } },
           { registration: { equals: normalizedSlugId, mode: 'insensitive' } }
         ]
       },
       select: {
         id: true,
+        cbUserId: true,
         name: true,
         email: true,
         username: true,
@@ -119,12 +298,14 @@ export async function getMemberBySlugId(slugId: string) {
       member = await prisma.user.findFirst({
         where: {
           OR: [
+            { cbUserId: { equals: lowercaseSlugId, mode: 'insensitive' } },
             { username: { equals: lowercaseSlugId, mode: 'insensitive' } },
             { registration: { equals: lowercaseSlugId, mode: 'insensitive' } }
           ]
         },
         select: {
           id: true,
+          cbUserId: true,
           name: true,
           email: true,
           username: true,
@@ -163,12 +344,14 @@ export async function getMemberBySlugId(slugId: string) {
       member = await prisma.user.findFirst({
         where: {
           OR: [
+            { cbUserId: { contains: normalizedSlugId, mode: 'insensitive' } },
             { registration: { contains: normalizedSlugId, mode: 'insensitive' } },
             { username: { contains: normalizedSlugId, mode: 'insensitive' } }
           ]
         },
         select: {
           id: true,
+          cbUserId: true,
           name: true,
           email: true,
           username: true,
@@ -281,14 +464,57 @@ export async function deleteMember(id: string) {
   }
 }
 
+export async function deleteMembers(ids: string[]) {
+  await requireAdmin();
+
+  try {
+    const sanitizedIds = Array.from(
+      new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0))
+    );
+
+    if (sanitizedIds.length === 0) {
+      return {
+        status: "error" as const,
+        message: "No members selected",
+      };
+    }
+
+    const { count } = await prisma.user.deleteMany({
+      where: {
+        id: { in: sanitizedIds },
+        role: { not: "admin" },
+      },
+    });
+
+    if (count === 0) {
+      return {
+        status: "error" as const,
+        message: "No members were deleted",
+      };
+    }
+
+    return {
+      status: "success" as const,
+      message: `${count} member${count > 1 ? "s" : ""} deleted successfully`,
+      data: { deletedCount: count },
+    };
+  } catch (error) {
+    console.error("Error deleting members:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to delete selected members",
+    };
+  }
+}
+
 export async function getMembersStats() {
   await requireAdmin();
   
   try {
     const [totalMembers, verifiedMembers, bannedMembers] = await Promise.all([
-      prisma.user.count({ where: { profileComplete: true, role: { not: "admin" } } }),
+      prisma.user.count({ where: { role: { not: "admin" } } }),
       prisma.user.count({ where: { emailVerified: true, profileComplete: true, role: { not: "admin" } } }),
-      prisma.user.count({ where: { banned: true, profileComplete: true, role: { not: "admin" } } }),
+      prisma.user.count({ where: { banned: true, role: { not: "admin" } } }),
     ]);
 
     return {

@@ -6,6 +6,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 
+import { ThemeSelectorDropdown } from "@/components/ui/theme-selector-dropdown"
+
 export function SiteHeader() {
   const router = useRouter();
 
@@ -14,8 +16,8 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+    <header className="print:hidden flex h-(--header-height) shrink-0 items-center justify-between gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+      <div className="flex items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator
           orientation="vertical"
@@ -31,10 +33,10 @@ export function SiteHeader() {
           <ArrowLeft className="w-4 h-4" />
           Back
         </Button>
-        
-        {/* Spacer to push mobile back button to right */}
-        <div className="flex-1 md:hidden" />
-        
+      </div>
+
+      <div className="px-4 flex items-center gap-2">
+        <ThemeSelectorDropdown />
         {/* Back button for mobile - right side */}
         <Button
           variant="ghost"

@@ -35,59 +35,87 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
             const objectUrl = URL.createObjectURL(file);
             setPreviewUrl(objectUrl);
 
-            // Get pre-signed URL from server
-            const response = await fetch('/api/s3/upload', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    fileName: file.name,
-                    contentType: file.type,
-                    size: file.size,
-                    isImage: fileTypeAccepted === 'image',
-                    isPdf: fileTypeAccepted === 'pdf',
-                })
-            });
+            // Server-side direct upload fallback helper
+            const uploadDirectly = async () => {
+                const formData = new FormData();
+                formData.append('file', file);
+                const directRes = await fetch('/api/s3/upload-direct', {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!directRes.ok) {
+                    throw new Error('Direct server upload failed');
+                }
+                const data = await directRes.json();
+                if (!data.key) throw new Error('No key returned from server upload');
+                setUploadProgress(100);
+                onChange?.(data.key);
+                toast.success('File uploaded successfully');
+            };
 
-            if (!response.ok) {
-                const error = await response.text();
-                console.error('Upload error:', error);
-                toast.error('Failed to get upload URL');
-                return;
+            try {
+                // Get pre-signed URL from server
+                const response = await fetch('/api/s3/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fileName: file.name,
+                        contentType: file.type,
+                        size: file.size,
+                        isImage: fileTypeAccepted === 'image',
+                        isPdf: fileTypeAccepted === 'pdf',
+                    })
+                });
+
+                if (!response.ok) {
+                    await uploadDirectly();
+                    return;
+                }
+
+                const { preSignedUrl, key } = await response.json();
+
+                // Upload to S3 via presigned URL
+                await new Promise<void>((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+
+                    xhr.upload.addEventListener('progress', (event) => {
+                        if (event.lengthComputable) {
+                            const progress = Math.round((event.loaded / event.total) * 100);
+                            setUploadProgress(progress);
+                        }
+                    });
+
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            setUploadProgress(100);
+                            onChange?.(key);
+                            toast.success('File uploaded successfully');
+                            resolve();
+                        } else {
+                            reject(new Error(`Upload failed with status ${xhr.status}`));
+                        }
+                    });
+
+                    xhr.addEventListener('error', () => {
+                        reject(new Error('Network error during file upload'));
+                    });
+
+                    xhr.addEventListener('abort', () => {
+                        reject(new Error('Upload aborted'));
+                    });
+
+                    xhr.open('PUT', preSignedUrl);
+                    xhr.setRequestHeader('Content-Type', file.type);
+                    xhr.send(file);
+                });
+            } catch (presignedErr) {
+                console.warn('Presigned upload failed or blocked by CORS. Using direct upload fallback...', presignedErr);
+                await uploadDirectly();
             }
 
-            const { preSignedUrl, key } = await response.json();
-
-            // Upload to S3 with progress tracking
-            const xhr = new XMLHttpRequest();
-
-            xhr.upload.addEventListener('progress', (event) => {
-                if (event.lengthComputable) {
-                    const progress = Math.round((event.loaded / event.total) * 100);
-                    setUploadProgress(progress);
-                }
-            });
-
-            xhr.addEventListener('load', () => {
-                if (xhr.status === 200 || xhr.status === 204) {
-                    setUploadProgress(100);
-                    onChange?.(key);
-                    toast.success('File uploaded successfully');
-                } else {
-                    throw new Error('Upload failed');
-                }
-            });
-
-            xhr.addEventListener('error', () => {
-                throw new Error('Upload failed');
-            });
-
-            xhr.open('PUT', preSignedUrl);
-            xhr.setRequestHeader('Content-Type', file.type);
-            xhr.send(file);
-
         } catch (error) {
-            console.error('Upload error:', error);
-            toast.error('Upload failed');
+            console.error('All upload attempts failed:', error);
+            toast.error('Upload failed. Please try again.');
             setPreviewUrl('');
             setUploadProgress(0);
         } finally {
@@ -151,145 +179,153 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
         }
     };
 
-    const getFileUrl = (key: string) => {
+    const getImageUrl = (key: string) => {
+        if (key.startsWith('http://') || key.startsWith('https://') || key.startsWith('blob:')) {
+            return key;
+        }
         return `https://codebreakers.t3.storage.dev/${key}`;
     };
 
-    // Show uploading state with progress
-    if (uploading) {
-        return (
-            <Card className="mt-2">
-                <CardContent className="p-6">
-                    <div className="space-y-4">
-                        <div className="flex items-center space-x-3">
-                            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                            <div className="flex-1">
-                                <p className="text-sm font-medium">Uploading {fileName}...</p>
-                                <p className="text-xs text-muted-foreground">{uploadProgress}% complete</p>
-                            </div>
-                        </div>
-                        <Progress value={uploadProgress} className="w-full" />
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+    const currentDisplayUrl = previewUrl || (value ? getImageUrl(value) : '');
 
-    // Show uploaded file with preview option
-    if (value && !uploading) {
-        const fileUrl = getFileUrl(value);
-        
-        return (
-            <Card className="mt-2">
-                <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex items-center space-x-3 min-w-0 flex-1">
+    return (
+        <div className="w-full">
+            {currentDisplayUrl || value ? (
+                <div className="relative rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 overflow-hidden">
                             {fileTypeAccepted === 'image' ? (
-                                <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded overflow-hidden shrink-0">
+                                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border">
                                     <Image
-                                        src={previewUrl || fileUrl}
-                                        alt="Uploaded image"
+                                        src={currentDisplayUrl}
+                                        alt="Preview"
                                         fill
                                         className="object-cover"
-                                        priority
+                                        unoptimized={currentDisplayUrl.startsWith('blob:')}
                                     />
                                 </div>
                             ) : (
-                                <FileIcon className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 shrink-0" />
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
+                                    <FileIcon className="h-6 w-6 text-muted-foreground" />
+                                </div>
                             )}
-                            <div className="min-w-0 flex-1">
-                                <p className="font-medium text-sm sm:text-base truncate">File uploaded</p>
-                                <p className="text-xs sm:text-sm text-muted-foreground">
-                                    {fileTypeAccepted === 'image' ? 'Image file' : 'PDF file'}
-                                </p>
+                            <div className="flex flex-col truncate">
+                                <span className="text-sm font-medium truncate">
+                                    {fileName || (value ? value.split('-').slice(1).join('-') : '') || value || ''}
+                                </span>
+                                {uploading && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Uploading... {uploadProgress}%
+                                    </span>
+                                )}
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2 w-full sm:w-auto">
-                            {/* Preview Button */}
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
-                                        <EyeIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" side="top">
-                                    {fileTypeAccepted === 'image' ? (
-                                        <div className="relative">
-                                            <Image
-                                                src={previewUrl || fileUrl}
-                                                alt="Image preview"
-                                                width={300}
-                                                height={200}
-                                                className="object-contain rounded-md max-w-[90vw] h-auto"
-                                                priority
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="w-[90vw] max-w-[600px] h-[60vh] max-h-[500px]">
-                                            <iframe
-                                                src={fileUrl}
-                                                width="100%"
-                                                height="100%"
-                                                className="rounded-md"
-                                                title="PDF Preview"
-                                            />
-                                        </div>
-                                    )}
-                                </PopoverContent>
-                            </Popover>
-                            
-                            {/* Remove Button */}
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                size="icon"
-                                onClick={handleRemove}
-                                className="h-8 w-8 sm:h-9 sm:w-9"
-                            >
-                                <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                            </Button>
+
+                        <div className="flex items-center gap-2">
+                            {currentDisplayUrl && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                        >
+                                            <EyeIcon className="h-4 w-4" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-80 p-2" align="end">
+                                        {fileTypeAccepted === 'image' ? (
+                                            <div className="relative aspect-video w-full overflow-hidden rounded-md">
+                                                <Image
+                                                    src={currentDisplayUrl}
+                                                    alt="Full Preview"
+                                                    fill
+                                                    className="object-contain"
+                                                    unoptimized={currentDisplayUrl.startsWith('blob:')}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <a
+                                                href={currentDisplayUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-primary hover:underline"
+                                            >
+                                                View Document
+                                            </a>
+                                        )}
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+
+                            {!disabled && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleRemove}
+                                    disabled={uploading}
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                    <TrashIcon className="h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     </div>
-                </CardContent>
-            </Card>
-        );
-    }
 
-    // Show upload area
-    return (
-        <Card
-            {...getRootProps()}
-            className={cn(
-                "mt-2 border-2 border-dashed cursor-pointer transition-colors",
-                isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25",
-                disabled && "opacity-50 cursor-not-allowed"
-            )}
-        >
-            <CardContent className="p-4 sm:p-6 md:p-8">
-                <input {...getInputProps()} />
-                <div className="flex flex-col items-center text-center space-y-3 sm:space-y-4">
-                    {fileTypeAccepted === 'image' ? (
-                        <ImageIcon className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
-                    ) : (
-                        <FileIcon className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
+                    {uploading && (
+                        <div className="mt-3">
+                            <Progress value={uploadProgress} className="h-1" />
+                        </div>
                     )}
-                    <div>
-                        <p className="text-xs sm:text-sm font-medium">
-                            Drop your {fileTypeAccepted === 'image' ? 'image' : 'PDF'} here or click to browse
+                </div>
+            ) : (
+                <div
+                    {...getRootProps()}
+                    className={cn(
+                        'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-center transition-colors',
+                        isDragActive && 'border-primary/50 bg-primary/5',
+                        disabled && 'opacity-60 cursor-not-allowed',
+                        !disabled && 'cursor-pointer hover:border-primary/50 hover:bg-muted/50'
+                    )}
+                >
+                    <input {...getInputProps()} />
+                    
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                        {uploading ? (
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        ) : fileTypeAccepted === 'image' ? (
+                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                        ) : (
+                            <FileIcon className="h-6 w-6 text-muted-foreground" />
+                        )}
+                    </div>
+
+                    <div className="mt-3 space-y-1">
+                        <p className="text-sm font-medium">
+                            {uploading ? (
+                                `Uploading... ${uploadProgress}%`
+                            ) : (
+                                <>
+                                    <span className="text-primary hover:underline">Click to upload</span> or drag and drop
+                                </>
+                            )}
                         </p>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground">
                             {fileTypeAccepted === 'image' 
-                                ? `Supports JPG, PNG, WebP (max ${maxSize >= 1024 * 1024 ? Math.round(maxSize / 1024 / 1024) + 'MB' : Math.round(maxSize / 1024) + 'KB'})` 
-                                : `Supports PDF (max ${maxSize >= 1024 * 1024 ? Math.round(maxSize / 1024 / 1024) + 'MB' : Math.round(maxSize / 1024) + 'KB'})`
-                            }
+                                ? 'JPG, PNG or WebP' 
+                                : 'PDF document'} (max. {Math.round(maxSize / 1024 / 1024)}MB)
                         </p>
                     </div>
-                    <Button type="button" variant="outline" size="sm" className="text-xs sm:text-sm">
-                        <CloudUploadIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                        Choose File
-                    </Button>
+
+                    {uploading && (
+                        <div className="mt-4 w-full max-w-xs">
+                            <Progress value={uploadProgress} className="h-1.5" />
+                        </div>
+                    )}
                 </div>
-            </CardContent>
-        </Card>
+            )}
+        </div>
     );
-} 
+}

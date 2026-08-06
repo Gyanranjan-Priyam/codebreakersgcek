@@ -20,6 +20,7 @@ import {
 interface MemberDetailsProps {
   member: {
     id: string;
+    cbUserId: string | null;
     name: string;
     email: string;
     username: string | null;
@@ -107,6 +108,11 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
               <h2 className="text-2xl font-bold">{member.name}</h2>
               {member.username && (
                 <p className="text-sm text-muted-foreground">@{member.username}</p>
+              )}
+              {member.cbUserId && (
+                <Badge variant="secondary" className="mt-2 mr-2">
+                  {member.cbUserId}
+                </Badge>
               )}
               {member.registration && (
                 <Badge variant="outline" className="mt-2">

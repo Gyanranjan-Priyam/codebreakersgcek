@@ -1,28 +1,21 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
-  Calendar,
   LayoutDashboard,
   FileText,
   Settings,
-  Megaphone,
   Brain,
-  Ticket,
-  FolderGit,
   Users,
-  ChartColumnIncreasing,
   Trophy,
-  UserX,
-  Activity,
   ListChecks,
-  FolderOpen,
-  QrCode
-} from "lucide-react"
+  QrCode,
+  Receipt,
+} from "lucide-react";
 
-import { NavMain } from "@/components/admin_components/dashboard/nav-main"
-import { NavSecondary } from "@/components/admin_components/dashboard/nav-secondary"
-import { NavUser } from "@/components/admin_components/dashboard/nav-user"
+import { NavMain } from "@/components/admin_components/dashboard/nav-main";
+import { NavSecondary } from "@/components/admin_components/dashboard/nav-secondary";
+import { NavUser } from "@/components/admin_components/dashboard/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -31,9 +24,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import Link from "next/link"
-import Image from "next/image"
+} from "@/components/ui/sidebar";
+import Link from "next/link";
+import Image from "next/image";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -58,37 +51,19 @@ const data = {
       icon: Users,
     },
     {
-      title: "Incomplete Profiles",
-      url: "/admin/incomplete-profiles",
-      icon: UserX,
+      title: "Attendance",
+      url: "/admin/attendance",
+      icon: QrCode,
     },
     {
-      title: "Activities",
-      url: "#",
-      icon: Activity,
-      isCollapsible: true,
-      items: [
-        {
-          title: "Attendance",
-          url: "/admin/attendance",
-          icon: QrCode,
-        },
-        {
-          title: "Quizzes",
-          url: "/admin/quizzes",
-          icon: Brain,
-        },
-        {
-          title: "Tasks",
-          url: "/admin/tasks",
-          icon: ListChecks,
-        },
-      ],
+      title: "Quizzes",
+      url: "/admin/quizzes",
+      icon: Brain,
     },
     {
-      title: "Leaderboard",
-      url: "/admin/leaderboard",
-      icon: ChartColumnIncreasing,
+      title: "Tasks",
+      url: "/admin/tasks",
+      icon: ListChecks,
     },
     {
       title: "Points Management",
@@ -96,35 +71,14 @@ const data = {
       icon: Trophy,
     },
     {
-      title: "Projects",
-      url: "#",
-      icon: FolderGit,
-      isCollapsible: true,
-      items: [
-        {
-          title: "All Projects",
-          url: "/admin/projects/all-projects",
-        },
-        {
-          title: "Submission Projects",
-          url: "/admin/projects/submission-projects",
-        },
-      ],
-    },
-    {
-      title: "Resources",
-      url: "/admin/resources",
-      icon: FolderOpen,
-    },
-    {
-      title: "Reports",
-      url: "/admin/reports",
+      title: "Forms",
+      url: "/admin/forms",
       icon: FileText,
     },
     {
-      title: "Support Messages",
-      url: "/admin/support-messages",
-      icon: Ticket,
+      title: "Transactions",
+      url: "/admin/transactions",
+      icon: Receipt,
     },
   ],
   navSecondary: [
@@ -133,46 +87,45 @@ const data = {
       url: "/admin/settings",
       icon: Settings,
     },
-    {
-      title: "Announcements",
-      url: "/admin/announcement",
-      icon: Megaphone,
-    },
   ],
-}
+};
 
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   // Create user data with proper formatting
-  const userData = user ? {
-    name: user.name || "User",
-    email: user.email,
-    avatar: user.image || "/default-avatar.png",
-  } : {
-    name: "Admin User",
-    email: "admin@example.com", 
-    avatar: "/default-avatar.png",
-  };
+  const userData = user
+    ? {
+        name: user.name || "User",
+        email: user.email,
+        avatar: user.image || "/default-avatar.png",
+      }
+    : {
+        name: "Admin User",
+        email: "admin@example.com",
+        avatar: "/default-avatar.png",
+      };
+
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar variant="floating" collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
+              tooltip="CodeBreakers"
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
               <Link href="/">
                 <div className="flex items-center">
                   <span className="text-[1.1rem] font-bold inline-flex items-center hover:text-amber-400">
                     <Image
-                    src="/assets/logo.png"
-                    alt="CodeBreakers Logo"
-                    width={32}
-                    height={32}
-                    className="inline-block mr-2 mb-1"
-                    priority
-                  />
-                    CodeBreakers
+                      src="/assets/logo.png"
+                      alt="CodeBreakers Logo"
+                      width={32}
+                      height={32}
+                      className="inline-block mr-2 mb-1 shrink-0"
+                      priority
+                    />
+                    <span className="group-data-[collapsible=icon]:hidden">CodeBreakers</span>
                   </span>
                 </div>
               </Link>
@@ -181,12 +134,12 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain}/>
+        <NavMain items={data.navMain} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={userData} />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

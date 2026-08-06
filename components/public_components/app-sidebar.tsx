@@ -12,9 +12,7 @@ import {
   FolderGit,
   Activity,
   ListChecks,
-  FileCode,
   Brain,
-  FolderOpen,
   QrCode,
 } from "lucide-react";
 
@@ -78,11 +76,6 @@ const data = {
       title: "Achievements",
       url: "/dashboard/achievements",
       icon: Trophy,
-    },
-    {
-      title: "Resources",
-      url: "/dashboard/resources",
-      icon: FolderOpen,
     },
     {
       title: "Leaderboards",
@@ -153,13 +146,15 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         avatar: "/default-avatar.png",
         profileImageKey: null,
       };
+
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar variant="floating" collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
+              tooltip="CodeBreakers"
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
               <Link href="/dashboard">
@@ -170,10 +165,10 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                       alt="CodeBreakers Logo"
                       width={32}
                       height={32}
-                      className="inline-block mr-2 mb-1"
+                      className="inline-block mr-2 mb-1 shrink-0"
                       priority
                     />
-                    CodeBreakers
+                    <span className="group-data-[collapsible=icon]:hidden">CodeBreakers</span>
                   </span>
                 </div>
               </Link>

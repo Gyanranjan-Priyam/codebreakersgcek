@@ -13,6 +13,28 @@ export const auth = betterAuth({
     database: prismaAdapter(prisma, {
         provider: "postgresql", // or "mysql", "sqlite", ...etc
     }),
+    account: {
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ["google", "github", "discord"],
+        },
+    },
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (user) => {
+                    // Only allow user creation if an admin pre-created the user record
+                    const existingUser = await prisma.user.findUnique({
+                        where: { email: user.email.toLowerCase() },
+                    });
+                    if (!existingUser) {
+                        // Returning false blocks the creation of new unapproved user accounts
+                        return false;
+                    }
+                },
+            },
+        },
+    },
     socialProviders: {
         github: {
             clientId: env.AUTH_GITHUB_CLIENT_ID,
@@ -32,6 +54,15 @@ export const auth = betterAuth({
     plugins: [
         emailOTP({
             async sendVerificationOTP({ email, otp }) {
+                // Ensure email is pre-registered by an admin
+                const existingUser = await prisma.user.findUnique({
+                    where: { email: email.trim().toLowerCase() },
+                });
+
+                if (!existingUser) {
+                    throw new Error("Unauthorized Access: Your email is not registered as a member.");
+                }
+
                 // Send verification email using nodemailer with beautiful template
                 await sendVerificationEmail({
                     to: email,

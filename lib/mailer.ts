@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { env } from "./env";
 import { type JSONContent } from "@tiptap/react";
+import { generateInvoicePDF } from "./invoice-generator";
 
 // Create a transporter using Gmail SMTP
 export const mailer = nodemailer.createTransport({
@@ -285,6 +286,104 @@ export const sendVerificationEmail = async ({
     console.error('Failed to send email:', error);
     throw error;
   }
+};
+
+const generateMemberPortalEmailHTML = ({
+  memberName,
+  title,
+  message,
+  ctaLabel,
+  ctaUrl,
+}: {
+  memberName: string;
+  title: string;
+  message: string;
+  ctaLabel: string;
+  ctaUrl: string;
+}) => {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#1f2937;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="padding:48px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0f172a 0%,#1d4ed8 100%);padding:40px 36px;text-align:center;">
+              <h1 style="margin:0;font-size:28px;line-height:1.2;color:#ffffff;">${title}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px 36px;">
+              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;">Hello <strong>${memberName}</strong>,</p>
+              <p style="margin:0 0 24px;font-size:15px;line-height:1.8;color:#374151;">${message}</p>
+              <div style="text-align:center;margin:32px 0;">
+                <a href="${ctaUrl}" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 24px;border-radius:10px;">${ctaLabel}</a>
+              </div>
+              <p style="margin:0;font-size:14px;line-height:1.7;color:#6b7280;">If the button doesn’t work, copy and paste this link into your browser:<br />${ctaUrl}</p>
+              <p style="margin:24px 0 0;font-size:15px;line-height:1.8;color:#374151;">Thanks,<br />The CodeBreakers Team</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+};
+
+export const sendMemberInvitationEmail = async ({
+  to,
+  memberName,
+  loginUrl,
+}: {
+  to: string;
+  memberName: string;
+  loginUrl: string;
+}) => {
+  try {
+    const html = generateMemberPortalEmailHTML({
+      memberName,
+      title: "You're invited to CodeBreakers",
+      message:
+        "Your member profile has been created. Use the link below to sign in to your CodeBreakers dashboard and continue your access setup.",
+      ctaLabel: "Sign in to your dashboard",
+      ctaUrl: loginUrl,
+    });
+
+    const info = await mailer.sendMail({
+      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      to,
+      subject: "You're invited to join CodeBreakers",
+      html,
+    });
+
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Failed to send member invitation email:', error);
+    throw error;
+  }
+};
+
+export const sendMemberWelcomeEmail = async ({
+  to,
+  memberName,
+  dashboardUrl,
+}: {
+  to: string;
+  memberName: string;
+  dashboardUrl: string;
+}) => {
+  return sendWelcomeEmail({
+    to,
+    firstName: memberName.split(" ")[0] || memberName,
+    getStartedUrl: dashboardUrl,
+  });
 };
 
 // Generate confirmation email HTML template
@@ -1193,5 +1292,357 @@ export const sendPaymentConfirmationEmail = async ({
   } catch (error) {
     console.error('Failed to send payment confirmation email:', error);
     throw error;
+  }
+};
+
+// Generate Welcome Email HTML Template
+export const generateWelcomeEmailHTML = ({
+  firstName = "there",
+  companyName = "CodeBreakers",
+  getStartedUrl = "https://codebreakers.in",
+  supportEmail = "contact.gyanranjan@gmail.com",
+  companyAddress = "GCEK, Bhawanipatna, Odisha",
+}: {
+  firstName?: string;
+  companyName?: string;
+  getStartedUrl?: string;
+  supportEmail?: string;
+  companyAddress?: string;
+}) => {
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="width=device-width" name="viewport"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta name="x-apple-disable-message-reformatting"/><meta content="telephone=no,address=no,email=no,date=no,url=no" name="format-detection"/><title>Start achieving more with your new account and tools.</title><style>@media (prefers-color-scheme: dark){li::marker{color:#c4c4c4}}</style></head><body dir="ltr" lang="en"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">Start achieving more with your new account and tools.<div>                                                                                                                                                  </div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td dir="ltr" lang="en" style="font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:1em;min-height:100%;line-height:155%"><table align="left" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;align:left;width:100%;border-radius:0px;line-height:155%"><tbody><tr style="width:100%"><td style="padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px"><h1 style="margin:0;padding:0;font-size:28px;line-height:1.44em;padding-top:0.389em;font-weight:700;color:#111827;margin-bottom:16px;text-align:left">Welcome to ${companyName}, ${firstName} 👋</h1><p style="margin:0;padding:0;font-size:1em;padding-top:8px;padding-bottom:0.5em">We're thrilled to have you on board. Your account is ready, and you can now access all the tools and features designed to help you get more done.</p><p style="margin:0;padding:0;font-size:1em;padding-top:16px;padding-bottom:0.5em">To help you get started quickly, here are a few things you can do right away:</p><ul style="margin:0;padding:0;padding-left:1.1em;padding-bottom:1em"><li style="margin:0;padding:0;margin-left:1em;padding-bottom:0.3em;padding-top:0.3em"><p style="margin:0;padding:0"><strong>Complete your profile </strong>so we can personalize your experience.</p></li><li style="margin:0;padding:0;margin-left:1em;padding-bottom:0.3em;padding-top:0.3em"><p style="margin:0;padding:0"><strong>Explore the dashboard </strong>to see everything available to you.</p></li><li style="margin:0;padding:0;margin-left:1em;padding-bottom:0.3em;padding-top:0.3em"><p style="margin:0;padding:0"><strong>Invite your team </strong>to collaborate on projects together.</p></li></ul><table width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="box-sizing:border-box"><tbody><tr><td style="padding:10px 20px 10px 20px;padding-top:24px;padding-bottom:24px"><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody style="width:100%"><tr style="width:100%"><td align="left" data-id="__react-email-column"><a class="button" href="${getStartedUrl}" style="line-height:100%;text-decoration:none;display:inline-block;max-width:100%;mso-padding-alt:0px;margin:0;padding:0;padding-top:12px;padding-right:28px;padding-bottom:12px;padding-left:28px;background-color:#000000;color:#ffffff;border-radius:4px;font-weight:500;font-size:0.875em;text-align:center" target="_blank"><span><!--[if mso]><i style="mso-font-width:466.6666666666667%;mso-text-raise:18px" hidden>&#8202;&#8202;&#8202;</i><![endif]--></span><span style="max-width:100%;display:inline-block;line-height:120%;mso-padding-alt:0px;mso-text-raise:9px">Get started</span><span><!--[if mso]><i style="mso-font-width:466.6666666666667%" hidden>&#8202;&#8202;&#8202;&#8203;</i><![endif]--></span></a></td></tr></tbody></table></td></tr></tbody></table><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">If you have any questions or need a hand, our support team is always ready to help. Just reply to this email or reach out to us at ${supportEmail}.</p><p style="margin:0;padding:0;font-size:1em;padding-top:16px;padding-bottom:0.5em">Welcome aboard,<br/>The ${companyName} Team</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" class="node-footer" style="font-size:0.8em"><tbody><tr><td style="padding-top:40px"><hr class="divider" style="width:100%;border:none;border-color:transparent;border-top:1px solid #eaeaea;padding-bottom:1em;border-style:solid;border-width:0;border-top-width:2px"/><p style="margin:0;padding:0;font-size:12px;padding-top:16px;padding-bottom:0.5em;color:#9ca3af;text-align:center">${companyName} • ${companyAddress}<br/>© 2026 ${companyName}. All rights reserved.</p></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>`;
+};
+
+// Generate Form Submission Confirmation Email HTML Template
+export const generateFormSubmissionEmailHTML = ({
+  firstName = "there",
+  formName = "Form",
+  responseId = "",
+  submittedAt = "",
+  companyName = "CodeBreakers",
+}: {
+  firstName?: string;
+  formName?: string;
+  responseId?: string;
+  submittedAt?: string;
+  companyName?: string;
+}) => {
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="width=device-width" name="viewport"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta name="x-apple-disable-message-reformatting"/><meta content="telephone=no,address=no,email=no,date=no,url=no" name="format-detection"/><title>Your submission has been received and is under review.</title><style>@media (prefers-color-scheme: dark){li::marker{color:#c4c4c4}}</style></head><body dir="ltr" lang="en"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">Your submission has been received and is under review.<div>                                                                                                                                                  </div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td dir="ltr" lang="en" style="font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:1em;min-height:100%;line-height:155%;text-decoration:none"><table align="left" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;align:left;width:100%;border-radius:0px;line-height:155%"><tbody><tr style="width:100%"><td style="padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px"><h2 style="margin:0;padding:0;font-size:1.8em;line-height:1.44em;padding-top:0.389em;font-weight:600">We received your submission</h2><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">Hi ${firstName},</p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">Thanks for submitting the ${formName}. We've received your response and our team will review it shortly.</p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">For your records, here is your response confirmation ID:</p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em"><strong>Response ID: </strong>${responseId}</p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">Submitted on: ${submittedAt}</p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">Please keep this ID handy in case you need to reference your submission in future correspondence. If you have any questions, simply reply to this email and we'll be glad to help.</p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">Best regards,<br/>The ${companyName} Team</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>`;
+};
+
+// Send Welcome Email
+export const sendWelcomeEmail = async ({
+  to,
+  firstName,
+  getStartedUrl,
+  supportEmail,
+  companyAddress,
+}: {
+  to: string;
+  firstName?: string;
+  getStartedUrl?: string;
+  supportEmail?: string;
+  companyAddress?: string;
+}) => {
+  try {
+    const html = generateWelcomeEmailHTML({
+      firstName,
+      companyName: "CodeBreakers",
+      getStartedUrl,
+      supportEmail,
+      companyAddress,
+    });
+
+    const info = await mailer.sendMail({
+      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      to,
+      subject: "Welcome to CodeBreakers 👋",
+      html,
+    });
+
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Failed to send welcome email:", error);
+    return { success: false, error };
+  }
+};
+
+// Send Form Submission Email
+export const sendFormSubmissionEmail = async ({
+  to,
+  firstName,
+  formName,
+  responseId,
+  submittedAt,
+}: {
+  to: string;
+  firstName?: string;
+  formName?: string;
+  responseId?: string;
+  submittedAt?: string;
+}) => {
+  try {
+    const html = generateFormSubmissionEmailHTML({
+      firstName,
+      formName,
+      responseId,
+      submittedAt,
+      companyName: "CodeBreakers",
+    });
+
+    const info = await mailer.sendMail({
+      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      to,
+      subject: `Submission Received: ${formName || "Form"}`,
+      html,
+    });
+
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Failed to send form submission email:", error);
+    return { success: false, error };
+  }
+};
+
+// Generate Invoice Design HTML Template based on invoice-design.md
+export const generateInvoiceDesignHTML = ({
+  recipientName = "Participant",
+  recipientEmail = "",
+  formTitle = "Form",
+  referenceNumber = "CB-INV-001",
+  issuedDate = new Date().toLocaleDateString("en-US"),
+  transactionId = "",
+  paymentAmount = 0,
+  collegeName = "",
+}: {
+  recipientName?: string;
+  recipientEmail?: string;
+  formTitle?: string;
+  referenceNumber?: string;
+  issuedDate?: string;
+  transactionId?: string;
+  paymentAmount?: number;
+  collegeName?: string;
+}) => {
+  const formattedAmount = (paymentAmount || 0).toFixed(2);
+  const logoUrl = "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice - CodeBreakers</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f4; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; color: #0c0a09;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Message Card -->
+        <table width="640" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #ffffff; border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; padding: 28px; margin-bottom: 20px; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; color: #1c1917; line-height: 1.6;">
+          <tr>
+            <td>
+              <h2 style="font-size: 20px; font-weight: 700; color: #0c0a09; margin: 0 0 12px 0;">🎉 Registration Approved & Payment Verified</h2>
+              <p style="margin: 0 0 12px 0;">Hi <strong>${recipientName}</strong>,</p>
+              <p style="margin: 0 0 12px 0;">Great news! Your response and payment for <strong>${formTitle}</strong> have been successfully verified and approved by the CodeBreakers team.</p>
+              
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #fafaf9; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 6px; margin: 16px 0; font-size: 13px;">
+                <tr>
+                  <td>
+                    <p style="margin: 0;"><strong>Reference ID:</strong> ${referenceNumber}</p>
+                    ${transactionId ? `<p style="margin: 4px 0 0 0;"><strong>Transaction ID:</strong> ${transactionId}</p>` : ''}
+                    <p style="margin: 4px 0 0 0;"><strong>Amount Paid:</strong> ₹${formattedAmount}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 8px 0;">Below is your verified payment receipt for your records.</p>
+              <p style="margin: 0; color: #78716c; font-size: 13px;">Best regards,<br/><strong>The CodeBreakers Team</strong></p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Main Invoice Container -->
+        <table width="640" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #fafaf9; border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          
+          <!-- Header Row with Logo and INVOICE Title -->
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td align="left" valign="top">
+                    <img src="${logoUrl}" alt="CodeBreakers Logo" style="width: 48px; height: 48px; display: block; border-radius: 8px;" />
+                  </td>
+                  <td align="right" valign="top">
+                    <h1 style="margin: 0; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #0c0a09;">INVOICE</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Meta Row: Reference & Dates -->
+          <tr>
+            <td style="padding-top: 32px; padding-bottom: 24px; border-bottom: 1px solid #e7e5e4;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size: 13px; line-height: 1.6; color: #44403c;">
+                <tr>
+                  <td width="50%" valign="top">
+                    <p style="margin: 0;"><strong>Reference:</strong> ${referenceNumber}</p>
+                    <p style="margin: 0;"><strong>Issued:</strong> ${issuedDate}</p>
+                    <p style="margin: 0;"><strong>Status:</strong> <span style="color: #16a34a; font-weight: 700;">PAID & APPROVED</span></p>
+                  </td>
+                  <td width="50%" valign="top" align="right">
+                    <p style="margin: 0;"><strong>Payment Method:</strong> UPI</p>
+                    <p style="margin: 0;"><strong>Transaction ID:</strong> ${transactionId || "N/A"}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- From and Bill To Row -->
+          <tr>
+            <td style="padding-top: 24px; padding-bottom: 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size: 13px; line-height: 1.6; color: #44403c;">
+                <tr>
+                  <td width="50%" valign="top">
+                    <p style="margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; color: #0c0a09; letter-spacing: 0.05em;">FROM</p>
+                    <p style="margin: 0; font-weight: 600; color: #0c0a09;">CodeBreakers</p>
+                    <p style="margin: 0;">Government College of Engineering Kalahandi</p>
+                    <p style="margin: 0;">Bhawanipatna, Odisha 766002</p>
+                    <p style="margin: 0;">Tax ID: CB-1029384756</p>
+                  </td>
+                  <td width="50%" valign="top" align="right">
+                    <p style="margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; color: #0c0a09; letter-spacing: 0.05em;">BILL TO</p>
+                    <p style="margin: 0; font-weight: 600; color: #0c0a09;">${recipientName}</p>
+                    <p style="margin: 0;">${recipientEmail}</p>
+                    ${collegeName ? `<p style="margin: 0;">${collegeName}</p>` : ''}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Items Table -->
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse: collapse; font-size: 13px;">
+                <thead>
+                  <tr style="background-color: #e7e5e4;">
+                    <th align="left" style="padding: 10px 12px; font-weight: 700; text-transform: uppercase; color: #0c0a09;">Description</th>
+                    <th align="right" style="padding: 10px 12px; font-weight: 700; text-transform: uppercase; color: #0c0a09;">Units</th>
+                    <th align="right" style="padding: 10px 12px; font-weight: 700; text-transform: uppercase; color: #0c0a09;">Unit Cost</th>
+                    <th align="right" style="padding: 10px 12px; font-weight: 700; text-transform: uppercase; color: #0c0a09;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid #e7e5e4;">
+                    <td style="padding: 12px; color: #0c0a09;">${formTitle} Registration Fee</td>
+                    <td align="right" style="padding: 12px; color: #44403c;">1</td>
+                    <td align="right" style="padding: 12px; color: #44403c;">₹${formattedAmount}</td>
+                    <td align="right" style="padding: 12px; font-weight: 600; color: #0c0a09;">₹${formattedAmount}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Summary & Balance Due -->
+          <tr>
+            <td style="padding-top: 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td width="40%"></td>
+                  <td width="60%">
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size: 13px; line-height: 1.8; color: #44403c;">
+                      <tr>
+                        <td>Net Amount:</td>
+                        <td align="right">₹${formattedAmount}</td>
+                      </tr>
+                      <tr>
+                        <td>Discount:</td>
+                        <td align="right">₹0.00</td>
+                      </tr>
+                      <tr style="border-top: 2px solid #0c0a09; border-bottom: 2px solid #0c0a09; font-weight: 700; color: #0c0a09;">
+                        <td style="padding: 8px 0; text-transform: uppercase;">Total Amount Paid:</td>
+                        <td align="right" style="padding: 8px 0; font-size: 15px;">₹${formattedAmount} (PAID)</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top: 48px; font-size: 12px; color: #78716c; border-top: 1px solid #e7e5e4; margin-top: 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td align="left" valign="top">
+                    <p style="margin: 0;">contact.gyanranjan@gmail.com</p>
+                    <p style="margin: 0;">CodeBreakers • GCEK Bhawanipatna</p>
+                  </td>
+                  <td align="right" valign="top">
+                    <p style="margin: 0;">Prepared for prompt processing.</p>
+                    <p style="margin: 0;">Issued by CodeBreakers Team</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+};
+
+// Send Form Response Invoice Email
+export const sendFormResponseInvoiceEmail = async ({
+  to,
+  recipientName = "Participant",
+  formTitle = "Form",
+  referenceNumber = "CB-INV-001",
+  issuedDate = new Date().toLocaleDateString("en-US"),
+  transactionId = "",
+  paymentAmount = 0,
+  collegeName = "",
+}: {
+  to: string;
+  recipientName?: string;
+  formTitle?: string;
+  referenceNumber?: string;
+  issuedDate?: string;
+  transactionId?: string;
+  paymentAmount?: number;
+  collegeName?: string;
+}) => {
+  try {
+    const html = generateInvoiceDesignHTML({
+      recipientName,
+      recipientEmail: to,
+      formTitle,
+      referenceNumber,
+      issuedDate,
+      transactionId,
+      paymentAmount,
+      collegeName,
+    });
+
+    const mailOptions = {
+      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      to,
+      subject: `🎉 Registration Approved & Official Receipt - ${formTitle} | ${referenceNumber}`,
+      html,
+    };
+
+    const info = await mailer.sendMail(mailOptions);
+
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Failed to send form response invoice email:", error);
+    return { success: false, error };
   }
 };
