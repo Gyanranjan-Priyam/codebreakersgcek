@@ -111,7 +111,7 @@ export default function FormsList({ forms }: FormsListProps) {
                 <TableCell>
                   <div className="space-y-1">
                     <p className="font-medium">{form.title}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{form.description || "No description"}</p>
+
                   </div>
                 </TableCell>
                 <TableCell className="font-mono text-sm">{form.formId}</TableCell>

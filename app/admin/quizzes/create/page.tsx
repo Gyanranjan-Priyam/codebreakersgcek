@@ -1,7 +1,4 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import CreateQuizForm from "./_components/create-quiz-form";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -35,11 +32,6 @@ export default async function CreateQuizPage({
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 w-full max-w-6xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="icon" asChild>
-          <Link href="/admin/quizzes">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create New Quiz</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
