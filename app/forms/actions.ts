@@ -12,6 +12,7 @@ export interface PublishedFormResponse {
   description: string | null;
   definition: FormDefinition;
   isPublished: boolean;
+  acceptingResponses: boolean;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +35,7 @@ export async function getPublishedFormByFormId(formId: string) {
         description: true,
         definition: true,
         isPublished: true,
+        acceptingResponses: true,
         publishedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -69,11 +71,17 @@ export async function submitFormResponse(input: {
         id: true,
         title: true,
         definition: true,
+        isPublished: true,
+        acceptingResponses: true,
       },
     });
 
-    if (!form) {
-      return { status: "error" as const, message: "Form not found" };
+    if (!form || !form.isPublished) {
+      return { status: "error" as const, message: "Form not found or not published" };
+    }
+
+    if (!form.acceptingResponses) {
+      return { status: "error" as const, message: "This form is no longer accepting responses" };
     }
 
     const formDef = form.definition as unknown as FormDefinition;

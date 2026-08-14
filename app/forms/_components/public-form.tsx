@@ -25,11 +25,18 @@ import {
   CreditCard,
   Check,
   Copy,
+  Ban,
 } from "lucide-react";
 import { format } from "date-fns";
 import { submitFormResponse } from "../actions";
 import type { PublishedFormResponse } from "../actions";
 import { FormFieldDefinition, BANNER_TEMPLATES } from "@/lib/form-types";
+import { generateHTML } from "@tiptap/html";
+import StarterKit from "@tiptap/starter-kit";
+import ListItem from "@tiptap/extension-list-item";
+import BulletList from "@tiptap/extension-bullet-list";
+import OrderedList from "@tiptap/extension-ordered-list";
+import parse from "html-react-parser";
 
 interface PublicFormProps {
   form: PublishedFormResponse;
@@ -320,6 +327,35 @@ const FORM_CSS = `
     color: #D13438;
     margin-top: 4px;
   }
+
+  /* ─── Closed State ─── */
+  .mf-closed-card {
+    background: #FFFFFF;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    padding: 60px 48px;
+    text-align: center;
+  }
+  @media (max-width: 640px) {
+    .mf-closed-card { padding: 40px 20px; }
+  }
+
+  /* ─── Rich Text Content ─── */
+  .mf-rich-text {
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+  }
+  .mf-rich-text p { margin: 0 0 8px; }
+  .mf-rich-text p:last-child { margin-bottom: 0; }
+  .mf-rich-text strong { font-weight: 700; }
+  .mf-rich-text em { font-style: italic; }
+  .mf-rich-text ul, .mf-rich-text ol {
+    margin: 4px 0;
+    padding-left: 24px;
+  }
+  .mf-rich-text li { margin: 2px 0; }
+  .mf-rich-text ul { list-style-type: disc; }
+  .mf-rich-text ol { list-style-type: decimal; }
 `;
 
 /* ─── Helpers ─── */
@@ -330,6 +366,32 @@ function getBannerGradient(form: PublishedFormResponse): string {
   }
   const tpl = BANNER_TEMPLATES.find((t) => t.id === templateId);
   return tpl ? tpl.cssGradient : "linear-gradient(135deg, #2dd4bf 0%, #a7f3d0 50%, #bfdbfe 100%)";
+}
+
+const tiptapExtensions = [
+  StarterKit.configure({
+    bulletList: false,
+    orderedList: false,
+    listItem: false,
+  }),
+  ListItem,
+  BulletList.configure({ HTMLAttributes: { class: "" } }),
+  OrderedList.configure({ HTMLAttributes: { class: "" } }),
+];
+
+/** Render Tiptap JSON or plain text as React elements */
+function renderRichText(value: string | null | undefined, className?: string) {
+  if (!value) return null;
+  try {
+    const json = JSON.parse(value);
+    if (json && typeof json === "object" && (json.type || json.content)) {
+      const html = generateHTML(json, tiptapExtensions);
+      return <div className={`mf-rich-text ${className || ""}`}>{parse(html)}</div>;
+    }
+  } catch {
+    // Not JSON — render as plain text
+  }
+  return <p className={className}>{value}</p>;
 }
 
 export default function PublicForm({ form }: PublicFormProps) {
@@ -650,7 +712,7 @@ export default function PublicForm({ form }: PublicFormProps) {
           <p className="mf-question-label">
             {qNumber}. {field.label}
           </p>
-          {field.description && <p className="mf-question-desc">{field.description}</p>}
+          {field.description && renderRichText(field.description, "mf-question-desc")}
           <button
             type="button"
             className="mf-submit-btn"
@@ -676,7 +738,7 @@ export default function PublicForm({ form }: PublicFormProps) {
             {qNumber}. {field.label}
             <span className="mf-asterisk">*</span>
           </p>
-          {field.description && <p className="mf-question-desc">{field.description}</p>}
+          {field.description && renderRichText(field.description, "mf-question-desc")}
 
           <div className="mf-payment-card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -751,7 +813,7 @@ export default function PublicForm({ form }: PublicFormProps) {
           {qNumber}. {field.label}
           {field.required && <span className="mf-asterisk">*</span>}
         </p>
-        {field.description && <p className="mf-question-desc">{field.description}</p>}
+        {field.description && renderRichText(field.description, "mf-question-desc")}
 
         {field.imageKey && (
           <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 8, overflow: "hidden", marginBottom: 16, border: "1px solid #e8e8e8" }}>
@@ -988,89 +1050,134 @@ export default function PublicForm({ form }: PublicFormProps) {
             )}
 
             {/* Form Description */}
-            {form.description && (
-              <p className="mf-description">{form.description}</p>
-            )}
+            {form.description && renderRichText(form.description, "mf-description")}
 
-            {/* Disclaimer text */}
-            <p className="mf-disclaimer">
-              When you submit this form, it will not automatically collect your details like name and email address unless you provide it yourself.
-            </p>
-
-            {/* Required notice */}
-            {hasAnyRequired && (
-              <p className="mf-required-notice">
-                <span className="mf-asterisk">*</span> Required
-              </p>
-            )}
-
-            {/* ─── Name Field ─── */}
-            {form.definition.settings.collectName && (() => {
-              questionNum++;
-              const nameErr = (submitAttempted || touched["__name"]) && !name.trim();
-              return (
-                <div className="mf-question mf-fade-in">
-                  <p className="mf-question-label">
-                    {questionNum}. NAME <span className="mf-asterisk">*</span>
-                  </p>
-                  <input
-                    className={`mf-input${nameErr ? " mf-input-error" : ""}`}
-                    type="text"
-                    value={name}
-                    onChange={(e) => { setName(e.target.value); setTouched((c) => ({ ...c, __name: true })); }}
-                    placeholder="Enter your answer"
-                  />
-                  {nameErr && <p className="mf-error-msg">This field is required</p>}
+            {!form.acceptingResponses ? (
+              /* ─── Closed State ─── */
+              <div style={{ paddingTop: 24, textAlign: "center" }}>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    background: "#FDE8E8",
+                    color: "#D13438",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 16px",
+                  }}
+                >
+                  <Ban style={{ width: 28, height: 28 }} />
                 </div>
-              );
-            })()}
-
-            {/* ─── Email Field ─── */}
-            {form.definition.settings.collectEmail && (() => {
-              questionNum++;
-              const emailErr = (submitAttempted || touched["__email"]) && (!email.trim() || !email.includes("@"));
-              return (
-                <div className="mf-question mf-fade-in">
-                  <p className="mf-question-label">
-                    {questionNum}. Email <span className="mf-asterisk">*</span>
-                  </p>
-                  <input
-                    className={`mf-input${emailErr ? " mf-input-error" : ""}`}
-                    type="email"
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); setTouched((c) => ({ ...c, __email: true })); }}
-                    placeholder="Enter your answer"
-                  />
-                  {emailErr && <p className="mf-error-msg">Please enter a valid email address</p>}
-                </div>
-              );
-            })()}
-
-            {/* ─── Section Fields ─── */}
-            {form.definition.sections.map((section) => (
-              <div key={section.id}>
-                {section.fields.map((field) => {
-                  questionNum++;
-                  return renderField(field, questionNum);
-                })}
+                <h2
+                  style={{
+                    fontFamily: "'Sora', sans-serif",
+                    fontSize: "clamp(18px, 3vw, 24px)",
+                    fontWeight: 700,
+                    color: "#1C1B1F",
+                    marginBottom: 8,
+                  }}
+                >
+                  This form is no longer accepting responses
+                </h2>
+                <p
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: 14,
+                    color: "#666",
+                    lineHeight: 1.6,
+                    maxWidth: 400,
+                    margin: "0 auto",
+                  }}
+                >
+                  The form owner has closed this form for new submissions. If you believe this is a mistake, please contact the form creator.
+                </p>
               </div>
-            ))}
+            ) : (
+              /* ─── Active Form ─── */
+              <>
+                {/* Disclaimer text */}
+                <p className="mf-disclaimer">
+                  When you submit this form, it will not automatically collect your details like name and email address unless you provide it yourself.
+                </p>
 
-            {/* ─── Submit Button ─── */}
-            <div style={{ paddingTop: 16 }}>
-              <button
-                type="button"
-                className="mf-submit-btn"
-                disabled={isSubmitting}
-                onClick={handleSubmit}
-              >
-                {isSubmitting ? (
-                  <><Loader2 className="animate-spin h-4 w-4" /> Submitting…</>
-                ) : (
-                  <>{form.definition.settings.submitButtonLabel || "Submit"}</>
+                {/* Required notice */}
+                {hasAnyRequired && (
+                  <p className="mf-required-notice">
+                    <span className="mf-asterisk">*</span> Required
+                  </p>
                 )}
-              </button>
-            </div>
+
+                {/* ─── Name Field ─── */}
+                {form.definition.settings.collectName && (() => {
+                  questionNum++;
+                  const nameErr = (submitAttempted || touched["__name"]) && !name.trim();
+                  return (
+                    <div className="mf-question mf-fade-in">
+                      <p className="mf-question-label">
+                        {questionNum}. NAME <span className="mf-asterisk">*</span>
+                      </p>
+                      <input
+                        className={`mf-input${nameErr ? " mf-input-error" : ""}`}
+                        type="text"
+                        value={name}
+                        onChange={(e) => { setName(e.target.value); setTouched((c) => ({ ...c, __name: true })); }}
+                        placeholder="Enter your answer"
+                      />
+                      {nameErr && <p className="mf-error-msg">This field is required</p>}
+                    </div>
+                  );
+                })()}
+
+                {/* ─── Email Field ─── */}
+                {form.definition.settings.collectEmail && (() => {
+                  questionNum++;
+                  const emailErr = (submitAttempted || touched["__email"]) && (!email.trim() || !email.includes("@"));
+                  return (
+                    <div className="mf-question mf-fade-in">
+                      <p className="mf-question-label">
+                        {questionNum}. Email <span className="mf-asterisk">*</span>
+                      </p>
+                      <input
+                        className={`mf-input${emailErr ? " mf-input-error" : ""}`}
+                        type="email"
+                        value={email}
+                        onChange={(e) => { setEmail(e.target.value); setTouched((c) => ({ ...c, __email: true })); }}
+                        placeholder="Enter your answer"
+                      />
+                      {emailErr && <p className="mf-error-msg">Please enter a valid email address</p>}
+                    </div>
+                  );
+                })()}
+
+                {/* ─── Section Fields ─── */}
+                {form.definition.sections.map((section) => (
+                  <div key={section.id}>
+                    {section.fields.map((field) => {
+                      questionNum++;
+                      return renderField(field, questionNum);
+                    })}
+                  </div>
+                ))}
+
+                {/* ─── Submit Button ─── */}
+                <div style={{ paddingTop: 16 }}>
+                  <button
+                    type="button"
+                    className="mf-submit-btn"
+                    disabled={isSubmitting}
+                    onClick={handleSubmit}
+                  >
+                    {isSubmitting ? (
+                      <><Loader2 className="animate-spin h-4 w-4" /> Submitting…</>
+                    ) : (
+                      <>{form.definition.settings.submitButtonLabel || "Submit"}</>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* ─── Footer ─── */}

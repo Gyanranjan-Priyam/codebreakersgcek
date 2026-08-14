@@ -14,6 +14,7 @@ export interface FormSummary {
   title: string;
   description: string | null;
   isPublished: boolean;
+  acceptingResponses: boolean;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -39,6 +40,7 @@ export interface FormDetail {
   description: string | null;
   definition: FormDefinition;
   isPublished: boolean;
+  acceptingResponses: boolean;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -113,6 +115,7 @@ export async function getAllForms() {
         title: true,
         description: true,
         isPublished: true,
+        acceptingResponses: true,
         publishedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -142,6 +145,7 @@ export async function getFormByFormId(formId: string) {
         description: true,
         definition: true,
         isPublished: true,
+        acceptingResponses: true,
         publishedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -194,7 +198,7 @@ export async function createForm(input: {
         id: randomUUID(),
         formId,
         title: input.title.trim(),
-        description: input.description?.trim() || null,
+        description: input.description || null,
         definition: toJsonValue(input.definition),
         isPublished: false,
       },
@@ -204,6 +208,7 @@ export async function createForm(input: {
         title: true,
         description: true,
         isPublished: true,
+        acceptingResponses: true,
         publishedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -236,7 +241,7 @@ export async function updateForm(
       where: { formId },
       data: {
         title: input.title.trim(),
-        description: input.description?.trim() || null,
+        description: input.description || null,
         definition: toJsonValue(input.definition),
       },
     });
@@ -276,6 +281,30 @@ export async function toggleFormPublish(formId: string, isPublished: boolean) {
   } catch (error) {
     console.error("Error toggling form publish status:", error);
     return { status: "error" as const, message: "Failed to update publish status" };
+  }
+}
+
+export async function toggleAcceptingResponses(formId: string, accepting: boolean) {
+  await requireAdmin();
+
+  try {
+    const form = await prisma.form.update({
+      where: { formId },
+      data: { acceptingResponses: accepting },
+    });
+
+    revalidatePath("/admin/forms");
+    revalidatePath(`/admin/forms/${form.formId}`);
+    revalidatePath(`/forms/${form.formId}`);
+
+    return {
+      status: "success" as const,
+      message: accepting ? "Form is now accepting responses" : "Form stopped accepting responses",
+      data: form,
+    };
+  } catch (error) {
+    console.error("Error toggling accepting responses:", error);
+    return { status: "error" as const, message: "Failed to update accepting responses status" };
   }
 }
 

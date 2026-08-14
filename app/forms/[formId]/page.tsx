@@ -7,6 +7,26 @@ interface PublicFormPageProps {
   params: Promise<{ formId: string }>;
 }
 
+/** Extract plain text from Tiptap JSON for OG/meta descriptions */
+function extractPlainText(description: string | null): string {
+  if (!description) return "";
+  try {
+    const json = JSON.parse(description);
+    // Recursively extract text from Tiptap JSON content
+    function getText(node: Record<string, unknown>): string {
+      if (node.text && typeof node.text === "string") return node.text;
+      if (Array.isArray(node.content)) {
+        return (node.content as Record<string, unknown>[]).map(getText).join(" ");
+      }
+      return "";
+    }
+    return getText(json).replace(/\s+/g, " ").trim();
+  } catch {
+    // Not JSON — treat as plain text
+    return description;
+  }
+}
+
 export async function generateMetadata({ params }: PublicFormPageProps): Promise<Metadata> {
   const { formId } = await params;
   const result = await getPublishedFormByFormId(formId);
@@ -15,7 +35,7 @@ export async function generateMetadata({ params }: PublicFormPageProps): Promise
     ? result.data.title
     : `Form ${formId}`;
   const description = result.status === "success" && result.data.description
-    ? result.data.description
+    ? extractPlainText(result.data.description)
     : "Fill out this form published by CodeBreakers GCEK.";
   const formUrl = `https://www.codebreakersgcek.tech/forms/${formId}`;
 

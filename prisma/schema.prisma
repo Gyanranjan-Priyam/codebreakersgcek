@@ -600,18 +600,19 @@ model Resource {
 }
 
 model Form {
-  id          String        @id
-  formId      String        @unique
-  title       String
-  description String?
-  definition  Json
-  isPublished Boolean       @default(false)
-  publishedAt DateTime?
-  createdById String?
-  createdBy   User?         @relation("FormCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  responses   FormResponse[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @default(now()) @updatedAt
+  id                 String        @id
+  formId             String        @unique
+  title              String
+  description        String?
+  definition         Json
+  isPublished        Boolean       @default(false)
+  acceptingResponses Boolean       @default(true)
+  publishedAt        DateTime?
+  createdById        String?
+  createdBy          User?         @relation("FormCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  responses          FormResponse[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @default(now()) @updatedAt
 
   @@index([isPublished])
   @@map("form")

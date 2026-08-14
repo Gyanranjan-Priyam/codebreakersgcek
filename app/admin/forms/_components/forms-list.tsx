@@ -25,8 +25,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Copy, Eye, Edit, ToggleLeft, ToggleRight, Trash2, Inbox } from "lucide-react";
-import { deleteForm, toggleFormPublish } from "../actions";
+import { MoreHorizontal, Copy, Eye, Edit, ToggleLeft, ToggleRight, Trash2, Inbox, Ban, PlayCircle } from "lucide-react";
+import { deleteForm, toggleFormPublish, toggleAcceptingResponses } from "../actions";
 
 interface FormRow {
   id: string;
@@ -34,6 +34,7 @@ interface FormRow {
   title: string;
   description: string | null;
   isPublished: boolean;
+  acceptingResponses: boolean;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -60,6 +61,18 @@ export default function FormsList({ forms }: FormsListProps) {
   const handlePublishToggle = async (form: FormRow) => {
     setIsLoading(true);
     const result = await toggleFormPublish(form.formId, !form.isPublished);
+    if (result.status === "success") {
+      toast.success(result.message);
+      router.refresh();
+    } else {
+      toast.error(result.message);
+    }
+    setIsLoading(false);
+  };
+
+  const handleAcceptingToggle = async (form: FormRow) => {
+    setIsLoading(true);
+    const result = await toggleAcceptingResponses(form.formId, !form.acceptingResponses);
     if (result.status === "success") {
       toast.success(result.message);
       router.refresh();
@@ -116,9 +129,16 @@ export default function FormsList({ forms }: FormsListProps) {
                 </TableCell>
                 <TableCell className="font-mono text-sm">{form.formId}</TableCell>
                 <TableCell>
-                  <Badge variant={form.isPublished ? "default" : "secondary"}>
-                    {form.isPublished ? "Published" : "Draft"}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={form.isPublished ? "default" : "secondary"}>
+                      {form.isPublished ? "Published" : "Draft"}
+                    </Badge>
+                    {form.isPublished && !form.acceptingResponses && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        Closed
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>{form._count.responses}</TableCell>
                 <TableCell>{new Date(form.updatedAt).toLocaleDateString()}</TableCell>
@@ -172,6 +192,21 @@ export default function FormsList({ forms }: FormsListProps) {
                           </>
                         )}
                       </DropdownMenuItem>
+                      {form.isPublished && (
+                        <DropdownMenuItem onClick={() => handleAcceptingToggle(form)} disabled={isLoading}>
+                          {form.acceptingResponses ? (
+                            <>
+                              <Ban className="mr-2 h-4 w-4" />
+                              Stop Collecting
+                            </>
+                          ) : (
+                            <>
+                              <PlayCircle className="mr-2 h-4 w-4" />
+                              Start Collecting
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive"

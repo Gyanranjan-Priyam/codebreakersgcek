@@ -122,6 +122,7 @@ import {
   type FormSectionDefinition,
 } from "@/lib/form-types";
 import { Uploader } from "@/components/file-uploader/Uploader";
+import { MiniRichEditor } from "@/components/admin_components/rich-text-editor/MiniRichEditor";
 
 /* ─── Helpers ─── */
 
@@ -498,12 +499,10 @@ function QuestionCard({
             )}
 
             {/* Helper text */}
-            <input
-              type="text"
+            <MiniRichEditor
               value={field.description || ""}
-              onChange={(e) => onUpdate({ description: e.target.value })}
+              onChange={(val) => onUpdate({ description: val })}
               placeholder="Description or helper text (optional)"
-              className="w-full text-sm text-muted-foreground bg-transparent border-b border-dashed border-border/50 focus:border-primary focus:border-solid outline-none py-1.5 transition-all"
             />
 
             {/* Field editor */}
@@ -1335,7 +1334,11 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
                 {!hasBanner && <div className="h-2 bg-gradient-to-r from-primary via-primary/80 to-primary/60" />}
                 <div className="p-6 space-y-3">
                   <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Form Title" className="w-full text-2xl sm:text-3xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50" />
-                  <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Add a description..." className="w-full text-sm bg-transparent border-none outline-none text-muted-foreground placeholder:text-muted-foreground/40" />
+                  <MiniRichEditor
+                    value={description}
+                    onChange={(val) => setDescription(val)}
+                    placeholder="Add a description..."
+                  />
                   <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       {definition.settings.collectEmail ? <><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Collecting emails</> : <><X className="h-3 w-3 text-muted-foreground/50" /> Email off</>}
@@ -1381,12 +1384,10 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
                     </Button>
                   )}
                 </div>
-                <input
-                  type="text"
+                <MiniRichEditor
                   value={currentSection.description || ""}
-                  onChange={(e) => updateSection(safeIdx, { description: e.target.value })}
+                  onChange={(val) => updateSection(safeIdx, { description: val })}
                   placeholder="Section description (optional)"
-                  className="w-full text-xs text-muted-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/40"
                 />
                 <div className="flex items-center gap-2 pt-1 border-t border-border/30">
                   <span className="text-[11px] text-muted-foreground/70">
