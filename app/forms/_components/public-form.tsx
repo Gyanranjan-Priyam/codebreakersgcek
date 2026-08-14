@@ -36,6 +36,7 @@ import StarterKit from "@tiptap/starter-kit";
 import ListItem from "@tiptap/extension-list-item";
 import BulletList from "@tiptap/extension-bullet-list";
 import OrderedList from "@tiptap/extension-ordered-list";
+import TextAlign from "@tiptap/extension-text-align";
 import parse from "html-react-parser";
 
 interface PublicFormProps {
@@ -344,18 +345,30 @@ const FORM_CSS = `
   .mf-rich-text {
     font-family: 'Inter', sans-serif;
     line-height: 1.6;
+    color: #444;
   }
   .mf-rich-text p { margin: 0 0 8px; }
   .mf-rich-text p:last-child { margin-bottom: 0; }
-  .mf-rich-text strong { font-weight: 700; }
+  .mf-rich-text strong { font-weight: 700; color: #1C1B1F; }
   .mf-rich-text em { font-style: italic; }
-  .mf-rich-text ul, .mf-rich-text ol {
-    margin: 4px 0;
-    padding-left: 24px;
+  .mf-rich-text ul, .mf-rich-text .my-bullet-list, .mf-rich-text .prose-bullet-list, .tiptap-content ul {
+    list-style-type: disc !important;
+    margin: 8px 0 !important;
+    padding-left: 24px !important;
   }
-  .mf-rich-text li { margin: 2px 0; }
-  .mf-rich-text ul { list-style-type: disc; }
-  .mf-rich-text ol { list-style-type: decimal; }
+  .mf-rich-text ol, .mf-rich-text .my-ordered-list, .mf-rich-text .prose-ordered-list, .tiptap-content ol {
+    list-style-type: decimal !important;
+    margin: 8px 0 !important;
+    padding-left: 24px !important;
+  }
+  .mf-rich-text li, .mf-rich-text .my-list-item, .tiptap-content li {
+    display: list-item !important;
+    margin: 4px 0 !important;
+  }
+  .mf-rich-text li p, .tiptap-content li p {
+    margin: 0 !important;
+    display: inline !important;
+  }
 `;
 
 /* ─── Helpers ─── */
@@ -374,10 +387,127 @@ const tiptapExtensions = [
     orderedList: false,
     listItem: false,
   }),
-  ListItem,
-  BulletList.configure({ HTMLAttributes: { class: "" } }),
-  OrderedList.configure({ HTMLAttributes: { class: "" } }),
+  ListItem.configure({
+    HTMLAttributes: {
+      class: "my-list-item",
+    },
+  }),
+  BulletList.configure({
+    HTMLAttributes: {
+      class: "my-bullet-list",
+    },
+    itemTypeName: "listItem",
+  }),
+  OrderedList.configure({
+    HTMLAttributes: {
+      class: "my-ordered-list",
+    },
+    itemTypeName: "listItem",
+  }),
+  TextAlign.configure({
+    types: ["heading", "paragraph", "listItem"],
+  }),
 ];
+
+function hasListNodes(json: any): boolean {
+  if (!json || typeof json !== "object") return false;
+  if (json.type === "bulletList" || json.type === "orderedList") return true;
+  if (Array.isArray(json.content)) {
+    return json.content.some(hasListNodes);
+  }
+  return false;
+}
+
+function extractPlainTextFromJson(json: any): string {
+  if (!json) return "";
+  if (typeof json === "string") return json;
+  if (json.text && typeof json.text === "string") return json.text;
+  if (Array.isArray(json.content)) {
+    return json.content.map(extractPlainTextFromJson).join(" ");
+  }
+  return "";
+}
+
+function autoFormatDescriptionText(text: string): string {
+  if (!text) return "";
+
+  if (text.includes("📌") || /important:/i.test(text)) {
+    const parts = text.split(/(📌\s*Important:?|Important:)/i);
+    if (parts.length >= 3) {
+      const intro = parts[0].trim();
+      const header = parts[1].trim();
+      const rest = parts.slice(2).join("").trim();
+
+      const rawSentences = rest.split(/(?<=\.)\s+|\r?\n/).map((s) => s.trim()).filter(Boolean);
+      let bulletItems: string[] = [];
+      let outro = "";
+
+      for (const sentence of rawSentences) {
+        if (/please complete the form/i.test(sentence)) {
+          outro = sentence;
+        } else {
+          const cleanSentence = sentence.replace(/^[•*\-\s]+/, "").trim();
+          if (cleanSentence) bulletItems.push(cleanSentence);
+        }
+      }
+
+      let html = "";
+      if (intro) html += `<p>${intro}</p>`;
+      if (header) html += `<p style="margin-top: 12px; margin-bottom: 6px;"><strong>${header}</strong></p>`;
+      if (bulletItems.length > 0) {
+        html += `<ul class="my-bullet-list">`;
+        for (const item of bulletItems) {
+          html += `<li class="my-list-item"><p>${item}</p></li>`;
+        }
+        html += `</ul>`;
+      }
+      if (outro) html += `<p style="margin-top: 12px;"><strong>${outro}</strong></p>`;
+
+      return html;
+    }
+  }
+
+  return plainTextToHtml(text);
+}
+
+function plainTextToHtml(text: string): string {
+  if (!text) return "";
+  const lines = text.split(/\r?\n/);
+  let html = "";
+  let inBulletList = false;
+  let inOrderedList = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (inBulletList) { html += "</ul>"; inBulletList = false; }
+      if (inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      continue;
+    }
+
+    const bulletMatch = line.match(/^(?:[•*\-]|&bull;)\s+(.*)/);
+    const orderedMatch = line.match(/^\d+[\.\)]\s+(.*)/);
+
+    if (bulletMatch) {
+      if (inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      if (!inBulletList) { html += "<ul class=\"my-bullet-list\">"; inBulletList = true; }
+      html += `<li class="my-list-item"><p>${bulletMatch[1]}</p></li>`;
+    } else if (orderedMatch) {
+      if (inBulletList) { html += "</ul>"; inBulletList = false; }
+      if (!inOrderedList) { html += "<ol class=\"my-ordered-list\">"; inOrderedList = true; }
+      html += `<li class="my-list-item"><p>${orderedMatch[1]}</p></li>`;
+    } else {
+      if (inBulletList) { html += "</ul>"; inBulletList = false; }
+      if (!inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      html += `<p>${line}</p>`;
+    }
+  }
+
+  if (inBulletList) html += "</ul>";
+  if (inOrderedList) html += "</ol>";
+
+  return html || `<p>${text}</p>`;
+}
 
 /** Render Tiptap JSON or plain text as React elements */
 function renderRichText(value: string | null | undefined, className?: string) {
@@ -385,13 +515,34 @@ function renderRichText(value: string | null | undefined, className?: string) {
   try {
     const json = JSON.parse(value);
     if (json && typeof json === "object" && (json.type || json.content)) {
+      if (!hasListNodes(json)) {
+        const text = extractPlainTextFromJson(json);
+        if (text) {
+          const formattedHtml = autoFormatDescriptionText(text);
+          return (
+            <div className={`mf-rich-text tiptap-content ${className || ""}`}>
+              {parse(formattedHtml)}
+            </div>
+          );
+        }
+      }
+
       const html = generateHTML(json, tiptapExtensions);
-      return <div className={`mf-rich-text ${className || ""}`}>{parse(html)}</div>;
+      return (
+        <div className={`mf-rich-text tiptap-content ${className || ""}`}>
+          {parse(html)}
+        </div>
+      );
     }
   } catch {
-    // Not JSON — render as plain text
+    // Not JSON — convert plain text to HTML with paragraph and list tags
   }
-  return <p className={className}>{value}</p>;
+  const fallbackHtml = autoFormatDescriptionText(value);
+  return (
+    <div className={`mf-rich-text tiptap-content ${className || ""}`}>
+      {parse(fallbackHtml)}
+    </div>
+  );
 }
 
 export default function PublicForm({ form }: PublicFormProps) {
@@ -498,14 +649,11 @@ export default function PublicForm({ form }: PublicFormProps) {
   /* ─── Validation ─── */
   const isFieldValid = (field: FormFieldDefinition): boolean => {
     if (field.type === "multi_input") {
+      if (!field.required) return true;
       const valObj = (answers[field.id] as Record<string, string> | undefined) || {};
       const subQuestions = field.subQuestions || [];
       for (const sub of subQuestions) {
         if (sub.required && !valObj[sub.id]?.trim()) return false;
-      }
-      if (field.required) {
-        const hasAny = Object.values(valObj).some((v) => typeof v === "string" && v.trim().length > 0);
-        if (!hasAny) return false;
       }
       return true;
     }
@@ -855,12 +1003,13 @@ export default function PublicForm({ form }: PublicFormProps) {
             {(field.subQuestions || []).map((sub, idx) => {
               const currentValObj = (answers[field.id] as Record<string, string> | undefined) || {};
               const subVal = currentValObj[sub.id] || "";
-              const subErr = (submitAttempted || touched[field.id]) && (sub.required || field.required) && !subVal.trim();
+              const isSubRequired = Boolean(field.required && sub.required);
+              const subErr = (submitAttempted || touched[field.id]) && isSubRequired && !subVal.trim();
               return (
                 <div key={sub.id || idx}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: "#1C1B1F", display: "block", marginBottom: 4 }}>
                     {sub.label || `Sub-question ${idx + 1}`}
-                    {(sub.required || field.required) && <span style={{ color: "#D13438", marginLeft: 2 }}>*</span>}
+                    {isSubRequired && <span style={{ color: "#D13438", marginLeft: 2 }}>*</span>}
                   </label>
                   <input
                     className={`mf-input${subErr ? " mf-input-error" : ""}`}

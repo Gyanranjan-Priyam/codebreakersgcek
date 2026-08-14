@@ -57,13 +57,17 @@ function generateFormId() {
 
 function normalizeDefinition(definition: FormDefinition): FormDefinition {
   return {
-    sections: definition.sections
+    ...definition,
+    theme: definition.theme || "default",
+    bannerKey: definition.bannerKey ?? "",
+    bannerTemplate: definition.bannerTemplate ?? "purple-blue",
+    sections: (definition.sections || [])
       .slice()
       .sort((left, right) => left.order - right.order)
       .map((section, sectionIndex) => ({
         ...section,
         order: sectionIndex,
-        fields: section.fields
+        fields: (section.fields || [])
           .slice()
           .sort((left, right) => left.order - right.order)
           .map((field, fieldIndex) => ({

@@ -824,7 +824,7 @@ function QuestionCard({
                       <div key={i} className="space-y-1">
                         <label className="text-xs font-medium text-foreground">
                           {sub.label || `Sub-question ${i + 1}`}
-                          {sub.required && <span className="text-destructive ml-1">*</span>}
+                          {field.required && sub.required && <span className="text-destructive ml-1">*</span>}
                         </label>
                         <Input disabled placeholder={sub.placeholder || "Enter answer..."} className="max-w-md bg-muted/10 border-dashed text-muted-foreground h-9 rounded-lg text-xs" />
                       </div>

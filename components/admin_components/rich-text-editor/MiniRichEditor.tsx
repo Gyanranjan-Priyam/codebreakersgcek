@@ -3,6 +3,9 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import ListItem from "@tiptap/extension-list-item";
+import BulletList from "@tiptap/extension-bullet-list";
+import OrderedList from "@tiptap/extension-ordered-list";
 import { Bold, Italic, List, ListOrdered } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +14,106 @@ interface MiniRichEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+}
+
+function hasListNodes(json: any): boolean {
+  if (!json || typeof json !== "object") return false;
+  if (json.type === "bulletList" || json.type === "orderedList") return true;
+  if (Array.isArray(json.content)) {
+    return json.content.some(hasListNodes);
+  }
+  return false;
+}
+
+function extractPlainTextFromJson(json: any): string {
+  if (!json) return "";
+  if (typeof json === "string") return json;
+  if (json.text && typeof json.text === "string") return json.text;
+  if (Array.isArray(json.content)) {
+    return json.content.map(extractPlainTextFromJson).join(" ");
+  }
+  return "";
+}
+
+function autoFormatDescriptionText(text: string): string {
+  if (!text) return "";
+
+  if (text.includes("📌") || /important:/i.test(text)) {
+    const parts = text.split(/(📌\s*Important:?|Important:)/i);
+    if (parts.length >= 3) {
+      const intro = parts[0].trim();
+      const header = parts[1].trim();
+      const rest = parts.slice(2).join("").trim();
+
+      const rawSentences = rest.split(/(?<=\.)\s+|\r?\n/).map((s) => s.trim()).filter(Boolean);
+      let bulletItems: string[] = [];
+      let outro = "";
+
+      for (const sentence of rawSentences) {
+        if (/please complete the form/i.test(sentence)) {
+          outro = sentence;
+        } else {
+          const cleanSentence = sentence.replace(/^[•*\-\s]+/, "").trim();
+          if (cleanSentence) bulletItems.push(cleanSentence);
+        }
+      }
+
+      let html = "";
+      if (intro) html += `<p>${intro}</p>`;
+      if (header) html += `<p style="margin-top: 12px; margin-bottom: 6px;"><strong>${header}</strong></p>`;
+      if (bulletItems.length > 0) {
+        html += `<ul class="my-bullet-list">`;
+        for (const item of bulletItems) {
+          html += `<li class="my-list-item"><p>${item}</p></li>`;
+        }
+        html += `</ul>`;
+      }
+      if (outro) html += `<p style="margin-top: 12px;"><strong>${outro}</strong></p>`;
+
+      return html;
+    }
+  }
+
+  return plainTextToHtml(text);
+}
+
+function plainTextToHtml(text: string): string {
+  if (!text) return "";
+  const lines = text.split(/\r?\n/);
+  let html = "";
+  let inBulletList = false;
+  let inOrderedList = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (inBulletList) { html += "</ul>"; inBulletList = false; }
+      if (inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      continue;
+    }
+
+    const bulletMatch = line.match(/^(?:[•*\-]|&bull;)\s+(.*)/);
+    const orderedMatch = line.match(/^\d+[\.\)]\s+(.*)/);
+
+    if (bulletMatch) {
+      if (inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      if (!inBulletList) { html += "<ul class=\"my-bullet-list\">"; inBulletList = true; }
+      html += `<li class="my-list-item"><p>${bulletMatch[1]}</p></li>`;
+    } else if (orderedMatch) {
+      if (inBulletList) { html += "</ul>"; inBulletList = false; }
+      if (!inOrderedList) { html += "<ol class=\"my-ordered-list\">"; inOrderedList = true; }
+      html += `<li class="my-list-item"><p>${orderedMatch[1]}</p></li>`;
+    } else {
+      if (inBulletList) { html += "</ul>"; inBulletList = false; }
+      if (!inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      html += `<p>${line}</p>`;
+    }
+  }
+
+  if (inBulletList) html += "</ul>";
+  if (inOrderedList) html += "</ol>";
+
+  return html || `<p>${text}</p>`;
 }
 
 /**
@@ -25,6 +128,26 @@ export function MiniRichEditor({ value, onChange, placeholder = "Add a descripti
         codeBlock: false,
         blockquote: false,
         horizontalRule: false,
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+      }),
+      ListItem.configure({
+        HTMLAttributes: {
+          class: "my-list-item",
+        },
+      }),
+      BulletList.configure({
+        HTMLAttributes: {
+          class: "my-bullet-list",
+        },
+        itemTypeName: "listItem",
+      }),
+      OrderedList.configure({
+        HTMLAttributes: {
+          class: "my-ordered-list",
+        },
+        itemTypeName: "listItem",
       }),
       Placeholder.configure({
         placeholder,
@@ -33,9 +156,12 @@ export function MiniRichEditor({ value, onChange, placeholder = "Add a descripti
     editorProps: {
       attributes: {
         class: cn(
-          "min-h-[40px] max-h-[200px] overflow-y-auto px-3 py-2 text-sm focus:outline-none",
+          "min-h-[40px] h-auto px-3 py-2 text-sm focus:outline-none",
           "prose prose-sm dark:prose-invert !max-w-none",
-          "[&_p]:m-0 [&_p]:leading-relaxed [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0",
+          "[&_p]:m-0 [&_p]:leading-relaxed",
+          "[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1",
+          "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1",
+          "[&_li]:my-0.5",
         ),
       },
     },
@@ -45,10 +171,16 @@ export function MiniRichEditor({ value, onChange, placeholder = "Add a descripti
     content: (() => {
       if (!value) return "";
       try {
-        return JSON.parse(value);
+        const json = JSON.parse(value);
+        if (json && typeof json === "object" && !hasListNodes(json)) {
+          const text = extractPlainTextFromJson(json);
+          if (text) {
+            return autoFormatDescriptionText(text);
+          }
+        }
+        return json;
       } catch {
-        // If it's plain text (legacy), wrap it
-        return value ? `<p>${value}</p>` : "";
+        return autoFormatDescriptionText(value);
       }
     })(),
     immediatelyRender: false,
