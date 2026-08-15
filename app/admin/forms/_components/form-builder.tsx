@@ -28,26 +28,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -576,12 +556,15 @@ function QuestionCard({
                     <div className="mt-3 p-3 rounded-lg bg-background border border-border flex items-center gap-4">
                       <div className="relative w-20 h-20 bg-white rounded-md border border-border p-1 shrink-0">
                         {/* eslint-disable-next-html-img-element */}
-                        <img
+                        <Image
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
                             `upi://pay?pa=${field.upiId}&pn=${encodeURIComponent(field.payeeName || field.label || "Payment")}&am=${field.paymentAmount ?? ""}&cu=INR`
                           )}`}
                           alt="Live UPI QR"
+                          width={80}
+                          height={80}
                           className="w-full h-full object-contain"
+                          unoptimized
                         />
                       </div>
                       <div className="text-xs space-y-1">
@@ -895,7 +878,6 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
   /* ─── Responses sidebar state (for detail sheet) ─── */
   const [viewingResponse, setViewingResponse] = useState<FormResponseSummary | null>(null);
   const [singleDeleteId, setSingleDeleteId] = useState<string | null>(null);
-  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));

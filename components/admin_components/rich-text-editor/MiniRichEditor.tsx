@@ -46,7 +46,7 @@ function autoFormatDescriptionText(text: string): string {
       const rest = parts.slice(2).join("").trim();
 
       const rawSentences = rest.split(/(?<=\.)\s+|\r?\n/).map((s) => s.trim()).filter(Boolean);
-      let bulletItems: string[] = [];
+      const bulletItems: string[] = [];
       let outro = "";
 
       for (const sentence of rawSentences) {

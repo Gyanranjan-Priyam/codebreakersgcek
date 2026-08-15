@@ -17,6 +17,15 @@ export interface TransactionItem {
   answers: Record<string, unknown>;
   createdAt: string;
   verifiedAt: string | null;
+  hasFormPaymentField: boolean;
+  isValidTransaction: boolean;
+  isFakeOrSuspicious: boolean;
+}
+
+export interface PaymentFormOption {
+  formId: string;
+  title: string;
+  paymentAmount: number;
 }
 
 function extractName(answers: Record<string, unknown>): string {
@@ -37,6 +46,26 @@ function extractEmail(answers: Record<string, unknown>): string {
   return "N/A";
 }
 
+function hasFormPaymentField(definitionJson: unknown): boolean {
+  try {
+    const def = typeof definitionJson === "string" ? JSON.parse(definitionJson) : definitionJson;
+    if (def && Array.isArray(def.sections)) {
+      for (const sec of def.sections) {
+        if (Array.isArray(sec.fields)) {
+          for (const f of sec.fields) {
+            if (f.type === "payment") {
+              return true;
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return false;
+}
+
 function extractPaymentAmount(definitionJson: unknown): number {
   try {
     const def = typeof definitionJson === "string" ? JSON.parse(definitionJson) : definitionJson;
@@ -44,7 +73,7 @@ function extractPaymentAmount(definitionJson: unknown): number {
       for (const sec of def.sections) {
         if (Array.isArray(sec.fields)) {
           for (const f of sec.fields) {
-            if (f.type === "payment" && f.paymentAmount) {
+            if (f.type === "payment" && f.paymentAmount !== undefined) {
               return Number(f.paymentAmount);
             }
           }
@@ -54,10 +83,36 @@ function extractPaymentAmount(definitionJson: unknown): number {
   } catch {
     // fallback
   }
-  return 100;
+  return 0;
 }
 
-export async function getAdminTransactions(): Promise<{ success: boolean; data?: TransactionItem[]; error?: string }> {
+function checkTransactionValidity(txId: string | null, status: string): { isValid: boolean; isFakeOrSuspicious: boolean } {
+  if (!txId || !txId.trim()) {
+    return { isValid: false, isFakeOrSuspicious: true };
+  }
+  const cleanTx = txId.trim().toLowerCase();
+  
+  // Known fake / dummy patterns
+  const dummyPatterns = ["123", "1234", "12345", "0000", "test", "fake", "dummy", "asdf", "nil", "none", "na", "null"];
+  const isDummy = dummyPatterns.some((pattern) => cleanTx === pattern || cleanTx.startsWith(pattern));
+  
+  if (isDummy || cleanTx.length < 5) {
+    return { isValid: false, isFakeOrSuspicious: true };
+  }
+
+  if (status === "verified") {
+    return { isValid: true, isFakeOrSuspicious: false };
+  }
+
+  return { isValid: false, isFakeOrSuspicious: false };
+}
+
+export async function getAdminTransactions(): Promise<{
+  success: boolean;
+  data?: TransactionItem[];
+  paymentForms?: PaymentFormOption[];
+  error?: string;
+}> {
   try {
     const responses = await prisma.formResponse.findMany({
       include: {
@@ -68,27 +123,53 @@ export async function getAdminTransactions(): Promise<{ success: boolean; data?:
       },
     });
 
-    const items: TransactionItem[] = responses.map((res) => {
-      const ans = (res.answers as Record<string, unknown>) || {};
-      const amount = extractPaymentAmount(res.form?.definition);
+    const paymentFormsMap = new Map<string, { title: string; paymentAmount: number }>();
+    const items: TransactionItem[] = [];
 
-      return {
+    for (const res of responses) {
+      const formDef = res.form?.definition;
+      const isPaymentForm = hasFormPaymentField(formDef);
+      const txId = res.transactionId ? res.transactionId.trim() : null;
+
+      // Filter: Show ONLY form responses that are associated with a payment field or have a transaction ID
+      if (!isPaymentForm && !txId) {
+        continue;
+      }
+
+      const amount = extractPaymentAmount(formDef);
+
+      if (res.form?.formId && res.form?.title) {
+        paymentFormsMap.set(res.form.formId, { title: res.form.title, paymentAmount: amount });
+      }
+
+      const ans = (res.answers as Record<string, unknown>) || {};
+      const status = res.paymentStatus || "pending";
+      const { isValid, isFakeOrSuspicious } = checkTransactionValidity(txId, status);
+
+      items.push({
         id: res.id,
         formId: res.form?.formId || "N/A",
         formTitle: res.form?.title || "Form Registration",
         receiptNumber: `CB-INV-${res.id.slice(0, 8).toUpperCase()}`,
-        transactionId: res.transactionId || null,
-        paymentStatus: res.paymentStatus || "pending",
+        transactionId: txId,
+        paymentStatus: status,
         paymentAmount: amount,
         recipientName: extractName(ans),
         recipientEmail: extractEmail(ans),
         answers: ans,
         createdAt: res.createdAt.toISOString(),
         verifiedAt: res.verifiedAt ? res.verifiedAt.toISOString() : null,
-      };
-    });
+        hasFormPaymentField: isPaymentForm,
+        isValidTransaction: isValid,
+        isFakeOrSuspicious,
+      });
+    }
 
-    return { success: true, data: items };
+    const paymentForms: PaymentFormOption[] = Array.from(paymentFormsMap.entries()).map(
+      ([formId, info]) => ({ formId, title: info.title, paymentAmount: info.paymentAmount })
+    );
+
+    return { success: true, data: items, paymentForms };
   } catch (err: unknown) {
     console.error("Error fetching admin transactions:", err);
     return { success: false, error: err instanceof Error ? err.message : "Failed to load transactions." };
@@ -133,3 +214,4 @@ export async function resendTransactionReceipt(responseId: string): Promise<{ su
     return { success: false, error: err instanceof Error ? err.message : "Failed to resend receipt." };
   }
 }
+

@@ -396,7 +396,7 @@ export async function updateFormResponseStatus(responseId: string, paymentStatus
             referenceNumber: refNo,
             issuedDate: new Date().toLocaleDateString("en-US"),
             transactionId: responseDetail.transactionId || undefined,
-            paymentAmount: paymentAmount || 299,
+            paymentAmount: paymentAmount,
             collegeName: collegeName || undefined,
           }).catch((err) => console.error("Error sending invoice email on approval:", err));
         }
@@ -481,7 +481,7 @@ export async function updateFormResponsesStatus(responseIds: string[], paymentSt
             referenceNumber: refNo,
             issuedDate: new Date().toLocaleDateString("en-US"),
             transactionId: resItem.transactionId || undefined,
-            paymentAmount: paymentAmount || 299,
+            paymentAmount: paymentAmount,
             collegeName: collegeName || undefined,
           }).catch((err) => console.error("Error sending bulk approval invoice email:", err));
         }

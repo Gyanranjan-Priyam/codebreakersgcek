@@ -10,18 +10,20 @@ export const metadata = {
 export default async function AdminTransactionsPage() {
   const result = await getAdminTransactions();
   const transactions = result.data || [];
+  const paymentForms = result.paymentForms || [];
 
   return (
     <div className="container mx-auto px-2 sm:px-4 lg:px-2 py-3 sm:py-6 max-w-8xl">
       <PageHeader
         title="Transactions"
-        description="Manage all form registration payment transactions. View receipts and export data."
+        description="Manage form registration payment transactions. View receipts, verify payments, and export data."
         showBackButton={false}
       />
 
       <div className="mt-6 sm:mt-8">
-        <TransactionsClient initialTransactions={transactions} />
+        <TransactionsClient initialTransactions={transactions} initialPaymentForms={paymentForms} />
       </div>
     </div>
   );
 }
+

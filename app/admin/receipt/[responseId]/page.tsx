@@ -73,7 +73,7 @@ export default async function ReceiptPage({ params }: ReceiptPageProps) {
     collegeName: collegeName || undefined,
     transactionId: response.transactionId || "N/A",
     paymentStatus: response.paymentStatus,
-    paymentAmount: paymentAmount || 299,
+    paymentAmount: paymentAmount,
     submittedAt: response.createdAt.toISOString(),
     verifiedAt: response.verifiedAt ? response.verifiedAt.toISOString() : null,
   };
