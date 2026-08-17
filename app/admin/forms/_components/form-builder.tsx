@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroupItem } from "@/components/ui/radio-group";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -814,15 +814,27 @@ function QuestionCard({
                     ))}
                   </div>
                 ) : field.type === "radio" || field.type === "checkbox" || field.type === "dropdown" ? (
-                  <div className="space-y-1.5">
-                    {(field.options || ["Option 1"]).slice(0, 3).map((opt, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {field.type === "radio" ? <RadioGroupItem value={`opt-${i}`} disabled className="h-3.5 w-3.5" /> : field.type === "checkbox" ? <Checkbox disabled className="h-3.5 w-3.5" /> : <span className="w-3 text-center">{i + 1}.</span>}
-                        <span>{opt}</span>
-                      </div>
-                    ))}
-                    {(field.options?.length || 0) > 3 && <p className="text-xs text-muted-foreground/60 pl-5">+{(field.options?.length || 0) - 3} more</p>}
-                  </div>
+                  field.type === "radio" ? (
+                    <RadioGroup disabled className="space-y-1.5">
+                      {(field.options || ["Option 1"]).slice(0, 3).map((opt, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <RadioGroupItem value={`opt-${i}`} disabled className="h-3.5 w-3.5" />
+                          <span>{opt}</span>
+                        </div>
+                      ))}
+                      {(field.options?.length || 0) > 3 && <p className="text-xs text-muted-foreground/60 pl-5">+{(field.options?.length || 0) - 3} more</p>}
+                    </RadioGroup>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {(field.options || ["Option 1"]).slice(0, 3).map((opt, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {field.type === "checkbox" ? <Checkbox disabled className="h-3.5 w-3.5" /> : <span className="w-3 text-center">{i + 1}.</span>}
+                          <span>{opt}</span>
+                        </div>
+                      ))}
+                      {(field.options?.length || 0) > 3 && <p className="text-xs text-muted-foreground/60 pl-5">+{(field.options?.length || 0) - 3} more</p>}
+                    </div>
+                  )
                 ) : field.type === "linear_scale" ? (
                   <div className="space-y-2 pt-1">
                     <div className="flex flex-wrap items-center gap-2">

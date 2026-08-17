@@ -65,6 +65,16 @@ export function NavUser({
     }
   }
 
+  // Get profile avatar URL - return undefined for missing / default fallback
+  const getValidAvatarUrl = (avatarUrl?: string) => {
+    if (!avatarUrl || avatarUrl === "/default-avatar.png" || avatarUrl === "undefined") {
+      return undefined;
+    }
+    return avatarUrl;
+  };
+
+  const avatarUrl = getValidAvatarUrl(user.avatar);
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -75,7 +85,7 @@ export function NavUser({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarImage src={avatarUrl} alt={user.name} />
                 <AvatarFallback className="rounded-lg">{getInitials(user.name)}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -96,7 +106,7 @@ export function NavUser({
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarImage src={avatarUrl} alt={user.name} />
                   <AvatarFallback className="rounded-lg">{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
