@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { Input } from "@/components/ui/input";
@@ -183,7 +184,7 @@ export function LoginForm() {
               size="sm"
               className="w-full text-xs font-medium rounded-lg shadow-sm"
             >
-              <a href="mailto:admin@codebreakersgcek.com?subject=Member%20Access%20Help%20Request">
+              <a href="mailto:gcek.codebreakers@gmail.com?subject=Member%20Access%20Help%20Request">
                 <Mail className="w-4 h-4 mr-1.5" />
                 If you are a member, contact with admin
               </a>

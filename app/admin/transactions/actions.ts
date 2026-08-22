@@ -187,6 +187,10 @@ export async function resendTransactionReceipt(responseId: string): Promise<{ su
       return { success: false, error: "Response not found." };
     }
 
+    if (!res.transactionId || !res.transactionId.trim()) {
+      return { success: false, error: "Cannot send invoice: this submission does not contain a transaction." };
+    }
+
     const ans = (res.answers as Record<string, unknown>) || {};
     const name = extractName(ans);
     const email = extractEmail(ans);

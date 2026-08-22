@@ -58,7 +58,7 @@ export default function UnauthorizedPage() {
           asChild
           className="w-full h-12 sm:h-14 text-base font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full shadow-sm"
         >
-          <a href="mailto:admin@codebreakersgcek.com?subject=CodeBreakers%20Member%20Access%20Request">
+          <a href="mailto:gcek.codebreakers@gmail.com?subject=CodeBreakers%20Member%20Access%20Request">
             <Mail className="w-5 h-5 mr-2" />
             Contact Administrator
           </a>

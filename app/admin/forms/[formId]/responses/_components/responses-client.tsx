@@ -553,7 +553,7 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
                               <DropdownMenuItem className="cursor-pointer" onClick={() => setViewingResponse(res)}>
                                 <Eye className="mr-2 h-4 w-4" /> View Details
                               </DropdownMenuItem>
-                              {res.paymentStatus === "verified" && (
+                              {res.paymentStatus === "verified" && Boolean(res.transactionId) && (
                                 <DropdownMenuItem className="cursor-pointer"
                                   onClick={() => router.push(`/admin/receipt/${res.id}`)}>
                                   <FileText className="mr-2 h-4 w-4" /> View Receipt

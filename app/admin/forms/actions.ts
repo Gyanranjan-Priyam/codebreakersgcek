@@ -353,7 +353,8 @@ export async function updateFormResponseStatus(responseId: string, paymentStatus
         },
       });
 
-      if (responseDetail) {
+      // ONLY send invoice email if the response contains a transaction ID
+      if (responseDetail && responseDetail.transactionId && responseDetail.transactionId.trim()) {
         const formDef = responseDetail.form.definition as unknown as FormDefinition;
         const answersObj = (responseDetail.answers || {}) as Record<string, unknown>;
 
@@ -395,7 +396,7 @@ export async function updateFormResponseStatus(responseId: string, paymentStatus
             formTitle: responseDetail.form.title || "Form",
             referenceNumber: refNo,
             issuedDate: new Date().toLocaleDateString("en-US"),
-            transactionId: responseDetail.transactionId || undefined,
+            transactionId: responseDetail.transactionId.trim(),
             paymentAmount: paymentAmount,
             collegeName: collegeName || undefined,
           }).catch((err) => console.error("Error sending invoice email on approval:", err));
@@ -439,6 +440,11 @@ export async function updateFormResponsesStatus(responseIds: string[], paymentSt
       });
 
       for (const resItem of responsesToEmail) {
+        // ONLY send invoice email if the response contains a transaction ID
+        if (!resItem.transactionId || !resItem.transactionId.trim()) {
+          continue;
+        }
+
         const formDef = resItem.form.definition as unknown as FormDefinition;
         const answersObj = (resItem.answers || {}) as Record<string, unknown>;
 
@@ -480,7 +486,7 @@ export async function updateFormResponsesStatus(responseIds: string[], paymentSt
             formTitle: resItem.form.title || "Form",
             referenceNumber: refNo,
             issuedDate: new Date().toLocaleDateString("en-US"),
-            transactionId: resItem.transactionId || undefined,
+            transactionId: resItem.transactionId.trim(),
             paymentAmount: paymentAmount,
             collegeName: collegeName || undefined,
           }).catch((err) => console.error("Error sending bulk approval invoice email:", err));
