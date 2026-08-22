@@ -163,6 +163,7 @@ export default async function SessionDetailPage({ params }: PageProps) {
           <MemberAttendanceList 
             members={members} 
             sessionId={session.id}
+            sessionTitle={`Session #${session.sessionNumber}: ${session.title}`}
             initialAttendance={initialAttendance}
             adminId={authSession.user.id}
           />

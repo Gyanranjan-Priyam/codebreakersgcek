@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -1185,7 +1186,7 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
 
       {/* ═══ RESPONSE DETAILS SHEET ═══ */}
       <Sheet open={Boolean(viewingResponse)} onOpenChange={(open) => { if (!open) setViewingResponse(null); }} modal>
-        <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex h-dvh max-h-screen flex-col overflow-hidden">
+        <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl p-0 flex h-dvh max-h-screen flex-col overflow-hidden">
           <div className="shrink-0 border-b bg-background px-6 pt-6 pb-4">
             <SheetHeader>
               <SheetTitle className="text-base font-bold flex items-center justify-between">

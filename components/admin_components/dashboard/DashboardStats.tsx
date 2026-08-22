@@ -64,6 +64,7 @@ interface DashboardStatsProps {
             email: string;
             createdAt: Date;
             emailVerified: boolean;
+            role?: string | null;
         }>;
         recentTickets: Array<{
             id: string;
@@ -259,10 +260,13 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
                                 stats.recentUsers.map((user, index) => (
                                     <div key={index} className="flex items-start justify-between p-3 rounded-lg border bg-muted/30">
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <p className="font-medium text-sm truncate">{user.name}</p>
                                                 {user.emailVerified && (
                                                     <CheckCircle2 className="h-3 w-3 text-green-600 shrink-0" />
+                                                )}
+                                                {user.role === "admin" && (
+                                                    <Badge className="bg-purple-600 text-[10px] px-1.5 py-0 h-4">Admin</Badge>
                                                 )}
                                             </div>
                                             <p className="text-xs text-muted-foreground truncate">{user.email}</p>

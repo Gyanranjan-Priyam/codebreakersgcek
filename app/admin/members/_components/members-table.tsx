@@ -52,12 +52,14 @@ import {
   Loader2,
   Plus,
   User,
+  QrCode,
 } from "lucide-react";
 import { MemberData, toggleMemberBan, deleteMember, deleteMembers, getMemberBySlugId } from "../actions";
 import Link from "next/link";
 import { toast } from "sonner";
 import AddMemberSidebar from "@/app/admin/members/_components/add-member-sidebar";
 import MemberDetails from "@/app/admin/members/[id]/_components/member-details";
+import MemberQRDialog from "@/app/admin/members/_components/member-qr-dialog";
 
 interface MembersTableProps {
   members: MemberData[];
@@ -81,6 +83,8 @@ export default function MembersTable({ members }: MembersTableProps) {
   const [banReason, setBanReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
+  const [qrMember, setQrMember] = useState<MemberData | null>(null);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -104,6 +108,7 @@ export default function MembersTable({ members }: MembersTableProps) {
         member.cbUserId?.toLowerCase().includes(lowercaseQuery) ||
         member.name.toLowerCase().includes(lowercaseQuery) ||
         member.email.toLowerCase().includes(lowercaseQuery) ||
+        member.role?.toLowerCase().includes(lowercaseQuery) ||
         member.username?.toLowerCase().includes(lowercaseQuery) ||
         member.firstName?.toLowerCase().includes(lowercaseQuery) ||
         member.lastName?.toLowerCase().includes(lowercaseQuery) ||
@@ -356,6 +361,7 @@ export default function MembersTable({ members }: MembersTableProps) {
                 <TableHead className="w-16">S.No.</TableHead>
                 <TableHead className="min-w-37.5">Name</TableHead>
                 <TableHead className="min-w-28">User ID</TableHead>
+                <TableHead className="min-w-20">Role</TableHead>
                 <TableHead className="min-w-50">Email</TableHead>
                 <TableHead className="min-w-30">WhatsApp</TableHead>
                 <TableHead className="min-w-25">Branch</TableHead>
@@ -367,7 +373,7 @@ export default function MembersTable({ members }: MembersTableProps) {
             <TableBody>
               {filteredMembers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     {searchQuery ? "No members found matching your search." : "No members registered yet."}
                   </TableCell>
                 </TableRow>
@@ -395,8 +401,15 @@ export default function MembersTable({ members }: MembersTableProps) {
                         )}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm font-mono">
+                    <TableCell className="text-sm font-mono font-medium">
                       {member.cbUserId || <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell>
+                      {member.role === "admin" ? (
+                        <Badge className="bg-purple-600 hover:bg-purple-700 text-white border-none">Admin</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Member</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">{member.email}</TableCell>
                     <TableCell className="text-sm">
@@ -441,6 +454,16 @@ export default function MembersTable({ members }: MembersTableProps) {
                           >
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setQrMember(member);
+                              setShowQrDialog(true);
+                            }}
+                          >
+                            <QrCode className="mr-2 h-4 w-4" />
+                            View QR
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="cursor-pointer"
@@ -667,6 +690,17 @@ export default function MembersTable({ members }: MembersTableProps) {
         isOpen={showAddMemberSidebar}
         onClose={() => setShowAddMemberSidebar(false)}
       />
+
+      {qrMember && (
+        <MemberQRDialog
+          open={showQrDialog}
+          onOpenChange={(open) => {
+            setShowQrDialog(open);
+            if (!open) setQrMember(null);
+          }}
+          member={qrMember}
+        />
+      )}
     </Card>
   );
 }

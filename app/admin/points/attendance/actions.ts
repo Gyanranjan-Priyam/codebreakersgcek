@@ -17,12 +17,14 @@ export interface MemberForAttendance {
   id: string;
   name: string;
   email: string;
+  cbUserId: string | null;
   username: string | null;
   registration: string | null;
   rollNumber: string | null;
   branch: string | null;
   admissionYear: string | null;
   mobileNumber: string | null;
+  role: string | null;
 }
 
 export async function getAllMembers() {
@@ -30,20 +32,18 @@ export async function getAllMembers() {
   
   try {
     const members = await prisma.user.findMany({
-      where: {
-        profileComplete: true,
-        role: { not: "admin" },
-      },
       select: {
         id: true,
         name: true,
         email: true,
+        cbUserId: true,
         username: true,
         registration: true,
         rollNumber: true,
         branch: true,
         admissionYear: true,
         mobileNumber: true,
+        role: true,
       },
       orderBy: {
         name: 'asc',

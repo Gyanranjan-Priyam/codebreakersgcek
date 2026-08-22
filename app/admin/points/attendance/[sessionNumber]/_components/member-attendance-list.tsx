@@ -18,25 +18,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Search, Camera } from "lucide-react";
 import { MemberForAttendance, markAttendance } from "../../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import SessionQRScannerDialog from "./session-qr-scanner-dialog";
 
 interface MemberAttendanceListProps {
   members: MemberForAttendance[];
   sessionId: string;
+  sessionTitle?: string;
   initialAttendance: Record<string, string>;
   adminId: string;
 }
 
-export default function MemberAttendanceList({ members, sessionId, initialAttendance, adminId }: MemberAttendanceListProps) {
+export default function MemberAttendanceList({ members, sessionId, sessionTitle, initialAttendance, adminId }: MemberAttendanceListProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [attendanceStatus, setAttendanceStatus] = useState<Record<string, string>>(initialAttendance);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   const handleAttendanceChange = async (userId: string, status: string) => {
     setUpdatingId(userId);
@@ -99,6 +109,7 @@ export default function MemberAttendanceList({ members, sessionId, initialAttend
         searchQuery === "" ||
         member.name.toLowerCase().includes(searchLower) ||
         member.email.toLowerCase().includes(searchLower) ||
+        member.cbUserId?.toLowerCase().includes(searchLower) ||
         member.username?.toLowerCase().includes(searchLower) ||
         member.registration?.toLowerCase().includes(searchLower) ||
         member.rollNumber?.toLowerCase().includes(searchLower);
@@ -117,19 +128,19 @@ export default function MemberAttendanceList({ members, sessionId, initialAttend
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* Filters and Scanner Button */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, email, username, registration..."
+            placeholder="Search by name, User ID, email, roll..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
         </div>
         <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="w-full sm:w-[150px]">
             <SelectValue placeholder="Admission Year" />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +153,7 @@ export default function MemberAttendanceList({ members, sessionId, initialAttend
           </SelectContent>
         </Select>
         <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="w-full sm:w-[150px]">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
           <SelectContent>
@@ -154,7 +165,29 @@ export default function MemberAttendanceList({ members, sessionId, initialAttend
             ))}
           </SelectContent>
         </Select>
+        <Button
+          onClick={() => setShowScanner(true)}
+          className="gap-2 shrink-0"
+        >
+          <Camera className="h-4 w-4" />
+          Scan Student QR
+        </Button>
       </div>
+
+      {/* Dedicated QR Scanner Dialog */}
+      <SessionQRScannerDialog
+        open={showScanner}
+        onOpenChange={setShowScanner}
+        sessionId={sessionId}
+        sessionTitle={sessionTitle || "Current Session"}
+        onScanSuccess={(user) => {
+          setAttendanceStatus((prev) => ({
+            ...prev,
+            [user.id]: "present",
+          }));
+          router.refresh();
+        }}
+      />
 
       {/* Results count */}
       <div className="text-sm text-muted-foreground">
@@ -170,11 +203,12 @@ export default function MemberAttendanceList({ members, sessionId, initialAttend
           </p>
         </div>
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>User ID</TableHead>
                 <TableHead>Username</TableHead>
                 <TableHead>Registration</TableHead>
                 <TableHead>Roll Number</TableHead>
@@ -189,6 +223,9 @@ export default function MemberAttendanceList({ members, sessionId, initialAttend
               {filteredMembers.map((member) => (
                 <TableRow key={member.id}>
                   <TableCell className="font-medium">{member.name}</TableCell>
+                  <TableCell className="font-mono text-xs font-medium">
+                    {member.cbUserId || <span className="text-muted-foreground">-</span>}
+                  </TableCell>
                   <TableCell>
                     {member.username ? (
                       <Badge variant="outline">@{member.username}</Badge>

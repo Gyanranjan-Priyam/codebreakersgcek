@@ -10,35 +10,45 @@ import {
 import { env } from "@/lib/env";
 import { z } from "zod";
 
-const CB_USER_ID_PREFIX = "CB-";
-const CB_USER_ID_DIGITS = 5;
+const CB_USER_ID_PREFIX = "GCEK-CB-";
 
-function parseCbUserId(value: string | null | undefined) {
-  if (!value) return 0;
-
-  const match = value.match(/^CB-(\d+)$/);
-  if (!match) return 0;
-
-  return Number.parseInt(match[1] ?? "0", 10) || 0;
+export async function generateCbUserId(): Promise<string> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const randomDigits = Math.floor(100000 + Math.random() * 900000).toString();
+    const candidateId = `${CB_USER_ID_PREFIX}${randomDigits}`;
+    const existing = await prisma.user.findUnique({
+      where: { cbUserId: candidateId },
+      select: { id: true },
+    });
+    if (!existing) {
+      return candidateId;
+    }
+  }
+  throw new Error("Failed to generate a unique CB User ID");
 }
 
-async function generateCbUserId() {
-  const latest = await prisma.user.findFirst({
+export async function backfillMissingCbUserIds() {
+  const usersToUpdate = await prisma.user.findMany({
     where: {
-      cbUserId: {
-        startsWith: CB_USER_ID_PREFIX,
-      },
+      OR: [
+        { cbUserId: null },
+        { cbUserId: { not: { startsWith: "GCEK-CB-" } } },
+      ],
     },
-    orderBy: {
-      cbUserId: "desc",
-    },
-    select: {
-      cbUserId: true,
-    },
+    select: { id: true },
   });
 
-  const nextNumber = parseCbUserId(latest?.cbUserId) + 1;
-  return `${CB_USER_ID_PREFIX}${String(nextNumber).padStart(CB_USER_ID_DIGITS, "0")}`;
+  for (const user of usersToUpdate) {
+    try {
+      const newId = await generateCbUserId();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { cbUserId: newId },
+      });
+    } catch (e) {
+      console.error(`Error backfilling cbUserId for user ${user.id}:`, e);
+    }
+  }
 }
 
 export interface MemberData {
@@ -62,6 +72,7 @@ export interface MemberData {
   emailVerified: boolean;
   banned: boolean | null;
   profileComplete: boolean;
+  role: string | null;
 }
 
 const createMemberSchema = z.object({
@@ -78,10 +89,9 @@ export async function getAllMembers() {
   await requireAdmin();
   
   try {
+    await backfillMissingCbUserIds();
+
     const members = await prisma.user.findMany({
-      where: {
-        role: { not: "admin" }, // Exclude admin users
-      },
       select: {
         id: true,
         cbUserId: true,
@@ -103,6 +113,7 @@ export async function getAllMembers() {
         emailVerified: true,
         banned: true,
         profileComplete: true,
+        role: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -512,9 +523,9 @@ export async function getMembersStats() {
   
   try {
     const [totalMembers, verifiedMembers, bannedMembers] = await Promise.all([
-      prisma.user.count({ where: { role: { not: "admin" } } }),
-      prisma.user.count({ where: { emailVerified: true, profileComplete: true, role: { not: "admin" } } }),
-      prisma.user.count({ where: { banned: true, role: { not: "admin" } } }),
+      prisma.user.count(),
+      prisma.user.count({ where: { emailVerified: true, profileComplete: true } }),
+      prisma.user.count({ where: { banned: true } }),
     ]);
 
     return {

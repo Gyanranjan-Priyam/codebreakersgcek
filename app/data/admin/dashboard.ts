@@ -20,13 +20,12 @@ export async function getDashboardStats() {
             bannedUsers,
             newUsersThisMonth,
         ] = await Promise.all([
-            prisma.user.count({ where: { role: { not: "admin" } } }),
-            prisma.user.count({ where: { emailVerified: true, role: { not: "admin" } } }),
-            prisma.user.count({ where: { banned: true, role: { not: "admin" } } }),
+            prisma.user.count(),
+            prisma.user.count({ where: { emailVerified: true } }),
+            prisma.user.count({ where: { banned: true } }),
             prisma.user.count({ 
                 where: { 
-                    createdAt: { gte: monthStart, lte: monthEnd },
-                    role: { not: "admin" }
+                    createdAt: { gte: monthStart, lte: monthEnd }
                 } 
             }),
         ]);
@@ -128,7 +127,6 @@ export async function getDashboardStats() {
 
         // Get recent activities
         const recentUsers = await prisma.user.findMany({
-            where: { role: { not: "admin" } },
             orderBy: { createdAt: 'desc' },
             take: 5,
             select: {
@@ -136,6 +134,7 @@ export async function getDashboardStats() {
                 email: true,
                 createdAt: true,
                 emailVerified: true,
+                role: true,
             }
         });
 

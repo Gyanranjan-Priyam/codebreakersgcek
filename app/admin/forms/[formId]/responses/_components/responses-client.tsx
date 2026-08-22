@@ -588,7 +588,7 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
 
       {/* ─── RESPONSE DETAILS SHEET ─── */}
       <Sheet open={Boolean(viewingResponse)} onOpenChange={(open) => { if (!open) setViewingResponse(null); }}>
-        <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex h-dvh max-h-screen flex-col overflow-hidden">
+        <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl p-0 flex h-dvh max-h-screen flex-col overflow-hidden">
           <div className="shrink-0 border-b bg-background">
             <SheetHeader className="px-6 pt-6 pb-4">
               <SheetTitle className="flex items-center justify-between">
@@ -596,7 +596,7 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
                 {viewingResponse && (
                   <Badge
                     variant={viewingResponse.paymentStatus === "verified" ? "default" : viewingResponse.paymentStatus === "rejected" ? "destructive" : "secondary"}
-                    className="text-xs capitalize"
+                    className="text-xs capitalize mr-12"
                   >
                     {viewingResponse.paymentStatus === "verified" ? "Approved" : viewingResponse.paymentStatus}
                   </Badge>

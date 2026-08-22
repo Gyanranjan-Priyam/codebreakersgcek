@@ -1536,7 +1536,7 @@ export const generateInvoiceDesignHTML = ({
                 </thead>
                 <tbody>
                   <tr style="border-bottom: 1px solid #e7e5e4;">
-                    <td style="padding: 12px; color: #0c0a09;">${formTitle} Registration Fee</td>
+                    <td style="padding: 12px; color: #0c0a09;">${formTitle}</td>
                     <td align="right" style="padding: 12px; color: #44403c;">1</td>
                     <td align="right" style="padding: 12px; color: #44403c;">₹${formattedAmount}</td>
                     <td align="right" style="padding: 12px; font-weight: 600; color: #0c0a09;">₹${formattedAmount}</td>

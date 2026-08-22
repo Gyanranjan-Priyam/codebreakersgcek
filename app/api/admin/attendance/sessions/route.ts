@@ -100,3 +100,43 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user || session.user.role !== "admin") {
+      return NextResponse.json(
+        { error: "Unauthorized. Admin access required." },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    await prisma.attendanceSession.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Attendance session deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting attendance session:", error);
+    return NextResponse.json(
+      { error: "Failed to delete attendance session" },
+      { status: 500 }
+    );
+  }
+}

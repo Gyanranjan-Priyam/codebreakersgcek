@@ -152,7 +152,7 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
                 </thead>
                 <tbody className="divide-y divide-[#E7E5DE]">
                   <tr>
-                    <td className="p-3 font-semibold text-[#0C0A09]">{receipt.formTitle} Registration Fee</td>
+                    <td className="p-3 font-semibold text-[#0C0A09]">{receipt.formTitle}</td>
                     <td className="p-3 text-right text-[#44403C]">1</td>
                     <td className="p-3 text-right text-[#44403C]">₹{formattedAmount}</td>
                     <td className="p-3 text-right font-bold text-[#0C0A09]">₹{formattedAmount}</td>
