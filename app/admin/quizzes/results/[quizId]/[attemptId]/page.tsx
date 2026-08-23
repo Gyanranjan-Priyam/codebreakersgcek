@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +7,121 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, User, Mail, Calendar, CheckCircle2, XCircle, Award, Clock } from "lucide-react";
 import Link from "next/link";
 import { PublishResultButton } from "../_components/publish-result-button";
+import { ExportResultPdfButton } from "../_components/export-result-pdf-button";
+import { ScorecardPDFData } from "@/lib/student-result-pdf";
+
+function findCorrectAnswerIndex(question: any): number {
+  if (!question || !Array.isArray(question.options)) return -1;
+  const options = question.options.map((opt: any) =>
+    opt !== null && opt !== undefined ? String(opt).trim() : ""
+  );
+
+  // 1. Numeric index in correctAnswer or answer
+  if (typeof question.correctAnswer === "number" && question.correctAnswer >= 0 && question.correctAnswer < options.length) {
+    return question.correctAnswer;
+  }
+  if (typeof question.answer === "number" && question.answer >= 0 && question.answer < options.length) {
+    return question.answer;
+  }
+
+  // 2. String target
+  const rawTarget = question.correctAnswer !== undefined && question.correctAnswer !== null ? question.correctAnswer : question.answer;
+  if (rawTarget === undefined || rawTarget === null) return -1;
+  const targetStr = String(rawTarget).trim();
+
+  // 3. Exact text match in options
+  const exactIdx = options.findIndex((opt: string) => opt.toLowerCase() === targetStr.toLowerCase());
+  if (exactIdx !== -1) return exactIdx;
+
+  // 4. Numeric string ("0", "1", "2")
+  const parsedNum = parseInt(targetStr, 10);
+  if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < options.length && String(parsedNum) === targetStr) {
+    return parsedNum;
+  }
+
+  // 5. Letter key ("A", "B", "C", "D")
+  if (targetStr.length === 1) {
+    const letterIdx = targetStr.toUpperCase().charCodeAt(0) - 65;
+    if (letterIdx >= 0 && letterIdx < options.length) {
+      return letterIdx;
+    }
+  }
+
+  return -1;
+}
+
+function parseUserAnswersMap(answersJsonRaw: string | null | undefined): Record<number, any> {
+  const map: Record<number, any> = {};
+  if (!answersJsonRaw) return map;
+
+  try {
+    const parsed = JSON.parse(answersJsonRaw);
+    if (!parsed) return map;
+
+    if (Array.isArray(parsed.answers)) {
+      parsed.answers.forEach((ans: any, idx: number) => {
+        const qIdx = typeof ans.questionIndex === "number" ? ans.questionIndex : idx;
+        const aVal = ans.answerIndex !== undefined ? ans.answerIndex : ans.userAnswer;
+        if (aVal !== undefined && aVal !== null) {
+          map[qIdx] = aVal;
+        }
+      });
+    } else if (typeof parsed.answers === "object" && parsed.answers !== null) {
+      Object.entries(parsed.answers).forEach(([k, v]) => {
+        const qIdx = parseInt(k, 10);
+        if (!isNaN(qIdx) && v !== undefined && v !== null) {
+          map[qIdx] = v;
+        }
+      });
+    } else if (Array.isArray(parsed)) {
+      parsed.forEach((ans: any, idx: number) => {
+        const qIdx = typeof ans.questionIndex === "number" ? ans.questionIndex : idx;
+        const aVal = ans.answerIndex !== undefined ? ans.answerIndex : ans.userAnswer ?? ans;
+        if (aVal !== undefined && aVal !== null) {
+          map[qIdx] = aVal;
+        }
+      });
+    } else if (typeof parsed === "object") {
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (k === "tabSwitches" || k === "submittedAt") return;
+        const qIdx = parseInt(k, 10);
+        if (!isNaN(qIdx) && v !== undefined && v !== null) {
+          map[qIdx] = v;
+        }
+      });
+    }
+  } catch (e) {
+    console.error("Error parsing answersJson:", e);
+  }
+
+  return map;
+}
+
+function resolveUserOptionIndex(rawAnswer: any, options: string[]): number {
+  if (rawAnswer === undefined || rawAnswer === null) return -1;
+
+  if (typeof rawAnswer === "number" && rawAnswer >= 0 && rawAnswer < options.length) {
+    return rawAnswer;
+  }
+
+  const str = String(rawAnswer).trim();
+  const parsedNum = parseInt(str, 10);
+  if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < options.length && String(parsedNum) === str) {
+    return parsedNum;
+  }
+
+  const exactIdx = options.findIndex((opt) => String(opt).trim().toLowerCase() === str.toLowerCase());
+  if (exactIdx !== -1) return exactIdx;
+
+  if (str.length === 1) {
+    const letterIdx = str.toUpperCase().charCodeAt(0) - 65;
+    if (letterIdx >= 0 && letterIdx < options.length) {
+      return letterIdx;
+    }
+  }
+
+  return -1;
+}
 
 export default async function StudentResultDetailPage({
   params,
@@ -41,12 +157,7 @@ export default async function StudentResultDetailPage({
   }
 
   // Parse questions & student answers
-  let answersObj: Record<string, string> = {};
-  try {
-    answersObj = JSON.parse(attempt.answersJson || "{}");
-  } catch (e) {
-    console.error(e);
-  }
+  const userAnswersMap = parseUserAnswersMap(attempt.answersJson);
 
   let questionsData: any = {};
   try {
@@ -56,15 +167,83 @@ export default async function StudentResultDetailPage({
   }
 
   let questionsList: any[] = [];
-  const setLetter = String.fromCharCode(64 + attempt.setNumber);
+  const setLetter = attempt.setNumber && attempt.setNumber >= 1 && attempt.setNumber <= 26
+    ? String.fromCharCode(64 + attempt.setNumber)
+    : "A";
 
-  if (typeof questionsData === "object" && !Array.isArray(questionsData)) {
+  if (typeof questionsData === "object" && !Array.isArray(questionsData) && questionsData !== null) {
     questionsList = questionsData[setLetter] || questionsData["A"] || [];
   } else if (Array.isArray(questionsData)) {
     questionsList = questionsData;
   }
 
-  const isPassed = attempt.score >= 50;
+  let isPassed = attempt.score >= 50;
+  let statusLabel = isPassed ? "QUALIFIED / PASSED" : "FAILED / NOT QUALIFIED";
+
+  const mode = attempt.quiz.cutoffType || "PERCENTAGE";
+  if (mode === "TOP_N") {
+    const allQuizAttempts = await prisma.quizAttempt.findMany({
+      where: { quizId: attempt.quizId },
+      orderBy: [{ score: "desc" }, { pointsEarned: "desc" }, { correctAnswers: "desc" }, { createdAt: "asc" }],
+      select: { id: true },
+    });
+    const rank = allQuizAttempts.findIndex((a) => a.id === attempt.id) + 1;
+    const topCount = attempt.quiz.topSelectCount || 10;
+    isPassed = rank > 0 && rank <= topCount;
+    statusLabel = isPassed ? `QUALIFIED (Rank ${rank})` : `FAILED (Rank ${rank})`;
+  } else if (mode === "MARKS") {
+    const minMarks = attempt.quiz.cutoffMarks ?? 0;
+    isPassed = (attempt.pointsEarned ?? 0) >= minMarks;
+    statusLabel = isPassed ? `QUALIFIED (>= ${minMarks} pts)` : `FAILED (< ${minMarks} pts)`;
+  } else {
+    const minPercentage = attempt.quiz.cutoffMarks ?? 50;
+    isPassed = (attempt.score ?? 0) >= minPercentage;
+    statusLabel = isPassed ? `QUALIFIED (>= ${minPercentage}%)` : `FAILED (< ${minPercentage}%)`;
+  }
+
+  let tabSwitches = 0;
+  try {
+    if (attempt.answersJson) {
+      const parsed = JSON.parse(attempt.answersJson);
+      tabSwitches = parsed.tabSwitches || 0;
+    }
+  } catch {}
+
+  const scorecardQuestions = questionsList.map((q: any, idx: number) => {
+    const options: string[] = Array.isArray(q.options) ? q.options : [];
+    const userOptionIdx = resolveUserOptionIndex(userAnswersMap[idx], options);
+    const correctOptionIdx = findCorrectAnswerIndex(q);
+    const isCorrect = userOptionIdx !== -1 && correctOptionIdx !== -1 && userOptionIdx === correctOptionIdx;
+
+    return {
+      questionIndex: idx,
+      questionText: q.question || `Question ${idx + 1}`,
+      options,
+      userAnswerIndex: userOptionIdx,
+      userAnswerText: userOptionIdx !== -1 ? options[userOptionIdx] : undefined,
+      correctAnswerIndex: correctOptionIdx,
+      correctAnswerText: correctOptionIdx !== -1 ? options[correctOptionIdx] : undefined,
+      isCorrect,
+    };
+  });
+
+  const scorecardPdfData: ScorecardPDFData = {
+    studentName,
+    studentEmail,
+    quizTitle: attempt.quiz.title,
+    quizId: attempt.quiz.quizId,
+    setLetter,
+    score: attempt.score,
+    correctAnswers: attempt.correctAnswers,
+    totalQuestions: attempt.totalQuestions,
+    pointsEarned: attempt.pointsEarned,
+    tabSwitches,
+    submissionDate: attempt.createdAt,
+    isPublished: attempt.isPublished,
+    isPassed,
+    statusLabel,
+    questions: scorecardQuestions,
+  };
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-8 max-w-5xl mx-auto w-full">
@@ -81,16 +260,19 @@ export default async function StudentResultDetailPage({
               Student Result: {studentName}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Detailed performance breakdown & email publication
+              Detailed performance breakdown & scorecard export
             </p>
           </div>
         </div>
 
-        <PublishResultButton
-          attemptId={attempt.id}
-          isPublished={attempt.isPublished}
-          publishedAt={attempt.publishedAt}
-        />
+        <div className="flex items-center gap-2">
+          <ExportResultPdfButton data={scorecardPdfData} />
+          <PublishResultButton
+            attemptId={attempt.id}
+            isPublished={attempt.isPublished}
+            publishedAt={attempt.publishedAt}
+          />
+        </div>
       </div>
 
       {/* Student Details Card */}
@@ -170,15 +352,20 @@ export default async function StudentResultDetailPage({
         </CardHeader>
         <CardContent className="space-y-4">
           {questionsList.map((q: any, idx: number) => {
-            const userAns = (answersObj[q.id.toString()] || "").toString().trim();
-            const correctAns = (q.answer || "").toString().trim();
-            const isCorrect = userAns === correctAns;
+            const options: string[] = Array.isArray(q.options) ? q.options : [];
+            const userOptionIdx = resolveUserOptionIndex(userAnswersMap[idx], options);
+            const correctOptionIdx = findCorrectAnswerIndex(q);
+            const isCorrect = userOptionIdx !== -1 && correctOptionIdx !== -1 && userOptionIdx === correctOptionIdx;
 
             return (
               <Card
                 key={idx}
                 className={`p-5 rounded-2xl border-2 transition-all ${
-                  isCorrect ? "border-emerald-500/30 bg-emerald-500/5" : "border-destructive/30 bg-destructive/5"
+                  userOptionIdx === -1
+                    ? "border-border/60 bg-card/40"
+                    : isCorrect
+                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    : "border-destructive/30 bg-destructive/5"
                 }`}
               >
                 <div className="space-y-3">
@@ -190,17 +377,28 @@ export default async function StudentResultDetailPage({
                       <h4 className="font-semibold text-base">{q.question}</h4>
                     </div>
 
-                    <Badge variant={isCorrect ? "default" : "destructive"} className="text-xs flex items-center gap-1">
-                      {isCorrect ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                      {isCorrect ? "Correct" : "Incorrect"}
-                    </Badge>
+                    {userOptionIdx === -1 ? (
+                      <Badge variant="secondary" className="text-xs flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        Unattempted
+                      </Badge>
+                    ) : isCorrect ? (
+                      <Badge variant="default" className="text-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Correct
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="text-xs flex items-center gap-1">
+                        <XCircle className="h-3.5 w-3.5" />
+                        Incorrect
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 ml-9 pt-2">
-                    {q.options.map((opt: string, optIdx: number) => {
-                      const optStr = opt.toString().trim();
-                      const isUserChoice = optStr === userAns;
-                      const isRightOption = optStr === correctAns;
+                    {options.map((opt: string, optIdx: number) => {
+                      const isUserChoice = userOptionIdx === optIdx;
+                      const isRightOption = correctOptionIdx === optIdx;
 
                       let style = "border-border/60 bg-card/40 text-muted-foreground";
                       if (isRightOption) {
@@ -210,17 +408,27 @@ export default async function StudentResultDetailPage({
                       }
 
                       return (
-                        <div key={optIdx} className={`p-3 rounded-xl border text-sm flex items-center justify-between ${style}`}>
+                        <div key={optIdx} className={`p-3 rounded-xl border text-sm flex items-center justify-between transition-colors ${style}`}>
                           <div className="flex items-center gap-2">
-                            <Badge variant={isRightOption ? "default" : "outline"} className="text-xs h-5 px-1.5">
+                            <Badge
+                              variant={isRightOption ? "default" : isUserChoice ? "destructive" : "outline"}
+                              className="text-xs h-5 px-1.5 font-mono"
+                            >
                               {String.fromCharCode(65 + optIdx)}
                             </Badge>
-                            <span>{opt}</span>
+                            <span className={isRightOption || isUserChoice ? "text-foreground font-semibold" : ""}>
+                              {opt}
+                            </span>
                           </div>
 
                           {isUserChoice && (
-                            <Badge variant="secondary" className="text-xs">
-                              Student Answer
+                            <Badge variant={isRightOption ? "default" : "destructive"} className="text-xs">
+                              {isRightOption ? "Student Choice (Correct)" : "Student Choice"}
+                            </Badge>
+                          )}
+                          {!isUserChoice && isRightOption && (
+                            <Badge variant="outline" className="text-xs border-emerald-500 text-emerald-400">
+                              Correct Key
                             </Badge>
                           )}
                         </div>

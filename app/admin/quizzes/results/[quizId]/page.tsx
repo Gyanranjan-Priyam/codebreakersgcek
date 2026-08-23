@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { PublishResultButton } from "./_components/publish-result-button";
 import { PublishAllResultsButton } from "./_components/publish-all-results-button";
+import { ExportExcelButton } from "./_components/export-excel-button";
 export default async function QuizResultsPage({ params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
   const result = await getQuizByQuizId(quizId);
@@ -60,6 +61,95 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
   });
 
   const userMap = new Map(users.map(u => [u.id, u]));
+
+  // Calculate top-to-bottom rankings (Rank 1, 2, 3...)
+  const sortedAttempts = [...attempts].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.pointsEarned !== a.pointsEarned) return b.pointsEarned - a.pointsEarned;
+    if (b.correctAnswers !== a.correctAnswers) return b.correctAnswers - a.correctAnswers;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+
+  const rankMap = new Map<string, number>();
+  sortedAttempts.forEach((att, idx) => {
+    rankMap.set(att.id, idx + 1);
+  });
+
+  // Evaluate candidate qualification status based on quiz cutoff settings
+  const evaluateAttemptQualification = (attempt: { id: string; score: number; pointsEarned: number }) => {
+    const rank = rankMap.get(attempt.id) || 1;
+    const mode = quiz.cutoffType || "PERCENTAGE";
+
+    if (mode === "TOP_N") {
+      const topCount = quiz.topSelectCount || 10;
+      const isTop = rank <= topCount;
+      return {
+        isQualified: isTop,
+        statusText: isTop ? "Qualified (Top N)" : "Failed",
+        statusLabel: isTop ? `QUALIFIED (Top ${topCount})` : `FAILED (Below Top ${topCount})`,
+        variant: isTop ? "default" as const : "destructive" as const,
+        rank,
+      };
+    }
+
+    if (mode === "MARKS") {
+      const minMarks = quiz.cutoffMarks !== null && quiz.cutoffMarks !== undefined ? quiz.cutoffMarks : 0;
+      const isPassed = (attempt.pointsEarned ?? 0) >= minMarks;
+      return {
+        isQualified: isPassed,
+        statusText: isPassed ? "Qualified" : "Failed",
+        statusLabel: isPassed ? `QUALIFIED (>= ${minMarks} pts)` : `FAILED (< ${minMarks} pts)`,
+        variant: isPassed ? "default" as const : "destructive" as const,
+        rank,
+      };
+    }
+
+    // Default: PERCENTAGE
+    const minPercentage = quiz.cutoffMarks !== null && quiz.cutoffMarks !== undefined ? quiz.cutoffMarks : 50;
+    const isPassed = (attempt.score ?? 0) >= minPercentage;
+    return {
+      isQualified: isPassed,
+      statusText: isPassed ? "Qualified" : "Failed",
+      statusLabel: isPassed ? `QUALIFIED (>= ${minPercentage}%)` : `FAILED (< ${minPercentage}%)`,
+      variant: isPassed ? "default" as const : "destructive" as const,
+      rank,
+    };
+  };
+
+  // Map attempts to formatted list for export with rankings
+  const rankedAttemptsData = attempts.map((attempt) => {
+    const user = userMap.get(attempt.userId);
+    const setLetter = attempt.setNumber && attempt.setNumber >= 1 && attempt.setNumber <= 26
+      ? String.fromCharCode(64 + attempt.setNumber)
+      : "A";
+
+    let tabSwitches = 0;
+    try {
+      if (attempt.answersJson) {
+        const parsed = JSON.parse(attempt.answersJson);
+        tabSwitches = parsed.tabSwitches || 0;
+      }
+    } catch {}
+
+    const qual = evaluateAttemptQualification(attempt);
+
+    return {
+      id: attempt.id,
+      participantName: attempt.participantName || user?.name || "Unknown User",
+      participantEmail: attempt.participantEmail || user?.email || "N/A",
+      setLetter,
+      score: attempt.score,
+      correctAnswers: attempt.correctAnswers,
+      totalQuestions: attempt.totalQuestions,
+      pointsEarned: attempt.pointsEarned,
+      status: attempt.completedAt ? "Completed" : "In Progress",
+      tabSwitches,
+      createdAt: attempt.createdAt,
+      isPublished: attempt.isPublished,
+      isQualified: qual.isQualified,
+      resultStatus: qual.statusLabel,
+    };
+  });
 
   // Fetch set assignments
   const setAssignments = await prisma.quizSetAssignment.findMany({
@@ -108,6 +198,8 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
     ? attempts.reduce((sum, a) => sum + a.correctAnswers, 0) / totalAttempts
     : 0;
 
+  const totalQuestions = attempts[0]?.totalQuestions || 0;
+
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       <div className="flex items-center gap-4">
@@ -124,11 +216,20 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
             {quiz.title} ({quiz.quizId})
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href={`/admin/quizzes/${quiz.quizId}`}>
-            View Quiz Details
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {attempts.length > 0 && (
+            <ExportExcelButton
+              quizTitle={quiz.title}
+              quizId={quiz.quizId}
+              attempts={rankedAttemptsData}
+            />
+          )}
+          <Button variant="outline" asChild>
+            <Link href={`/admin/quizzes/${quiz.quizId}`}>
+              View Quiz Details
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -148,33 +249,40 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Average Score</CardDescription>
-            <CardTitle className="text-3xl">{averageScore.toFixed(1)}%</CardTitle>
+            <CardTitle className="text-3xl">
+              {averageScore.toFixed(1)}%
+            </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Average Correct Answers</CardDescription>
-            <CardTitle className="text-3xl">{averageCorrect.toFixed(1)}</CardTitle>
+            <CardDescription>Avg Correct Answers</CardDescription>
+            <CardTitle className="text-3xl">
+              {averageCorrect.toFixed(1)} {totalQuestions > 0 ? `/ ${totalQuestions}` : ""}
+            </CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      {/* Set Assignments Distribution */}
-      {setAssignments.length > 0 && (
+      {/* Set Distribution */}
+      {Object.keys(setDistribution).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Set Distribution</CardTitle>
             <CardDescription>
-              Randomly assigned sets to {setAssignments.length} participant{setAssignments.length !== 1 ? 's' : ''}
+              Number of students assigned to each question set
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-              {Object.entries(setDistribution).sort().map(([set, count]) => (
-                <div key={set} className="p-4 border rounded-lg text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+              {Object.entries(setDistribution).map(([set, count]) => (
+                <div
+                  key={set}
+                  className="flex flex-col items-center justify-center p-4 border rounded-lg bg-card"
+                >
                   <div className="text-2xl font-bold">Set {set}</div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    {count} user{count !== 1 ? 's' : ''}
+                    {count} {count === 1 ? 'student' : 'students'}
                   </div>
                 </div>
               ))}
@@ -246,12 +354,22 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
           <div>
-            <CardTitle>All Attempts</CardTitle>
+            <CardTitle>All Attempts ({attempts.length})</CardTitle>
             <CardDescription>
-              Detailed results for all quiz attempts
+              Detailed results and rankings for all quiz attempts
             </CardDescription>
           </div>
-          {attempts.length > 0 && <PublishAllResultsButton quizId={quiz.id} />}
+          {attempts.length > 0 && (
+            <div className="flex items-center gap-2">
+              <ExportExcelButton
+                quizTitle={quiz.title}
+                quizId={quiz.quizId}
+                attempts={rankedAttemptsData}
+                variant="outline"
+              />
+              <PublishAllResultsButton quizId={quiz.id} />
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {attempts.length === 0 ? (
@@ -263,24 +381,33 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-16">Rank</TableHead>
                     <TableHead>Participant</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Set</TableHead>
                     <TableHead>Score</TableHead>
                     <TableHead>Correct Answers</TableHead>
-                    <TableHead>Total Questions</TableHead>
-                    <TableHead>Points Earned</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Points</TableHead>
+                    <TableHead>Qualification</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attempts.map((attempt) => {
+                  {sortedAttempts.map((attempt) => {
                     const user = userMap.get(attempt.userId);
-                    const setLetter = String.fromCharCode(64 + attempt.setNumber);
+                    const setLetter = attempt.setNumber && attempt.setNumber >= 1 && attempt.setNumber <= 26
+                      ? String.fromCharCode(64 + attempt.setNumber)
+                      : "A";
+                    const qual = evaluateAttemptQualification(attempt);
+
                     return (
                       <TableRow key={attempt.id}>
+                        <TableCell className="font-bold text-center">
+                          <Badge variant="outline" className="font-mono text-xs">
+                            #{qual.rank}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="font-medium">
                           {attempt.participantName || user?.name || "Unknown User"}
                         </TableCell>
@@ -298,13 +425,12 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                         <TableCell>
                           {attempt.correctAnswers} / {attempt.totalQuestions}
                         </TableCell>
-                        <TableCell>{attempt.totalQuestions}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{attempt.pointsEarned} pts</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={attempt.completedAt ? "default" : "secondary"}>
-                            {attempt.completedAt ? "Completed" : "In Progress"}
+                          <Badge variant={qual.variant}>
+                            {qual.statusText}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">

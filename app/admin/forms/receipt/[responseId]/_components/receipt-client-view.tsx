@@ -2,7 +2,13 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, CheckCircle2, Download, ShieldCheck } from "lucide-react";
+import {
+  Printer,
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  ShieldCheck,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface ReceiptClientViewProps {
@@ -31,8 +37,16 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
 
   const formattedAmount = (receipt.paymentAmount || 0).toFixed(2);
   const issuedDateStr = receipt.verifiedAt
-    ? new Date(receipt.verifiedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    : new Date(receipt.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    ? new Date(receipt.verifiedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : new Date(receipt.submittedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -40,8 +54,12 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
       <div className="print:hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-4 rounded-2xl border border-border/60 shadow-xs">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-sm font-bold text-foreground">Official Payment Receipt</h1>
-            <p className="text-xs text-muted-foreground">Invoice Reference: {receipt.referenceNumber}</p>
+            <h1 className="text-sm font-bold text-foreground">
+              Official Payment Receipt
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Invoice Reference: {receipt.referenceNumber}
+            </p>
           </div>
         </div>
 
@@ -70,8 +88,10 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
 
       {/* Main Invoice Paper Canvas */}
       <div className="bg-stone-100 dark:bg-stone-900 p-4 sm:p-8 rounded-3xl border border-border/40 shadow-inner flex justify-center print:bg-transparent print:p-0 print:border-none print:shadow-none print:rounded-none">
-        <article id="printable-receipt-card" className="w-full max-w-[760px] bg-[#FAF9F5] text-[#0C0A09] rounded-2xl border border-[#E7E5DE] p-8 sm:p-12 font-mono shadow-xl relative overflow-hidden print:shadow-none print:border-none print:w-full print:max-w-none print:p-6 print:m-0">
-          
+        <article
+          id="printable-receipt-card"
+          className="w-full max-w-[760px] bg-[#FAF9F5] text-[#0C0A09] rounded-2xl border border-[#E7E5DE] p-8 sm:p-12 font-mono shadow-xl relative overflow-hidden print:shadow-none print:border-none print:w-full print:max-w-none print:p-6 print:m-0"
+        >
           {/* Verified Watermark Stamp */}
           <div className="absolute top-8 right-8 sm:top-12 sm:right-12 opacity-10 pointer-events-none select-none rotate-[-12deg]">
             <div className="border-4 border-[#16A34A] text-[#16A34A] rounded-xl px-4 py-2 text-3xl font-black uppercase tracking-widest flex items-center gap-2">
@@ -94,13 +114,19 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
                   />
                 </div>
                 <div>
-                  <h3 className="font-sans font-bold text-base text-[#0C0A09] leading-tight">CodeBreakers</h3>
-                  <p className="text-[11px] text-[#57534E] font-sans">GCEK Bhawanipatna</p>
+                  <h3 className="font-sans font-bold text-base text-[#0C0A09] leading-tight">
+                    CodeBreakers
+                  </h3>
+                  <p className="text-[11px] text-[#57534E] font-sans">
+                    GCEK Bhawanipatna
+                  </p>
                 </div>
               </div>
 
               <div className="text-right">
-                <h2 className="text-2xl sm:text-3xl font-bold uppercase tracking-widest text-[#0C0A09]">INVOICE</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold uppercase tracking-widest text-[#0C0A09]">
+                  INVOICE
+                </h2>
                 <span className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-[#16A34A] bg-[#16A34A]/10 px-2.5 py-0.5 rounded-full font-sans">
                   <CheckCircle2 className="h-3.5 w-3.5" /> PAID & APPROVED
                 </span>
@@ -110,12 +136,36 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
             {/* Invoice Meta Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs leading-relaxed text-[#44403C] pt-2">
               <div>
-                <p><span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">Reference Number</span> <strong className="text-[#0C0A09]">{receipt.referenceNumber}</strong></p>
-                <p className="mt-1"><span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">Date Issued</span> {issuedDateStr}</p>
+                <p>
+                  <span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">
+                    Reference Number
+                  </span>{" "}
+                  <strong className="text-[#0C0A09]">
+                    {receipt.referenceNumber}
+                  </strong>
+                </p>
+                <p className="mt-1">
+                  <span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">
+                    Date Issued
+                  </span>{" "}
+                  {issuedDateStr}
+                </p>
               </div>
               <div className="sm:text-right">
-                <p><span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">Payment Method</span> UPI</p>
-                <p className="mt-1"><span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">Transaction ID</span> <span className="font-semibold text-[#0C0A09] font-mono">{receipt.transactionId}</span></p>
+                <p>
+                  <span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">
+                    Payment Method
+                  </span>{" "}
+                  UPI
+                </p>
+                <p className="mt-1">
+                  <span className="text-[#78716C] uppercase text-[10px] font-bold tracking-wider block">
+                    Transaction ID
+                  </span>{" "}
+                  <span className="font-semibold text-[#0C0A09] font-mono">
+                    {receipt.transactionId}
+                  </span>
+                </p>
               </div>
             </div>
           </header>
@@ -123,7 +173,9 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
           {/* Addresses Section */}
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-8 py-8 border-b border-[#E7E5DE] text-xs leading-relaxed">
             <div>
-              <p className="font-bold uppercase tracking-wider text-[10px] text-[#78716C] mb-2 font-sans">FROM</p>
+              <p className="font-bold uppercase tracking-wider text-[10px] text-[#78716C] mb-2 font-sans">
+                FROM
+              </p>
               <p className="font-bold text-[#0C0A09]">CodeBreakers</p>
               <p>Government College of Engineering Kalahandi</p>
               <p>Bhawanipatna, Odisha 766002</p>
@@ -131,10 +183,16 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
             </div>
 
             <div className="sm:text-right">
-              <p className="font-bold uppercase tracking-wider text-[10px] text-[#78716C] mb-2 font-sans">BILL TO</p>
-              <p className="font-bold text-[#0C0A09]">{receipt.recipientName}</p>
+              <p className="font-bold uppercase tracking-wider text-[10px] text-[#78716C] mb-2 font-sans">
+                BILL TO
+              </p>
+              <p className="font-bold text-[#0C0A09]">
+                {receipt.recipientName}
+              </p>
               <p className="text-[#44403C]">{receipt.recipientEmail}</p>
-              {receipt.collegeName && <p className="text-[#44403C]">{receipt.collegeName}</p>}
+              {receipt.collegeName && (
+                <p className="text-[#44403C]">{receipt.collegeName}</p>
+              )}
             </div>
           </section>
 
@@ -152,10 +210,16 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
                 </thead>
                 <tbody className="divide-y divide-[#E7E5DE]">
                   <tr>
-                    <td className="p-3 font-semibold text-[#0C0A09]">{receipt.formTitle}</td>
+                    <td className="p-3 font-semibold text-[#0C0A09]">
+                      {receipt.formTitle}
+                    </td>
                     <td className="p-3 text-right text-[#44403C]">1</td>
-                    <td className="p-3 text-right text-[#44403C]">₹{formattedAmount}</td>
-                    <td className="p-3 text-right font-bold text-[#0C0A09]">₹{formattedAmount}</td>
+                    <td className="p-3 text-right text-[#44403C]">
+                      ₹{formattedAmount}
+                    </td>
+                    <td className="p-3 text-right font-bold text-[#0C0A09]">
+                      ₹{formattedAmount}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -164,8 +228,18 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
             {/* Calculations & Totals */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-6">
               <div className="text-xs text-[#78716C] space-y-1">
-                <p>Form ID: <span className="font-mono text-[#0C0A09]">{receipt.formId}</span></p>
-                <p>Status: <span className="text-[#16A34A] font-semibold">Payment Verified & Certificate Issued</span></p>
+                <p>
+                  Form ID:{" "}
+                  <span className="font-mono text-[#0C0A09]">
+                    {receipt.formId}
+                  </span>
+                </p>
+                <p>
+                  Status:{" "}
+                  <span className="text-[#16A34A] font-semibold">
+                    Payment Verified & Certificate Issued
+                  </span>
+                </p>
               </div>
 
               <div className="space-y-2 text-xs">
@@ -188,12 +262,14 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
           {/* Footer */}
           <footer className="pt-8 border-t border-[#E7E5DE] text-[11px] text-[#78716C] flex flex-col sm:flex-row justify-between gap-4">
             <div>
-              <p>gcek.codebreakers@gmail.com</p>
+              <p>codebreakersgcekalahandi@gmail.com</p>
               <p>CodeBreakers • GCEK Bhawanipatna</p>
             </div>
             <div className="sm:text-right">
               <p>Prepared for prompt processing.</p>
-              <p className="font-semibold text-[#0C0A09]">Issued by CodeBreakers Team</p>
+              <p className="font-semibold text-[#0C0A09]">
+                Issued by CodeBreakers Team
+              </p>
             </div>
           </footer>
         </article>
@@ -206,7 +282,8 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
             size: A4 portrait;
             margin: 10mm;
           }
-          html, body {
+          html,
+          body {
             background: white !important;
             color: black !important;
             margin: 0 !important;
@@ -237,9 +314,9 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
             max-width: 100% !important;
             margin: 0 auto !important;
             padding: 24px !important;
-            background: #FAF9F5 !important;
-            color: #0C0A09 !important;
-            border: 1px solid #E7E5DE !important;
+            background: #faf9f5 !important;
+            color: #0c0a09 !important;
+            border: 1px solid #e7e5de !important;
             box-shadow: none !important;
             page-break-inside: avoid !important;
           }

@@ -1,3 +1,5 @@
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { prisma } from "@/lib/db";
@@ -133,6 +135,9 @@ export async function createQuiz(data: {
   accessCode?: string | null;
   formId?: string | null;
   feedbackFormId?: string | null;
+  cutoffMarks?: number | null;
+  cutoffType?: string | null;
+  topSelectCount?: number | null;
 }) {
   await requireAdmin();
   
@@ -181,6 +186,7 @@ export async function createQuiz(data: {
       };
     }
 
+    // Check if quizId already exists
     const existingQuiz = await prisma.quiz.findUnique({
       where: { quizId: data.quizId },
     });
@@ -208,6 +214,9 @@ export async function createQuiz(data: {
         accessCode: data.accessCode || null,
         formId: data.formId || null,
         feedbackFormId: data.feedbackFormId || null,
+        cutoffMarks: data.cutoffMarks !== undefined && data.cutoffMarks !== null ? data.cutoffMarks : 50,
+        cutoffType: data.cutoffType || "PERCENTAGE",
+        topSelectCount: data.topSelectCount || null,
       },
     });
 
@@ -243,6 +252,9 @@ export async function updateQuiz(
     accessCode?: string | null;
     formId?: string | null;
     feedbackFormId?: string | null;
+    cutoffMarks?: number | null;
+    cutoffType?: string | null;
+    topSelectCount?: number | null;
   }
 ) {
   await requireAdmin();
@@ -307,6 +319,9 @@ export async function updateQuiz(
         accessCode: data.accessCode,
         formId: data.formId,
         feedbackFormId: data.feedbackFormId,
+        cutoffMarks: data.cutoffMarks !== undefined && data.cutoffMarks !== null ? data.cutoffMarks : 50,
+        cutoffType: data.cutoffType || "PERCENTAGE",
+        topSelectCount: data.topSelectCount || null,
       },
     });
 
@@ -1001,6 +1016,9 @@ export async function publishStudentResult(attemptId: string) {
           select: {
             title: true,
             questionsJson: true,
+            cutoffType: true,
+            cutoffMarks: true,
+            topSelectCount: true,
           },
         },
       },
@@ -1028,6 +1046,42 @@ export async function publishStudentResult(attemptId: string) {
       return { status: "error" as const, message: "Student email address not found" };
     }
 
+    // Helper to find correct answer index across multiple data types
+    const findCorrectAnswerIndex = (question: any): number => {
+      if (!question || !Array.isArray(question.options)) return -1;
+      const options = question.options.map((opt: any) =>
+        opt !== null && opt !== undefined ? String(opt).trim() : ""
+      );
+
+      if (typeof question.correctAnswer === "number" && question.correctAnswer >= 0 && question.correctAnswer < options.length) {
+        return question.correctAnswer;
+      }
+      if (typeof question.answer === "number" && question.answer >= 0 && question.answer < options.length) {
+        return question.answer;
+      }
+
+      const rawTarget = question.correctAnswer !== undefined && question.correctAnswer !== null ? question.correctAnswer : question.answer;
+      if (rawTarget === undefined || rawTarget === null) return -1;
+      const targetStr = String(rawTarget).trim();
+
+      const exactIdx = options.findIndex((opt: string) => opt.toLowerCase() === targetStr.toLowerCase());
+      if (exactIdx !== -1) return exactIdx;
+
+      const parsedNum = parseInt(targetStr, 10);
+      if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < options.length && String(parsedNum) === targetStr) {
+        return parsedNum;
+      }
+
+      if (targetStr.length === 1) {
+        const letterIdx = targetStr.toUpperCase().charCodeAt(0) - 65;
+        if (letterIdx >= 0 && letterIdx < options.length) {
+          return letterIdx;
+        }
+      }
+
+      return -1;
+    };
+
     // Build answers breakdown
     let answersBreakdown: Array<{
       question: string;
@@ -1041,40 +1095,97 @@ export async function publishStudentResult(attemptId: string) {
       const allQuestions = JSON.parse(attempt.quiz.questionsJson || "{}");
 
       let questionsList: any[] = [];
-      const setLetter = String.fromCharCode(64 + attempt.setNumber);
+      const setLetter = attempt.setNumber && attempt.setNumber >= 1 && attempt.setNumber <= 26
+        ? String.fromCharCode(64 + attempt.setNumber)
+        : "A";
 
-      if (typeof allQuestions === "object" && !Array.isArray(allQuestions)) {
+      if (typeof allQuestions === "object" && !Array.isArray(allQuestions) && allQuestions !== null) {
         questionsList = allQuestions[setLetter] || allQuestions["A"] || [];
       } else if (Array.isArray(allQuestions)) {
         questionsList = allQuestions;
       }
 
-      let userAnswersObj: Record<string, string> = {};
-      
-      // Handle internal format: { answers: [{ questionIndex, answerIndex }] }
-      if (parsedAnswers && parsedAnswers.answers && Array.isArray(parsedAnswers.answers)) {
-        parsedAnswers.answers.forEach((ans: any) => {
-          const q = questionsList[ans.questionIndex];
-          if (q && q.options && typeof ans.answerIndex === 'number') {
-            userAnswersObj[q.id.toString()] = q.options[ans.answerIndex] || "";
-          }
-        });
-      } else {
-        // Handle external format: { "qId": "Answer String" }
-        userAnswersObj = parsedAnswers;
+      let userAnswersMap: Record<number, any> = {};
+      if (parsedAnswers) {
+        if (Array.isArray(parsedAnswers.answers)) {
+          parsedAnswers.answers.forEach((ans: any, idx: number) => {
+            const qIdx = typeof ans.questionIndex === "number" ? ans.questionIndex : idx;
+            const aVal = ans.answerIndex !== undefined ? ans.answerIndex : ans.userAnswer;
+            if (aVal !== undefined && aVal !== null) userAnswersMap[qIdx] = aVal;
+          });
+        } else if (typeof parsedAnswers.answers === "object" && parsedAnswers.answers !== null) {
+          Object.entries(parsedAnswers.answers).forEach(([k, v]) => {
+            const qIdx = parseInt(k, 10);
+            if (!isNaN(qIdx) && v !== undefined && v !== null) userAnswersMap[qIdx] = v;
+          });
+        } else if (typeof parsedAnswers === "object") {
+          Object.entries(parsedAnswers).forEach(([k, v]) => {
+            if (k === "tabSwitches" || k === "submittedAt") return;
+            const qIdx = parseInt(k, 10);
+            if (!isNaN(qIdx) && v !== undefined && v !== null) userAnswersMap[qIdx] = v;
+          });
+        }
       }
 
-      answersBreakdown = questionsList.map((q: any) => {
-        const uAns = userAnswersObj[q.id.toString()] || "";
+      answersBreakdown = questionsList.map((q: any, idx: number) => {
+        const options: string[] = Array.isArray(q.options) ? q.options : [];
+        const rawAns = userAnswersMap[idx];
+
+        let uOptIdx = -1;
+        if (typeof rawAns === "number" && rawAns >= 0 && rawAns < options.length) {
+          uOptIdx = rawAns;
+        } else if (rawAns !== undefined && rawAns !== null) {
+          const str = String(rawAns).trim();
+          const parsedNum = parseInt(str, 10);
+          if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < options.length && String(parsedNum) === str) {
+            uOptIdx = parsedNum;
+          } else {
+            uOptIdx = options.findIndex((opt) => String(opt).trim().toLowerCase() === str.toLowerCase());
+            if (uOptIdx === -1 && str.length === 1) {
+              const letterIdx = str.toUpperCase().charCodeAt(0) - 65;
+              if (letterIdx >= 0 && letterIdx < options.length) uOptIdx = letterIdx;
+            }
+          }
+        }
+
+        const correctOptIdx = findCorrectAnswerIndex(q);
+        const uAnsText = uOptIdx !== -1 && options[uOptIdx] ? options[uOptIdx] : "Unanswered";
+        const cAnsText = correctOptIdx !== -1 && options[correctOptIdx] ? options[correctOptIdx] : (q.answer || "N/A");
+        const isCorrect = uOptIdx !== -1 && correctOptIdx !== -1 && uOptIdx === correctOptIdx;
+
         return {
           question: q.question,
-          userAnswer: uAns,
-          correctAnswer: q.answer,
-          isCorrect: uAns.toString().trim() === q.answer.toString().trim(),
+          userAnswer: uAnsText,
+          correctAnswer: cAnsText,
+          isCorrect,
         };
       });
     } catch (parseErr) {
       console.error("Error parsing answers for breakdown:", parseErr);
+    }
+
+    let isPassed = attempt.score >= 50;
+    let statusLabel = isPassed ? "QUALIFIED / PASSED" : "FAILED / NOT QUALIFIED";
+
+    const mode = attempt.quiz.cutoffType || "PERCENTAGE";
+    if (mode === "TOP_N") {
+      const allQuizAttempts = await prisma.quizAttempt.findMany({
+        where: { quizId: attempt.quizId },
+        orderBy: [{ score: "desc" }, { pointsEarned: "desc" }, { correctAnswers: "desc" }, { createdAt: "asc" }],
+        select: { id: true },
+      });
+      const rank = allQuizAttempts.findIndex((a) => a.id === attempt.id) + 1;
+      const topCount = attempt.quiz.topSelectCount || 10;
+      isPassed = rank > 0 && rank <= topCount;
+      statusLabel = isPassed ? `QUALIFIED (Rank ${rank})` : `FAILED (Rank ${rank})`;
+    } else if (mode === "MARKS") {
+      const minMarks = attempt.quiz.cutoffMarks ?? 0;
+      isPassed = (attempt.pointsEarned ?? 0) >= minMarks;
+      statusLabel = isPassed ? `QUALIFIED (>= ${minMarks} pts)` : `FAILED (< ${minMarks} pts)`;
+    } else {
+      const minPercentage = attempt.quiz.cutoffMarks ?? 50;
+      isPassed = (attempt.score ?? 0) >= minPercentage;
+      statusLabel = isPassed ? `QUALIFIED (>= ${minPercentage}%)` : `FAILED (< ${minPercentage}%)`;
     }
 
     const emailResult = await sendQuizResultEmail({
@@ -1085,6 +1196,8 @@ export async function publishStudentResult(attemptId: string) {
       totalQuestions: attempt.totalQuestions,
       correctAnswers: attempt.correctAnswers,
       pointsEarned: attempt.pointsEarned,
+      isPassed,
+      statusLabel,
       answersBreakdown,
     });
 

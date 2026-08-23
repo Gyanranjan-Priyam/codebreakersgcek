@@ -3,35 +3,270 @@ import { env } from "./env";
 import { type JSONContent } from "@tiptap/react";
 import { generateInvoicePDF } from "./invoice-generator";
 
-// Create a transporter using Gmail SMTP
-export const mailer = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: env.GMAIL_USER,
-    pass: env.GMAIL_APP_PASSWORD,
+import { prisma } from "./db";
+
+// 1. Primary SMTP Transporter
+const primaryTransporter = nodemailer.createTransport(
+  env.SMTP_PRIMARY_HOST
+    ? {
+        host: env.SMTP_PRIMARY_HOST,
+        port: parseInt(env.SMTP_PRIMARY_PORT || "587", 10),
+        secure: env.SMTP_PRIMARY_PORT === "465",
+        auth: {
+          user: env.GMAIL_USER,
+          pass: env.GMAIL_APP_PASSWORD,
+        },
+      }
+    : {
+        service: "gmail",
+        auth: {
+          user: env.GMAIL_USER,
+          pass: env.GMAIL_APP_PASSWORD,
+        },
+      },
+);
+
+// 2. Backup / Secondary SMTP Transporter (if configured)
+const backupUser =
+  process.env.BACKUP_GMAIL_USER || process.env.SMTP_BACKUP_USER;
+const backupPass =
+  process.env.BACKUP_GMAIL_APP_PASSWORD || process.env.SMTP_BACKUP_PASS;
+const hasBackupSmtp = Boolean(backupUser && backupPass);
+
+const backupTransporter = hasBackupSmtp
+  ? nodemailer.createTransport(
+      process.env.SMTP_BACKUP_HOST
+        ? {
+            host: process.env.SMTP_BACKUP_HOST,
+            port: parseInt(process.env.SMTP_BACKUP_PORT || "587", 10),
+            secure: process.env.SMTP_BACKUP_PORT === "465",
+            auth: {
+              user: backupUser,
+              pass: backupPass,
+            },
+          }
+        : {
+            service: "gmail",
+            auth: {
+              user: backupUser,
+              pass: backupPass,
+            },
+          },
+    )
+  : primaryTransporter;
+
+// Daily email quota (Default 100 emails/day on primary before switching)
+const DAILY_LIMIT = parseInt(process.env.DAILY_EMAIL_LIMIT || "100", 10);
+
+// In-memory cache for fast tracking
+let cachedDateKey = "";
+let cachedPrimaryCount = 0;
+let cachedBackupCount = 0;
+
+function getTodayDateKey(): string {
+  const now = new Date();
+  return now.toISOString().slice(0, 10);
+}
+
+async function getUsageForToday(): Promise<{
+  primarySent: number;
+  backupSent: number;
+}> {
+  const dateKey = getTodayDateKey();
+
+  // If date changed, reset in-memory counts automatically (Daily Refresh)
+  if (cachedDateKey !== dateKey) {
+    cachedDateKey = dateKey;
+    try {
+      const record = await prisma.smtpUsageTracker.findUnique({
+        where: { dateKey },
+      });
+      if (record) {
+        cachedPrimaryCount = record.primarySent;
+        cachedBackupCount = record.backupSent;
+      } else {
+        cachedPrimaryCount = 0;
+        cachedBackupCount = 0;
+      }
+    } catch {
+      cachedPrimaryCount = 0;
+      cachedBackupCount = 0;
+    }
+  }
+
+  return { primarySent: cachedPrimaryCount, backupSent: cachedBackupCount };
+}
+
+async function incrementUsage(provider: "PRIMARY" | "BACKUP") {
+  const dateKey = getTodayDateKey();
+  if (provider === "PRIMARY") {
+    cachedPrimaryCount++;
+  } else {
+    cachedBackupCount++;
+  }
+
+  // Persist to database asynchronously
+  try {
+    await prisma.smtpUsageTracker.upsert({
+      where: { dateKey },
+      create: {
+        dateKey,
+        primarySent: provider === "PRIMARY" ? 1 : 0,
+        backupSent: provider === "BACKUP" ? 1 : 0,
+        activeSmtp:
+          cachedPrimaryCount >= DAILY_LIMIT && hasBackupSmtp
+            ? "BACKUP"
+            : "PRIMARY",
+      },
+      update: {
+        primarySent: provider === "PRIMARY" ? { increment: 1 } : undefined,
+        backupSent: provider === "BACKUP" ? { increment: 1 } : undefined,
+        activeSmtp:
+          cachedPrimaryCount >= DAILY_LIMIT && hasBackupSmtp
+            ? "BACKUP"
+            : "PRIMARY",
+      },
+    });
+  } catch (err) {
+    console.error("[Mailer] Error recording SMTP usage in database:", err);
+  }
+}
+
+function getFromAddress(
+  provider: "PRIMARY" | "BACKUP",
+  customFrom?: any,
+): string {
+  if (customFrom && typeof customFrom === "string") return customFrom;
+  if (provider === "BACKUP" && hasBackupSmtp) {
+    const fromName =
+      process.env.BACKUP_GMAIL_FROM_NAME ||
+      process.env.BACKUP_SMTP_FROM_NAME ||
+      env.GMAIL_FROM_NAME ||
+      "CodeBreakers Club";
+    return `"${fromName}" <${backupUser}>`;
+  }
+  const fromName = env.GMAIL_FROM_NAME || "CodeBreakers Club";
+  return `"${fromName}" <${env.GMAIL_USER}>`;
+}
+
+// Failover sendMail implementation
+async function sendMailWithFailover(
+  mailOptions: nodemailer.SendMailOptions,
+): Promise<nodemailer.SentMessageInfo> {
+  const { primarySent } = await getUsageForToday();
+  const shouldSwitchToBackup = hasBackupSmtp && primarySent >= DAILY_LIMIT;
+
+  if (shouldSwitchToBackup) {
+    console.log(
+      `[Mailer] 🔄 Primary SMTP reached daily limit (${primarySent}/${DAILY_LIMIT}). Routing email to Backup SMTP.`,
+    );
+    try {
+      const optionsWithFrom = {
+        ...mailOptions,
+        from: mailOptions.from || getFromAddress("BACKUP", mailOptions.from),
+      };
+      const info = await backupTransporter.sendMail(optionsWithFrom);
+      await incrementUsage("BACKUP");
+      return info;
+    } catch (backupError) {
+      console.warn(
+        "[Mailer] ⚠️ Backup SMTP failed, falling back to Primary SMTP:",
+        backupError,
+      );
+      const optionsWithFrom = {
+        ...mailOptions,
+        from: mailOptions.from || getFromAddress("PRIMARY", mailOptions.from),
+      };
+      const info = await primaryTransporter.sendMail(optionsWithFrom);
+      await incrementUsage("PRIMARY");
+      return info;
+    }
+  } else {
+    try {
+      const optionsWithFrom = {
+        ...mailOptions,
+        from: mailOptions.from || getFromAddress("PRIMARY", mailOptions.from),
+      };
+      const info = await primaryTransporter.sendMail(optionsWithFrom);
+      await incrementUsage("PRIMARY");
+      return info;
+    } catch (primaryError: any) {
+      console.warn(
+        `[Mailer] ⚠️ Primary SMTP failed (${primaryError?.message || primaryError}). Attempting Backup SMTP failover...`,
+      );
+      if (hasBackupSmtp) {
+        const optionsWithFrom = {
+          ...mailOptions,
+          from: mailOptions.from || getFromAddress("BACKUP", mailOptions.from),
+        };
+        const info = await backupTransporter.sendMail(optionsWithFrom);
+        await incrementUsage("BACKUP");
+        return info;
+      }
+      throw primaryError;
+    }
+  }
+}
+
+// Export mailer interface with failover and status inspection
+export const mailer = {
+  sendMail: sendMailWithFailover,
+  primary: primaryTransporter,
+  backup: backupTransporter,
+  getUsageStatus: async () => {
+    const { primarySent, backupSent } = await getUsageForToday();
+    const dateKey = getTodayDateKey();
+    return {
+      dateKey,
+      primarySent,
+      backupSent,
+      dailyLimit: DAILY_LIMIT,
+      activeSmtp:
+        primarySent >= DAILY_LIMIT && hasBackupSmtp ? "BACKUP" : "PRIMARY",
+      hasBackupConfigured: hasBackupSmtp,
+      primaryAccount: env.GMAIL_USER,
+      backupAccount: hasBackupSmtp ? backupUser : null,
+    };
   },
-});
+};
+
+export async function getSmtpUsageStatus() {
+  return mailer.getUsageStatus();
+}
 
 // Convert TipTap JSON content to HTML for emails
 const convertTipTapJSONToHTML = (content: JSONContent): string => {
-  if (!content) return '';
+  if (!content) return "";
 
-  let html = '';
+  let html = "";
 
   switch (content.type) {
-    case 'doc':
-      html = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "doc":
+      html =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       break;
 
-    case 'paragraph':
-      const paragraphContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "paragraph":
+      const paragraphContent =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       const textAlign = content.attrs?.textAlign;
-      const style = textAlign ? ` style="text-align: ${textAlign}; margin: 12px 0;"` : ' style="margin: 12px 0;"';
-      html = paragraphContent ? `<p${style}>${paragraphContent}</p>` : `<p${style}></p>`;
+      const style = textAlign
+        ? ` style="text-align: ${textAlign}; margin: 12px 0;"`
+        : ' style="margin: 12px 0;"';
+      html = paragraphContent
+        ? `<p${style}>${paragraphContent}</p>`
+        : `<p${style}></p>`;
       break;
 
-    case 'heading':
-      const headingContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "heading":
+      const headingContent =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       const level = content.attrs?.level || 1;
       const headingTextAlign = content.attrs?.textAlign;
       const headingStyle = headingTextAlign
@@ -40,41 +275,50 @@ const convertTipTapJSONToHTML = (content: JSONContent): string => {
       html = `<h${level}${headingStyle}>${headingContent}</h${level}>`;
       break;
 
-    case 'bulletList':
-      const bulletItems = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "bulletList":
+      const bulletItems =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       html = `<ul style="margin: 16px 0; padding-left: 24px;">${bulletItems}</ul>`;
       break;
 
-    case 'orderedList':
-      const orderedItems = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "orderedList":
+      const orderedItems =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       html = `<ol style="margin: 16px 0; padding-left: 24px;">${orderedItems}</ol>`;
       break;
 
-    case 'listItem':
-      const listItemContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "listItem":
+      const listItemContent =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       html = `<li style="margin: 4px 0;">${listItemContent}</li>`;
       break;
 
-    case 'text':
-      let textContent = content.text || '';
+    case "text":
+      let textContent = content.text || "";
 
       // Apply marks (formatting)
       if (content.marks) {
-        content.marks.forEach(mark => {
+        content.marks.forEach((mark) => {
           switch (mark.type) {
-            case 'bold':
+            case "bold":
               textContent = `<strong>${textContent}</strong>`;
               break;
-            case 'italic':
+            case "italic":
               textContent = `<em>${textContent}</em>`;
               break;
-            case 'code':
+            case "code":
               textContent = `<code style="background-color: #f3f4f6; padding: 2px 4px; border-radius: 4px; font-family: monospace;">${textContent}</code>`;
               break;
-            case 'strike':
+            case "strike":
               textContent = `<s>${textContent}</s>`;
               break;
-            case 'underline':
+            case "underline":
               textContent = `<u>${textContent}</u>`;
               break;
           }
@@ -84,24 +328,32 @@ const convertTipTapJSONToHTML = (content: JSONContent): string => {
       html = textContent;
       break;
 
-    case 'hardBreak':
-      html = '<br>';
+    case "hardBreak":
+      html = "<br>";
       break;
 
-    case 'codeBlock':
-      const codeContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "codeBlock":
+      const codeContent =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       html = `<pre style="background-color: #f3f4f6; padding: 12px; border-radius: 6px; overflow-x: auto; font-family: monospace; margin: 16px 0;"><code>${codeContent}</code></pre>`;
       break;
 
-    case 'blockquote':
-      const quoteContent = content.content?.map(node => convertTipTapJSONToHTML(node)).join('') || '';
+    case "blockquote":
+      const quoteContent =
+        content.content
+          ?.map((node) => convertTipTapJSONToHTML(node))
+          .join("") || "";
       html = `<blockquote style="border-left: 4px solid #e5e7eb; padding-left: 16px; margin: 16px 0; font-style: italic; color: #6b7280;">${quoteContent}</blockquote>`;
       break;
 
     default:
       // For unknown types, try to render content if it exists
       if (content.content) {
-        html = content.content.map(node => convertTipTapJSONToHTML(node)).join('');
+        html = content.content
+          .map((node) => convertTipTapJSONToHTML(node))
+          .join("");
       } else if (content.text) {
         html = content.text;
       }
@@ -275,15 +527,17 @@ export const sendVerificationEmail = async ({
     const html = generateVerificationEmailHTML(otp);
 
     const info = await mailer.sendMail({
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
-      subject: 'Verify your email address',
+      subject: "Verify your email address",
       html,
     });
 
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error("Failed to send email:", error);
     throw error;
   }
 };
@@ -357,7 +611,9 @@ export const sendMemberInvitationEmail = async ({
     });
 
     const info = await mailer.sendMail({
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject: "Congratulation!!! You're invited to join CodeBreakers",
       html,
@@ -365,7 +621,7 @@ export const sendMemberInvitationEmail = async ({
 
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Failed to send member invitation email:', error);
+    console.error("Failed to send member invitation email:", error);
     throw error;
   }
 };
@@ -479,12 +735,16 @@ const generateConfirmationEmailHTML = ({
                     <td style="padding: 8px 0; font-weight: 600; color: #374151;">Mobile:</td>
                     <td style="padding: 8px 0; color: #111827;">${registrationDetails.mobileNumber}</td>
                   </tr>
-                  ${registrationDetails.whatsappNumber ? `
+                  ${
+                    registrationDetails.whatsappNumber
+                      ? `
                   <tr>
                     <td style="padding: 8px 0; font-weight: 600; color: #374151;">WhatsApp:</td>
                     <td style="padding: 8px 0; color: #111827;">${registrationDetails.whatsappNumber}</td>
                   </tr>
-                  ` : ''}
+                  `
+                      : ""
+                  }
                   <tr>
                     <td style="padding: 8px 0; font-weight: 600; color: #374151;">College:</td>
                     <td style="padding: 8px 0; color: #111827;">${registrationDetails.collegeName}</td>
@@ -524,7 +784,7 @@ const generateConfirmationEmailHTML = ({
               <p style="margin: 0 0 10px; font-size: 14px; color: #666666;">Need help? Contact us at 
                 <a href="mailto:${env.GMAIL_USER}" style="color: #10b981; text-decoration: none;">${env.GMAIL_USER}</a>
               </p>
-              <p style="margin: 0; font-size: 12px; color: #999999;">© 2025 ${env.GMAIL_FROM_NAME || 'Event Management Platform'}. All rights reserved.</p>
+              <p style="margin: 0; font-size: 12px; color: #999999;">© 2025 ${env.GMAIL_FROM_NAME || "Event Management Platform"}. All rights reserved.</p>
             </td>
           </tr>
         </table>
@@ -555,7 +815,7 @@ export const sendConfirmationEmailWithAttachment = async ({
   eventVenue,
   registrationDetails,
   attachmentBuffer,
-  attachmentFilename
+  attachmentFilename,
 }: {
   to: string;
   participantName: string;
@@ -584,7 +844,9 @@ export const sendConfirmationEmailWithAttachment = async ({
     });
 
     const mailOptions: any = {
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject: `🎉 Registration Confirmed - ${eventTitle}`,
       html,
@@ -596,8 +858,8 @@ export const sendConfirmationEmailWithAttachment = async ({
         {
           filename: attachmentFilename,
           content: attachmentBuffer,
-          contentType: 'application/pdf'
-        }
+          contentType: "application/pdf",
+        },
       ];
     }
 
@@ -605,7 +867,7 @@ export const sendConfirmationEmailWithAttachment = async ({
 
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Failed to send confirmation email with attachment:', error);
+    console.error("Failed to send confirmation email with attachment:", error);
     throw error;
   }
 };
@@ -644,7 +906,9 @@ export const sendConfirmationEmail = async ({
     });
 
     const info = await mailer.sendMail({
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject: `🎉 Registration Confirmed - ${eventTitle}`,
       html,
@@ -652,7 +916,7 @@ export const sendConfirmationEmail = async ({
 
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Failed to send confirmation email:', error);
+    console.error("Failed to send confirmation email:", error);
     throw error;
   }
 };
@@ -676,22 +940,23 @@ const generateAnnouncementEmailHTML = ({
   priority: string;
   publishDate: string;
   expiryDate?: string;
-  relatedEvent?: { title: string; date: string; };
+  relatedEvent?: { title: string; date: string };
   hasAttachments: boolean;
   hasImages: boolean;
   isUpdate?: boolean;
 }) => {
   // Convert description to HTML if it's JSON content, otherwise use as string
-  const descriptionHTML = typeof description === 'string'
-    ? description
-    : convertTipTapJSONToHTML(description);
+  const descriptionHTML =
+    typeof description === "string"
+      ? description
+      : convertTipTapJSONToHTML(description);
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${isUpdate ? 'Updated Announcement' : 'New Announcement'} - ${title}</title>
+    <title>${isUpdate ? "Updated Announcement" : "New Announcement"} - ${title}</title>
     <style>
         * {
             margin: 0;
@@ -892,19 +1157,23 @@ const generateAnnouncementEmailHTML = ({
     <div class="container">
         <div class="header">
             <img src="https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png" alt="CodeBreakers Logo" class="announcement-icon" />
-            <h1>CodeBreakers ${isUpdate ? '- 🔁 Updated Announcement' : '- 🔈 New Announcement'}</h1>
+            <h1>CodeBreakers ${isUpdate ? "- 🔁 Updated Announcement" : "- 🔈 New Announcement"}</h1>
             <div class="badges">
-                <span class="badge ${priority.toLowerCase() === 'urgent' ? 'urgent' : priority.toLowerCase() === 'important' ? 'important' : ''}">${priority} Priority</span>
-                <span class="badge">${category.replace('_', ' ')}</span>
+                <span class="badge ${priority.toLowerCase() === "urgent" ? "urgent" : priority.toLowerCase() === "important" ? "important" : ""}">${priority} Priority</span>
+                <span class="badge">${category.replace("_", " ")}</span>
             </div>
         </div>
         
         <div class="content">
-            ${isUpdate ? `
+            ${
+              isUpdate
+                ? `
             <div class="update-notice">
                 <p>🔄 This announcement has been updated. Please review the changes below.</p>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
             
             <h2>${title}</h2>
             
@@ -912,13 +1181,19 @@ const generateAnnouncementEmailHTML = ({
                 ${descriptionHTML}
             </div>
             
-            ${hasAttachments || hasImages ? `
+            ${
+              hasAttachments || hasImages
+                ? `
             <div class="attachment-notice">
-                <p>📎 ${hasAttachments ? 'Files and documents' : ''}${hasAttachments && hasImages ? ' and ' : ''}${hasImages ? 'images' : ''} are attached to this announcement.</p>
+                <p>📎 ${hasAttachments ? "Files and documents" : ""}${hasAttachments && hasImages ? " and " : ""}${hasImages ? "images" : ""} are attached to this announcement.</p>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
             
-            ${relatedEvent ? `
+            ${
+              relatedEvent
+                ? `
             <div class="info-section">
                 <h3>🎯 Related Event</h3>
                 <div class="info-row">
@@ -930,7 +1205,9 @@ const generateAnnouncementEmailHTML = ({
                     <span class="info-value">${relatedEvent.date}</span>
                 </div>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
             
             <div class="info-section" style="margin-top: 32px;">
                 <h3>📅 Announcement Details</h3>
@@ -938,15 +1215,19 @@ const generateAnnouncementEmailHTML = ({
                     <span class="info-label">Published:</span>
                     <span class="info-value">${publishDate}</span>
                 </div>
-                ${expiryDate ? `
+                ${
+                  expiryDate
+                    ? `
                 <div class="info-row">
                     <span class="info-label">Expires:</span>
                     <span class="info-value">${expiryDate}</span>
                 </div>
-                ` : ''}
+                `
+                    : ""
+                }
                 <div class="info-row">
                     <span class="info-label">Category:</span>
-                    <span class="info-value">${category.replace('_', ' ')}</span>
+                    <span class="info-value">${category.replace("_", " ")}</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Priority:</span>
@@ -992,7 +1273,7 @@ export const sendAnnouncementNotification = async ({
   priority: string;
   publishDate: string;
   expiryDate?: string;
-  relatedEvent?: { title: string; date: string; };
+  relatedEvent?: { title: string; date: string };
   attachments?: Array<{
     filename: string;
     content: Buffer;
@@ -1009,15 +1290,25 @@ export const sendAnnouncementNotification = async ({
       publishDate,
       expiryDate,
       relatedEvent,
-      hasAttachments: attachments ? attachments.some(att => !att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) : false,
-      hasImages: attachments ? attachments.some(att => att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) : false,
+      hasAttachments: attachments
+        ? attachments.some(
+            (att) => !att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i),
+          )
+        : false,
+      hasImages: attachments
+        ? attachments.some((att) =>
+            att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i),
+          )
+        : false,
       isUpdate,
     });
 
     const mailOptions: any = {
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       bcc: recipients, // Use BCC to protect recipient privacy
-      subject: `${isUpdate ? '🔄 UPDATED' : '📢'} ${priority === 'URGENT' ? '🚨 URGENT: ' : priority === 'IMPORTANT' ? '⚠️ IMPORTANT: ' : ''}${title}`,
+      subject: `${isUpdate ? "🔄 UPDATED" : "📢"} ${priority === "URGENT" ? "🚨 URGENT: " : priority === "IMPORTANT" ? "⚠️ IMPORTANT: " : ""}${title}`,
       html,
     };
 
@@ -1028,9 +1319,13 @@ export const sendAnnouncementNotification = async ({
 
     const info = await mailer.sendMail(mailOptions);
 
-    return { success: true, messageId: info.messageId, recipientCount: recipients.length };
+    return {
+      success: true,
+      messageId: info.messageId,
+      recipientCount: recipients.length,
+    };
   } catch (error) {
-    console.error('Failed to send announcement notification:', error);
+    console.error("Failed to send announcement notification:", error);
     throw error;
   }
 };
@@ -1053,7 +1348,9 @@ export const sendEmail = async ({
 }) => {
   try {
     const mailOptions: any = {
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject,
       html,
@@ -1068,7 +1365,7 @@ export const sendEmail = async ({
 
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error("Failed to send email:", error);
     throw error;
   }
 };
@@ -1207,7 +1504,7 @@ const generatePaymentConfirmationEmailHTML = ({
               <p style="margin: 0 0 10px; font-size: 14px; color: #666666;">Need help? Contact us at 
                 <a href="mailto:${env.GMAIL_USER}" style="color: #059669; text-decoration: none;">${env.GMAIL_USER}</a>
               </p>
-              <p style="margin: 0; font-size: 12px; color: #999999;">© 2025 ${env.GMAIL_FROM_NAME || 'CodeBreakers 2025, GCEK'}. All rights reserved.</p>
+              <p style="margin: 0; font-size: 12px; color: #999999;">© 2025 ${env.GMAIL_FROM_NAME || "CodeBreakers 2025, GCEK"}. All rights reserved.</p>
             </td>
           </tr>
         </table>
@@ -1240,7 +1537,7 @@ export const sendPaymentConfirmationEmail = async ({
   paymentAmount,
   registrationDetails,
   invoiceBuffer,
-  invoiceFilename
+  invoiceFilename,
 }: {
   to: string;
   participantName: string;
@@ -1273,7 +1570,9 @@ export const sendPaymentConfirmationEmail = async ({
     });
 
     const mailOptions = {
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject: `💰 Payment Confirmed - ${eventTitle} | Invoice #${invoiceNumber}`,
       html,
@@ -1281,16 +1580,16 @@ export const sendPaymentConfirmationEmail = async ({
         {
           filename: invoiceFilename,
           content: invoiceBuffer,
-          contentType: 'application/pdf'
-        }
-      ]
+          contentType: "application/pdf",
+        },
+      ],
     };
 
     const info = await mailer.sendMail(mailOptions);
 
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Failed to send payment confirmation email:', error);
+    console.error("Failed to send payment confirmation email:", error);
     throw error;
   }
 };
@@ -1353,7 +1652,9 @@ export const sendWelcomeEmail = async ({
     });
 
     const info = await mailer.sendMail({
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject: "Welcome to CodeBreakers 👋",
       html,
@@ -1390,7 +1691,9 @@ export const sendFormSubmissionEmail = async ({
     });
 
     const info = await mailer.sendMail({
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject: `Submission Received: ${formName || "Form"}`,
       html,
@@ -1424,7 +1727,8 @@ export const generateInvoiceDesignHTML = ({
   collegeName?: string;
 }) => {
   const formattedAmount = (paymentAmount || 0).toFixed(2);
-  const logoUrl = "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png";
+  const logoUrl =
+    "https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1449,7 +1753,7 @@ export const generateInvoiceDesignHTML = ({
                 <tr>
                   <td>
                     <p style="margin: 0;"><strong>Reference ID:</strong> ${referenceNumber}</p>
-                    ${transactionId ? `<p style="margin: 4px 0 0 0;"><strong>Transaction ID:</strong> ${transactionId}</p>` : ''}
+                    ${transactionId ? `<p style="margin: 4px 0 0 0;"><strong>Transaction ID:</strong> ${transactionId}</p>` : ""}
                     <p style="margin: 4px 0 0 0;"><strong>Amount Paid:</strong> ₹${formattedAmount}</p>
                   </td>
                 </tr>
@@ -1515,7 +1819,7 @@ export const generateInvoiceDesignHTML = ({
                     <p style="margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; color: #0c0a09; letter-spacing: 0.05em;">BILL TO</p>
                     <p style="margin: 0; font-weight: 600; color: #0c0a09;">${recipientName}</p>
                     <p style="margin: 0;">${recipientEmail}</p>
-                    ${collegeName ? `<p style="margin: 0;">${collegeName}</p>` : ''}
+                    ${collegeName ? `<p style="margin: 0;">${collegeName}</p>` : ""}
                   </td>
                 </tr>
               </table>
@@ -1579,7 +1883,7 @@ export const generateInvoiceDesignHTML = ({
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
                   <td align="left" valign="top">
-                    <p style="margin: 0;">gcek.codebreakers@gmail.com</p>
+                    <p style="margin: 0;">codebreakersgcekalahandi@gmail.com</p>
                     <p style="margin: 0;">CodeBreakers • GCEK Bhawanipatna</p>
                   </td>
                   <td align="right" valign="top">
@@ -1632,7 +1936,9 @@ export const sendFormResponseInvoiceEmail = async ({
     });
 
     const mailOptions = {
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
       subject: `🎉 Registration Approved & Official Receipt - ${formTitle} | ${referenceNumber}`,
       html,
@@ -1655,6 +1961,8 @@ const generateQuizResultHTML = ({
   totalQuestions,
   correctAnswers,
   pointsEarned,
+  isPassed,
+  statusLabel,
   answersBreakdown,
 }: {
   recipientName: string;
@@ -1663,6 +1971,8 @@ const generateQuizResultHTML = ({
   totalQuestions: number;
   correctAnswers: number;
   pointsEarned: number;
+  isPassed?: boolean;
+  statusLabel?: string;
   answersBreakdown: Array<{
     question: string;
     userAnswer: string;
@@ -1671,7 +1981,8 @@ const generateQuizResultHTML = ({
   }>;
 }) => {
   const percentage = score;
-  const isPassed = percentage >= 50;
+  const passed = isPassed !== undefined ? isPassed : percentage >= 50;
+  const label = statusLabel || (passed ? "QUALIFIED / PASSED" : "FAILED / NOT QUALIFIED");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1725,7 +2036,7 @@ const generateQuizResultHTML = ({
                 </tr>
                 <tr>
                   <td style="padding:10px 0;font-size:11px;color:#867F73;border-top:1px solid #F0EEE9;">Result Status</td>
-                  <td style="padding:10px 0;font-size:12px;font-weight:700;color:${isPassed ? '#256D45' : '#B23A2F'};border-top:1px solid #F0EEE9;">${isPassed ? 'PASS' : 'NOT CLEARED'}</td>
+                  <td style="padding:10px 0;font-size:12px;font-weight:700;color:${passed ? "#256D45" : "#B23A2F"};border-top:1px solid #F0EEE9;">${label}</td>
                 </tr>
               </table>
             </td>
@@ -1754,31 +2065,8 @@ const generateQuizResultHTML = ({
                 </tr>
                 <tr>
                   <td style="padding:12px 14px;font-size:12px;font-weight:700;color:#262523;border-top:1px solid #262523;border-right:1px solid #E3DFD6;">Final Percentage</td>
-                  <td align="right" style="padding:12px 14px;font-size:14px;font-weight:800;color:${isPassed ? '#256D45' : '#B23A2F'};border-top:1px solid #262523;">${percentage.toFixed(1)}%</td>
+                  <td align="right" style="padding:12px 14px;font-size:14px;font-weight:800;color:${passed ? "#256D45" : "#B23A2F"};border-top:1px solid #262523;">${percentage.toFixed(1)}%</td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Question breakdown -->
-          <tr>
-            <td style="padding:28px 40px 8px 40px;">
-              <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#867F73;margin-bottom:10px;">Question-wise Breakdown</div>
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #E3DFD6;">
-                <tr style="background:#FAF9F6;">
-                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:6%;border-right:1px solid #E3DFD6;">#</td>
-                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:44%;border-right:1px solid #E3DFD6;">Question</td>
-                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:25%;border-right:1px solid #E3DFD6;">Your Answer</td>
-                  <td style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:#4A4742;width:25%;">Correct Answer</td>
-                </tr>
-                ${answersBreakdown.map((item, idx) => `
-                <tr>
-                  <td style="padding:10px 12px;font-size:11px;color:#4A4742;border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;vertical-align:top;">${idx + 1}</td>
-                  <td style="padding:10px 12px;font-size:11px;color:#262523;border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;vertical-align:top;">${item.question}</td>
-                  <td style="padding:10px 12px;font-size:11px;font-weight:600;color:${item.isCorrect ? '#256D45' : '#B23A2F'};border-top:1px solid #E3DFD6;border-right:1px solid #E3DFD6;vertical-align:top;">${item.userAnswer || 'Not answered'}</td>
-                  <td style="padding:10px 12px;font-size:11px;font-weight:600;color:#262523;border-top:1px solid #E3DFD6;vertical-align:top;">${item.isCorrect ? '—' : item.correctAnswer}</td>
-                </tr>
-                `).join('')}
               </table>
             </td>
           </tr>
@@ -1816,6 +2104,8 @@ export const sendQuizResultEmail = async ({
   totalQuestions = 0,
   correctAnswers = 0,
   pointsEarned = 0,
+  isPassed,
+  statusLabel,
   answersBreakdown = [],
 }: {
   to: string;
@@ -1825,6 +2115,8 @@ export const sendQuizResultEmail = async ({
   totalQuestions?: number;
   correctAnswers?: number;
   pointsEarned?: number;
+  isPassed?: boolean;
+  statusLabel?: string;
   answersBreakdown?: Array<{
     question: string;
     userAnswer: string;
@@ -1840,13 +2132,18 @@ export const sendQuizResultEmail = async ({
       totalQuestions,
       correctAnswers,
       pointsEarned,
+      isPassed,
+      statusLabel,
       answersBreakdown,
     });
 
+    const passed = isPassed !== undefined ? isPassed : score >= 50;
     const mailOptions = {
-      from: env.GMAIL_FROM_NAME ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>` : env.GMAIL_USER,
+      from: env.GMAIL_FROM_NAME
+        ? `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER}>`
+        : env.GMAIL_USER,
       to,
-      subject: `🏆 Your Quiz Results - ${quizTitle} (${score.toFixed(1)}%)`,
+      subject: `${passed ? "🏆" : "📋"} Your Quiz Results - ${quizTitle} (${score.toFixed(1)}%)`,
       html,
     };
 

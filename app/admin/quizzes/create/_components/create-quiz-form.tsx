@@ -67,6 +67,9 @@ const formSchema = z.object({
   sets: z.number().min(1).max(8),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   pointsPerQuestion: z.number().min(0.01, "Points must be greater than 0"),
+  cutoffMarks: z.number().min(0).optional(),
+  cutoffType: z.enum(["PERCENTAGE", "MARKS", "TOP_N"]).optional(),
+  topSelectCount: z.number().min(1).optional(),
   startDateTime: z.date(),
   endDateTime: z.date(),
   questionsJson: z.string().optional(),
@@ -107,6 +110,9 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
       sets: 1,
       duration: 30,
       pointsPerQuestion: 1,
+      cutoffMarks: 50,
+      cutoffType: "PERCENTAGE",
+      topSelectCount: 10,
       startDateTime: new Date(),
       endDateTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       questionsJson: "",
@@ -173,6 +179,9 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
       sets: data.sets,
       duration: data.duration,
       pointsPerQuestion: data.pointsPerQuestion,
+      cutoffMarks: data.cutoffMarks,
+      cutoffType: data.cutoffType,
+      topSelectCount: data.topSelectCount,
       startDateTime: data.startDateTime,
       endDateTime: data.endDateTime,
       questionsJson,
@@ -194,7 +203,6 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-4xl mx-auto w-full">
-        {/* Audience display banner */}
         <div className="flex items-center justify-between gap-4 p-4 border rounded-xl bg-muted/40">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
@@ -218,33 +226,61 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
             className="cursor-pointer shrink-0"
           >
             <Eye className="h-4 w-4 mr-1.5" />
-            Preview Quiz
+            Preview Questions ({totalQuestions})
           </Button>
         </div>
 
-        {/* External-only config */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="title"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quiz Title *</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="e.g. CodeHunt Season 3 Preliminary" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="quizId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quiz ID</FormLabel>
+                <FormControl>
+                  <Input {...field} readOnly className="font-mono bg-muted/50 text-xs" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         {watchAudience === "EXTERNAL" && (
-          <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
-            <div className="flex items-center gap-2 text-sm font-medium">
+          <div className="p-4 border border-blue-500/20 bg-blue-500/5 rounded-xl space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400">
               <Key className="h-4 w-4" />
-              External Configuration
+              <span>External Kiosk Settings</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="accessCode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>6-Digit Access Code</FormLabel>
+                    <FormLabel>Access Code</FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
-                        <Input {...field} maxLength={6} className="font-mono text-lg tracking-widest text-center" />
+                        <Input {...field} className="font-mono text-center tracking-widest text-lg font-bold" />
                       </FormControl>
-                      <Button type="button" variant="outline" size="icon" onClick={() => form.setValue("accessCode", generate6DigitCode())}>
+                      <Button type="button" variant="outline" size="icon" onClick={() => form.setValue("accessCode", generate6DigitCode())} title="Regenerate">
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                     </div>
-                    <FormDescription className="text-xs">Kiosks enter this to register</FormDescription>
+                    <FormDescription className="text-xs">Required to register kiosk laptops</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -254,23 +290,17 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                 name="formId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5" /> Registration Form (Optional)
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select form..." />
-                        </SelectTrigger>
-                      </FormControl>
+                    <FormLabel>Link Registration Form</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || "none"}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="none">None (manual entry)</SelectItem>
-                        {forms.map((f) => (
-                          <SelectItem key={f.id} value={f.formId}>{f.title}</SelectItem>
+                        <SelectItem value="none">None (Direct Registration)</SelectItem>
+                        {forms.map(f => (
+                          <SelectItem key={f.id} value={f.formId}>{f.title} ({f.formId})</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-xs">Use response IDs to auto-assign participants</FormDescription>
+                    <FormDescription className="text-xs">Auto-fills candidate details from responses</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -279,24 +309,18 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                 control={form.control}
                 name="feedbackFormId"
                 render={({ field }) => (
-                  <FormItem className="col-span-1 sm:col-span-2">
-                    <FormLabel className="flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5 text-primary" /> Feedback Form (Optional)
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select feedback form..." />
-                        </SelectTrigger>
-                      </FormControl>
+                  <FormItem>
+                    <FormLabel>Feedback Form (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || "none"}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="none">None (No Feedback Form)</SelectItem>
-                        {forms.map((f) => (
+                        <SelectItem value="none">None</SelectItem>
+                        {forms.map(f => (
                           <SelectItem key={f.id} value={f.formId}>{f.title} ({f.formId})</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-xs">A button will be shown after students complete the quiz to fill this feedback form</FormDescription>
+                    <FormDescription className="text-xs">Shown after quiz completion</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -304,38 +328,6 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
             </div>
           </div>
         )}
-
-        <Separator />
-
-        {/* Basic details */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="quizId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>System Quiz ID</FormLabel>
-                <FormControl>
-                  <Input {...field} disabled className="font-mono text-sm text-muted-foreground" />
-                </FormControl>
-                <FormDescription className="text-xs">Auto-generated identifier</FormDescription>
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Quiz Title *</FormLabel>
-                <FormControl>
-                  <Input {...field} placeholder="e.g., Annual Tech Quiz 2026" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
 
         <FormField
           control={form.control}
@@ -352,7 +344,6 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
           )}
         />
 
-        {/* Config row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border border-border rounded-lg bg-muted/20">
           <FormField
             control={form.control}
@@ -399,6 +390,126 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
             )}
           />
         </div>
+
+        {/* Passing / Qualification Criteria Card */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Award className="h-4 w-4 text-primary" />
+              <span>Passing & Qualification Criteria</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Configure how candidates qualify (passing score cutoff or selecting top ranked candidates)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="cutoffType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Qualification Mode</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "PERCENTAGE"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select criteria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="PERCENTAGE">
+                          Minimum Percentage Score (%)
+                        </SelectItem>
+                        <SelectItem value="MARKS">
+                          Minimum Marks / Points Cutoff
+                        </SelectItem>
+                        <SelectItem value="TOP_N">
+                          Top Ranked Candidates (Top N)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">
+                      {form.watch("cutoffType") === "TOP_N"
+                        ? "Only the highest scoring top N candidates will qualify"
+                        : form.watch("cutoffType") === "MARKS"
+                        ? "Candidates scoring at or above this raw score qualify"
+                        : "Candidates with percentage at or above this threshold qualify"}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch("cutoffType") === "TOP_N" ? (
+                <FormField
+                  control={form.control}
+                  name="topSelectCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Top Candidate Selection Count</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="e.g. 10"
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value ? parseInt(e.target.value, 10) : undefined
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Top {field.value || 10} candidates will be marked QUALIFIED; rest will be marked FAILED
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="cutoffMarks"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {form.watch("cutoffType") === "MARKS"
+                          ? "Cutoff Marks (Points)"
+                          : "Cutoff Percentage (%)"}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="any"
+                          min={0}
+                          placeholder={
+                            form.watch("cutoffType") === "MARKS" ? "e.g. 15.0" : "e.g. 50"
+                          }
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value ? parseFloat(e.target.value) : undefined
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        {form.watch("cutoffType") === "MARKS"
+                          ? "Scores below this mark will be marked FAILED"
+                          : "Percentages below this cutoff % will be marked FAILED"}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Dates */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

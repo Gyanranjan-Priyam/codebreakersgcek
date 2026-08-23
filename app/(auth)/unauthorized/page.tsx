@@ -35,7 +35,8 @@ export default function UnauthorizedPage() {
           Unauthorized Access
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Only registered members added by an administrator are authorized to log in.
+          Only registered members added by an administrator are authorized to
+          log in.
         </p>
       </div>
 
@@ -44,9 +45,14 @@ export default function UnauthorizedPage() {
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div className="space-y-1 text-sm">
-            <p className="font-semibold text-foreground">Are you a CodeBreakers member?</p>
+            <p className="font-semibold text-foreground">
+              Are you a CodeBreakers member?
+            </p>
             <p className="text-muted-foreground leading-relaxed">
-              If an administrator has already added you, please ensure you are signing in with the exact email address registered in the system. If you haven&apos;t received your invitation mail, please contact your administrator.
+              If an administrator has already added you, please ensure you are
+              signing in with the exact email address registered in the system.
+              If you haven&apos;t received your invitation mail, please contact
+              your administrator.
             </p>
           </div>
         </div>
@@ -58,7 +64,7 @@ export default function UnauthorizedPage() {
           asChild
           className="w-full h-12 sm:h-14 text-base font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full shadow-sm"
         >
-          <a href="mailto:gcek.codebreakers@gmail.com?subject=CodeBreakers%20Member%20Access%20Request">
+          <a href="mailto:codebreakersgcekalahandi@gmail.com?subject=CodeBreakers%20Member%20Access%20Request">
             <Mail className="w-5 h-5 mr-2" />
             Contact Administrator
           </a>

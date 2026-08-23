@@ -7,6 +7,116 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, Award, Clock, ArrowLeft, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { ExportResultPdfButton } from "@/app/admin/quizzes/results/[quizId]/_components/export-result-pdf-button";
+import { ScorecardPDFData } from "@/lib/student-result-pdf";
+
+function findCorrectAnswerIndex(question: any): number {
+  if (!question || !Array.isArray(question.options)) return -1;
+  const options = question.options.map((opt: any) =>
+    opt !== null && opt !== undefined ? String(opt).trim() : ""
+  );
+
+  if (typeof question.correctAnswer === "number" && question.correctAnswer >= 0 && question.correctAnswer < options.length) {
+    return question.correctAnswer;
+  }
+  if (typeof question.answer === "number" && question.answer >= 0 && question.answer < options.length) {
+    return question.answer;
+  }
+
+  const rawTarget = question.correctAnswer !== undefined && question.correctAnswer !== null ? question.correctAnswer : question.answer;
+  if (rawTarget === undefined || rawTarget === null) return -1;
+  const targetStr = String(rawTarget).trim();
+
+  const exactIdx = options.findIndex((opt: string) => opt.toLowerCase() === targetStr.toLowerCase());
+  if (exactIdx !== -1) return exactIdx;
+
+  const parsedNum = parseInt(targetStr, 10);
+  if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < options.length && String(parsedNum) === targetStr) {
+    return parsedNum;
+  }
+
+  if (targetStr.length === 1) {
+    const letterIdx = targetStr.toUpperCase().charCodeAt(0) - 65;
+    if (letterIdx >= 0 && letterIdx < options.length) {
+      return letterIdx;
+    }
+  }
+
+  return -1;
+}
+
+function parseUserAnswersMap(answersJsonRaw: string | null | undefined): Record<number, any> {
+  const map: Record<number, any> = {};
+  if (!answersJsonRaw) return map;
+
+  try {
+    const parsed = JSON.parse(answersJsonRaw);
+    if (!parsed) return map;
+
+    if (Array.isArray(parsed.answers)) {
+      parsed.answers.forEach((ans: any, idx: number) => {
+        const qIdx = typeof ans.questionIndex === "number" ? ans.questionIndex : idx;
+        const aVal = ans.answerIndex !== undefined ? ans.answerIndex : ans.userAnswer;
+        if (aVal !== undefined && aVal !== null) {
+          map[qIdx] = aVal;
+        }
+      });
+    } else if (typeof parsed.answers === "object" && parsed.answers !== null) {
+      Object.entries(parsed.answers).forEach(([k, v]) => {
+        const qIdx = parseInt(k, 10);
+        if (!isNaN(qIdx) && v !== undefined && v !== null) {
+          map[qIdx] = v;
+        }
+      });
+    } else if (Array.isArray(parsed)) {
+      parsed.forEach((ans: any, idx: number) => {
+        const qIdx = typeof ans.questionIndex === "number" ? ans.questionIndex : idx;
+        const aVal = ans.answerIndex !== undefined ? ans.answerIndex : ans.userAnswer ?? ans;
+        if (aVal !== undefined && aVal !== null) {
+          map[qIdx] = aVal;
+        }
+      });
+    } else if (typeof parsed === "object") {
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (k === "tabSwitches" || k === "submittedAt") return;
+        const qIdx = parseInt(k, 10);
+        if (!isNaN(qIdx) && v !== undefined && v !== null) {
+          map[qIdx] = v;
+        }
+      });
+    }
+  } catch (e) {
+    console.error("Error parsing answersJson:", e);
+  }
+
+  return map;
+}
+
+function resolveUserOptionIndex(rawAnswer: any, options: string[]): number {
+  if (rawAnswer === undefined || rawAnswer === null) return -1;
+
+  if (typeof rawAnswer === "number" && rawAnswer >= 0 && rawAnswer < options.length) {
+    return rawAnswer;
+  }
+
+  const str = String(rawAnswer).trim();
+  const parsedNum = parseInt(str, 10);
+  if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < options.length && String(parsedNum) === str) {
+    return parsedNum;
+  }
+
+  const exactIdx = options.findIndex((opt) => String(opt).trim().toLowerCase() === str.toLowerCase());
+  if (exactIdx !== -1) return exactIdx;
+
+  if (str.length === 1) {
+    const letterIdx = str.toUpperCase().charCodeAt(0) - 65;
+    if (letterIdx >= 0 && letterIdx < options.length) {
+      return letterIdx;
+    }
+  }
+
+  return -1;
+}
 
 export default async function QuizResultsPage({ 
   params 
@@ -33,45 +143,91 @@ export default async function QuizResultsPage({
   }
 
   // Parse the answers
-  let answersData: any = {};
-  let detailedResults: any[] = [];
   let tabSwitches = 0;
-
   if (attempt.answersJson) {
     try {
-      answersData = JSON.parse(attempt.answersJson);
+      const answersData = JSON.parse(attempt.answersJson);
       tabSwitches = answersData.tabSwitches || 0;
     } catch (e) {
       console.error("Error parsing answers:", e);
     }
   }
 
-  // Parse questions to get the set the user took
-  const questionsData = JSON.parse(attempt.quiz.questionsJson);
-  const setLetter = String.fromCharCode(65 + attempt.setNumber);
-  const questions = questionsData[setLetter];
+  const userAnswersMap = parseUserAnswersMap(attempt.answersJson);
+
+  let questionsData: any = {};
+  try {
+    questionsData = JSON.parse(attempt.quiz.questionsJson);
+  } catch (e) {
+    console.error(e);
+  }
+
+  const setLetter = attempt.setNumber && attempt.setNumber >= 0 && attempt.setNumber <= 25
+    ? String.fromCharCode(65 + attempt.setNumber)
+    : "A";
+
+  let questions: any[] = [];
+  if (typeof questionsData === "object" && !Array.isArray(questionsData) && questionsData !== null) {
+    questions = questionsData[setLetter] || questionsData["A"] || [];
+  } else if (Array.isArray(questionsData)) {
+    questions = questionsData;
+  }
 
   // Build detailed results
-  if (answersData.answers && Array.isArray(answersData.answers)) {
-    detailedResults = answersData.answers.map((answer: any) => {
-      const question = questions[answer.questionIndex];
-      const correctAnswerIndex = question.options.findIndex((opt: string) => opt === question.answer);
-      
-      return {
-        questionIndex: answer.questionIndex,
-        question: question.question,
-        userAnswer: answer.answerIndex,
-        correctAnswer: correctAnswerIndex,
-        isCorrect: answer.correct,
-        options: question.options,
-      };
-    });
-  }
+  const detailedResults = questions.map((question: any, idx: number) => {
+    const options: string[] = Array.isArray(question.options) ? question.options : [];
+    const userOptionIdx = resolveUserOptionIndex(userAnswersMap[idx], options);
+    const correctOptionIdx = findCorrectAnswerIndex(question);
+    const isCorrect = userOptionIdx !== -1 && correctOptionIdx !== -1 && userOptionIdx === correctOptionIdx;
+    
+    return {
+      questionIndex: idx,
+      question: question.question,
+      userAnswer: userOptionIdx,
+      correctAnswer: correctOptionIdx,
+      isCorrect,
+      options,
+    };
+  });
+
+  const scorecardQuestions = questions.map((q: any, idx: number) => {
+    const options: string[] = Array.isArray(q.options) ? q.options : [];
+    const userOptionIdx = resolveUserOptionIndex(userAnswersMap[idx], options);
+    const correctOptionIdx = findCorrectAnswerIndex(q);
+    const isCorrect = userOptionIdx !== -1 && correctOptionIdx !== -1 && userOptionIdx === correctOptionIdx;
+
+    return {
+      questionIndex: idx,
+      questionText: q.question || `Question ${idx + 1}`,
+      options,
+      userAnswerIndex: userOptionIdx,
+      userAnswerText: userOptionIdx !== -1 ? options[userOptionIdx] : undefined,
+      correctAnswerIndex: correctOptionIdx,
+      correctAnswerText: correctOptionIdx !== -1 ? options[correctOptionIdx] : undefined,
+      isCorrect,
+    };
+  });
+
+  const scorecardPdfData: ScorecardPDFData = {
+    studentName: user.name || "Student",
+    studentEmail: user.email || "",
+    quizTitle: attempt.quiz.title,
+    quizId: attempt.quiz.quizId,
+    setLetter,
+    score: attempt.score,
+    correctAnswers: attempt.correctAnswers,
+    totalQuestions: attempt.totalQuestions,
+    pointsEarned: attempt.pointsEarned,
+    tabSwitches,
+    submissionDate: attempt.createdAt,
+    isPublished: attempt.isPublished,
+    questions: scorecardQuestions,
+  };
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-4 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Quiz Results
@@ -79,6 +235,9 @@ export default async function QuizResultsPage({
           <p className="text-muted-foreground mt-1">
             {attempt.quiz.title}
           </p>
+        </div>
+        <div>
+          <ExportResultPdfButton data={scorecardPdfData} />
         </div>
       </div>
 

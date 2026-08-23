@@ -426,6 +426,9 @@ model Quiz {
   accessCode        String?              // 6-digit access code for external quiz
   formId            String?              // Linked registration form ID
   feedbackFormId    String?              // Optional feedback form ID
+  cutoffMarks       Float?               @default(50) // Minimum marks or percentage to pass
+  cutoffType        String?              @default("PERCENTAGE") // "PERCENTAGE" | "MARKS" | "TOP_N"
+  topSelectCount    Int?                 // Number of top students to select (for TOP_N mode)
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   createdBy         String               // Admin user ID who created this
@@ -636,5 +639,16 @@ model FormResponse {
   @@index([formId])
   @@index([paymentStatus])
   @@map("form_response")
+}
+
+model SmtpUsageTracker {
+  id          String   @id @default(cuid())
+  dateKey     String   @unique
+  primarySent Int      @default(0)
+  backupSent  Int      @default(0)
+  activeSmtp  String   @default("PRIMARY")
+  updatedAt   DateTime @updatedAt
+
+  @@map("smtp_usage_tracker")
 }
 

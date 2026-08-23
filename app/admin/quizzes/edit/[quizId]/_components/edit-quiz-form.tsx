@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -49,6 +49,7 @@ import {
   FileText,
   Sparkles,
   RefreshCw,
+  Award,
 } from "lucide-react";
 
 const formSchema = z.object({
@@ -61,6 +62,9 @@ const formSchema = z.object({
   sets: z.number().min(1).max(8),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   pointsPerQuestion: z.number().min(0.01, "Points must be greater than 0"),
+  cutoffMarks: z.number().min(0).optional(),
+  cutoffType: z.enum(["PERCENTAGE", "MARKS", "TOP_N"]).optional(),
+  topSelectCount: z.number().min(1).optional(),
   startDateTime: z.date(),
   endDateTime: z.date(),
   isActive: z.boolean(),
@@ -90,6 +94,9 @@ interface Quiz {
   accessCode?: string | null;
   formId?: string | null;
   feedbackFormId?: string | null;
+  cutoffMarks?: number | null;
+  cutoffType?: string | null;
+  topSelectCount?: number | null;
 }
 
 interface EditQuizFormProps {
@@ -123,6 +130,9 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
       sets: quiz.sets,
       duration: quiz.duration,
       pointsPerQuestion: quiz.pointsPerQuestion,
+      cutoffMarks: quiz.cutoffMarks ?? 50,
+      cutoffType: (quiz.cutoffType as "PERCENTAGE" | "MARKS" | "TOP_N") || "PERCENTAGE",
+      topSelectCount: quiz.topSelectCount ?? 10,
       startDateTime: quiz.startDateTime ? new Date(quiz.startDateTime) : new Date(),
       endDateTime: quiz.endDateTime ? new Date(quiz.endDateTime) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       isActive: quiz.isActive,
@@ -272,6 +282,9 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
       sets: data.sets,
       duration: data.duration,
       pointsPerQuestion: data.pointsPerQuestion,
+      cutoffMarks: data.cutoffMarks,
+      cutoffType: data.cutoffType,
+      topSelectCount: data.topSelectCount,
       startDateTime: data.startDateTime,
       endDateTime: data.endDateTime,
       isActive: data.isActive,
@@ -554,6 +567,126 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
             )}
           />
         </div>
+
+        {/* Passing / Qualification Criteria Card */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Award className="h-4 w-4 text-primary" />
+              <span>Passing & Qualification Criteria</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Configure how candidates qualify (passing score cutoff or selecting top ranked candidates)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="cutoffType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Qualification Mode</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "PERCENTAGE"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select criteria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="PERCENTAGE">
+                          Minimum Percentage Score (%)
+                        </SelectItem>
+                        <SelectItem value="MARKS">
+                          Minimum Marks / Points Cutoff
+                        </SelectItem>
+                        <SelectItem value="TOP_N">
+                          Top Ranked Candidates (Top N)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">
+                      {form.watch("cutoffType") === "TOP_N"
+                        ? "Only the highest scoring top N candidates will qualify"
+                        : form.watch("cutoffType") === "MARKS"
+                        ? "Candidates scoring at or above this raw score qualify"
+                        : "Candidates with percentage at or above this threshold qualify"}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch("cutoffType") === "TOP_N" ? (
+                <FormField
+                  control={form.control}
+                  name="topSelectCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Top Candidate Selection Count</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="e.g. 10"
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value ? parseInt(e.target.value, 10) : undefined
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Top {field.value || 10} candidates will be marked QUALIFIED; rest will be marked FAILED
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="cutoffMarks"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {form.watch("cutoffType") === "MARKS"
+                          ? "Cutoff Marks (Points)"
+                          : "Cutoff Percentage (%)"}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="any"
+                          min={0}
+                          placeholder={
+                            form.watch("cutoffType") === "MARKS" ? "e.g. 15.0" : "e.g. 50"
+                          }
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value ? parseFloat(e.target.value) : undefined
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        {form.watch("cutoffType") === "MARKS"
+                          ? "Scores below this mark will be marked FAILED"
+                          : "Percentages below this cutoff % will be marked FAILED"}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Start & End Dates and Active Switch */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">

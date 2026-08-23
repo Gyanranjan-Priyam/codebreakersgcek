@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import jsPDF from "jspdf";
 
 interface InvoiceDetails {
   invoiceNumber: string;
@@ -19,12 +19,14 @@ interface InvoiceDetails {
   paymentMethod: string;
 }
 
-export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffer> {
+export async function generateInvoicePDF(
+  details: InvoiceDetails,
+): Promise<Buffer> {
   // A4 paper dimensions: 210mm x 297mm
   const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
   });
 
   const pageWidth = 210;
@@ -34,41 +36,41 @@ export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffe
 
   // Paper Card Background Fill (#FAF9F5 -> RGB: 250, 249, 245)
   pdf.setFillColor(250, 249, 245);
-  pdf.rect(10, 10, 190, 277, 'F');
+  pdf.rect(10, 10, 190, 277, "F");
   pdf.setDrawColor(231, 229, 222);
   pdf.setLineWidth(0.4);
-  pdf.rect(10, 10, 190, 277, 'S');
+  pdf.rect(10, 10, 190, 277, "S");
 
   // VERIFIED Watermark Stamp (Top Right Rotated)
   pdf.setDrawColor(22, 163, 74);
   pdf.setTextColor(22, 163, 74);
-  pdf.setFont('helvetica', 'bold');
+  pdf.setFont("helvetica", "bold");
   pdf.setFontSize(18);
-  pdf.text('VERIFIED', 145, 28, { angle: -12 });
+  pdf.text("VERIFIED", 145, 28, { angle: -12 });
 
   // 1. Header Left: CodeBreakers
   let yPos = margin + 5;
-  pdf.setFont('helvetica', 'bold');
+  pdf.setFont("helvetica", "bold");
   pdf.setFontSize(16);
   pdf.setTextColor(12, 10, 9);
-  pdf.text('CodeBreakers', margin + 5, yPos);
+  pdf.text("CodeBreakers", margin + 5, yPos);
 
   yPos += 5;
-  pdf.setFont('helvetica', 'normal');
+  pdf.setFont("helvetica", "normal");
   pdf.setFontSize(9);
   pdf.setTextColor(87, 83, 78);
-  pdf.text('GCEK Bhawanipatna', margin + 5, yPos);
+  pdf.text("GCEK Bhawanipatna", margin + 5, yPos);
 
   // Header Right: INVOICE & PAID & APPROVED
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setFontSize(22);
   pdf.setTextColor(12, 10, 9);
-  pdf.text('INVOICE', rightX - 5, margin + 5, { align: 'right' });
+  pdf.text("INVOICE", rightX - 5, margin + 5, { align: "right" });
 
-  pdf.setFont('helvetica', 'bold');
+  pdf.setFont("helvetica", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(22, 163, 74);
-  pdf.text('(v) PAID & APPROVED', rightX - 5, margin + 11, { align: 'right' });
+  pdf.text("(v) PAID & APPROVED", rightX - 5, margin + 11, { align: "right" });
 
   // Divider Line 1
   yPos = 38;
@@ -78,34 +80,34 @@ export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffe
 
   // 2. Metadata Grid (Courier Monospace)
   yPos += 8;
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setFontSize(8);
   pdf.setTextColor(120, 113, 108);
-  pdf.text('REFERENCE NUMBER', margin + 5, yPos);
-  pdf.text('PAYMENT METHOD', rightX - 55, yPos);
+  pdf.text("REFERENCE NUMBER", margin + 5, yPos);
+  pdf.text("PAYMENT METHOD", rightX - 55, yPos);
 
   yPos += 5;
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(12, 10, 9);
   pdf.text(details.invoiceNumber, margin + 5, yPos);
-  pdf.setFont('courier', 'normal');
-  pdf.text(details.paymentMethod || 'UPI', rightX - 55, yPos);
+  pdf.setFont("courier", "normal");
+  pdf.text(details.paymentMethod || "UPI", rightX - 55, yPos);
 
   yPos += 7;
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setFontSize(8);
   pdf.setTextColor(120, 113, 108);
-  pdf.text('DATE ISSUED', margin + 5, yPos);
-  pdf.text('TRANSACTION ID', rightX - 55, yPos);
+  pdf.text("DATE ISSUED", margin + 5, yPos);
+  pdf.text("TRANSACTION ID", rightX - 55, yPos);
 
   yPos += 5;
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setFontSize(9);
   pdf.setTextColor(12, 10, 9);
   pdf.text(details.eventDate, margin + 5, yPos);
-  pdf.setFont('courier', 'bold');
-  pdf.text(details.transactionId || 'N/A', rightX - 55, yPos);
+  pdf.setFont("courier", "bold");
+  pdf.text(details.transactionId || "N/A", rightX - 55, yPos);
 
   // Divider Line 2
   yPos += 8;
@@ -114,33 +116,33 @@ export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffe
 
   // 3. FROM and BILL TO
   yPos += 8;
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setFontSize(8);
   pdf.setTextColor(120, 113, 108);
-  pdf.text('FROM', margin + 5, yPos);
-  pdf.text('BILL TO', rightX - 65, yPos);
+  pdf.text("FROM", margin + 5, yPos);
+  pdf.text("BILL TO", rightX - 65, yPos);
 
   yPos += 5;
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(12, 10, 9);
-  pdf.text('CodeBreakers', margin + 5, yPos);
-  pdf.text(details.fullName || 'Participant', rightX - 65, yPos);
+  pdf.text("CodeBreakers", margin + 5, yPos);
+  pdf.text(details.fullName || "Participant", rightX - 65, yPos);
 
   yPos += 5;
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setTextColor(68, 64, 60);
-  pdf.text('Government College of Engineering Kalahandi', margin + 5, yPos);
-  pdf.text(details.email || '', rightX - 65, yPos);
+  pdf.text("Government College of Engineering Kalahandi", margin + 5, yPos);
+  pdf.text(details.email || "", rightX - 65, yPos);
 
   yPos += 5;
-  pdf.text('Bhawanipatna, Odisha 766002', margin + 5, yPos);
-  if (details.collegeName && details.collegeName !== 'N/A') {
+  pdf.text("Bhawanipatna, Odisha 766002", margin + 5, yPos);
+  if (details.collegeName && details.collegeName !== "N/A") {
     pdf.text(details.collegeName.slice(0, 35), rightX - 65, yPos);
   }
 
   yPos += 5;
-  pdf.text('Tax ID: CB-1029384756', margin + 5, yPos);
+  pdf.text("Tax ID: CB-1029384756", margin + 5, yPos);
 
   // Divider Line 3
   yPos += 8;
@@ -150,58 +152,58 @@ export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffe
   // 4. Items Table Header (Gray Bar)
   yPos += 10;
   pdf.setFillColor(231, 229, 222); // #E7E5DE
-  pdf.roundedRect(margin + 5, yPos, rightX - margin - 10, 8, 2, 2, 'F');
+  pdf.roundedRect(margin + 5, yPos, rightX - margin - 10, 8, 2, 2, "F");
 
   yPos += 5.5;
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setFontSize(8);
   pdf.setTextColor(12, 10, 9);
-  pdf.text('DESCRIPTION', margin + 9, yPos);
-  pdf.text('UNITS', 125, yPos, { align: 'right' });
-  pdf.text('UNIT COST', 155, yPos, { align: 'right' });
-  pdf.text('LINE TOTAL', rightX - 9, yPos, { align: 'right' });
+  pdf.text("DESCRIPTION", margin + 9, yPos);
+  pdf.text("UNITS", 125, yPos, { align: "right" });
+  pdf.text("UNIT COST", 155, yPos, { align: "right" });
+  pdf.text("LINE TOTAL", rightX - 9, yPos, { align: "right" });
 
   // Item Row
   yPos += 9;
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(12, 10, 9);
   pdf.text(`${details.eventTitle} Registration Fee`, margin + 9, yPos);
-  pdf.setFont('courier', 'normal');
-  pdf.text('1', 125, yPos, { align: 'right' });
-  pdf.text(formattedAmount, 155, yPos, { align: 'right' });
-  pdf.setFont('courier', 'bold');
-  pdf.text(formattedAmount, rightX - 9, yPos, { align: 'right' });
+  pdf.setFont("courier", "normal");
+  pdf.text("1", 125, yPos, { align: "right" });
+  pdf.text(formattedAmount, 155, yPos, { align: "right" });
+  pdf.setFont("courier", "bold");
+  pdf.text(formattedAmount, rightX - 9, yPos, { align: "right" });
 
   // 5. Status Left & Totals Right Section
   yPos += 16;
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setFontSize(8.5);
   pdf.setTextColor(120, 113, 108);
   pdf.text(`Form ID: `, margin + 5, yPos);
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setTextColor(12, 10, 9);
-  pdf.text(details.registrationId || 'N/A', margin + 25, yPos);
+  pdf.text(details.registrationId || "N/A", margin + 25, yPos);
 
   yPos += 5;
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setTextColor(120, 113, 108);
   pdf.text(`Status: `, margin + 5, yPos);
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setTextColor(22, 163, 74);
-  pdf.text('Payment Verified & Certificate Issued', margin + 25, yPos);
+  pdf.text("Payment Verified & Certificate Issued", margin + 25, yPos);
 
   // Right side Summary Table
   let sumY = yPos - 5;
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setFontSize(8.5);
   pdf.setTextColor(68, 64, 60);
-  pdf.text('Net Amount:', 125, sumY);
-  pdf.text(formattedAmount, rightX - 5, sumY, { align: 'right' });
+  pdf.text("Net Amount:", 125, sumY);
+  pdf.text(formattedAmount, rightX - 5, sumY, { align: "right" });
 
   sumY += 5;
-  pdf.text('Discount:', 125, sumY);
-  pdf.text('Rs. 0.00', rightX - 5, sumY, { align: 'right' });
+  pdf.text("Discount:", 125, sumY);
+  pdf.text("Rs. 0.00", rightX - 5, sumY, { align: "right" });
 
   sumY += 5;
   pdf.setDrawColor(12, 10, 9);
@@ -209,11 +211,11 @@ export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffe
   pdf.line(125, sumY, rightX - 5, sumY);
 
   sumY += 5;
-  pdf.setFont('courier', 'bold');
+  pdf.setFont("courier", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(12, 10, 9);
-  pdf.text('TOTAL AMOUNT PAID:', 125, sumY);
-  pdf.text(`${formattedAmount} (PAID)`, rightX - 5, sumY, { align: 'right' });
+  pdf.text("TOTAL AMOUNT PAID:", 125, sumY);
+  pdf.text(`${formattedAmount} (PAID)`, rightX - 5, sumY, { align: "right" });
 
   sumY += 3;
   pdf.line(125, sumY, rightX - 5, sumY);
@@ -224,22 +226,28 @@ export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffe
   pdf.setDrawColor(231, 229, 222);
   pdf.line(margin + 5, footerY, rightX - 5, footerY);
 
-  pdf.setFont('courier', 'normal');
+  pdf.setFont("courier", "normal");
   pdf.setFontSize(8);
   pdf.setTextColor(120, 113, 108);
-  pdf.text('gcek.codebreakers@gmail.com', margin + 5, footerY + 5);
-  pdf.text('CodeBreakers • GCEK Bhawanipatna', margin + 5, footerY + 9);
+  pdf.text("codebreakersgcekalahandi@gmail.com", margin + 5, footerY + 5);
+  pdf.text("CodeBreakers • GCEK Bhawanipatna", margin + 5, footerY + 9);
 
-  pdf.text('Prepared for prompt processing.', rightX - 5, footerY + 5, { align: 'right' });
-  pdf.setFont('courier', 'bold');
+  pdf.text("Prepared for prompt processing.", rightX - 5, footerY + 5, {
+    align: "right",
+  });
+  pdf.setFont("courier", "bold");
   pdf.setTextColor(12, 10, 9);
-  pdf.text('Issued by CodeBreakers Team', rightX - 5, footerY + 9, { align: 'right' });
+  pdf.text("Issued by CodeBreakers Team", rightX - 5, footerY + 9, {
+    align: "right",
+  });
 
-  const pdfOutput = pdf.output('arraybuffer');
+  const pdfOutput = pdf.output("arraybuffer");
   return Buffer.from(pdfOutput);
 }
 
-export async function generateInvoiceHTML(details: InvoiceDetails): Promise<string> {
+export async function generateInvoiceHTML(
+  details: InvoiceDetails,
+): Promise<string> {
   return `
     <!DOCTYPE html>
     <html>
@@ -376,7 +384,7 @@ export async function generateInvoiceHTML(details: InvoiceDetails): Promise<stri
       
       <div class="invoice-meta">
         <div><strong>Invoice No:</strong> ${details.invoiceNumber}</div>
-        <div><strong>Invoice Date:</strong> ${details.paymentVerifiedDate.toLocaleDateString('en-IN')}</div>
+        <div><strong>Invoice Date:</strong> ${details.paymentVerifiedDate.toLocaleDateString("en-IN")}</div>
       </div>
       
       <h1 class="invoice-title">PAYMENT INVOICE</h1>
@@ -439,15 +447,15 @@ export async function generateInvoiceHTML(details: InvoiceDetails): Promise<stri
         </div>
         <div class="detail-row">
           <span class="label">Transaction ID:</span>
-          <span class="value">${details.transactionId || 'N/A'}</span>
+          <span class="value">${details.transactionId || "N/A"}</span>
         </div>
         <div class="detail-row">
           <span class="label">Payment Date:</span>
-          <span class="value">${details.paymentDate.toLocaleDateString('en-IN')}</span>
+          <span class="value">${details.paymentDate.toLocaleDateString("en-IN")}</span>
         </div>
         <div class="detail-row">
           <span class="label">Payment Verified:</span>
-          <span class="value">${details.paymentVerifiedDate.toLocaleDateString('en-IN')}</span>
+          <span class="value">${details.paymentVerifiedDate.toLocaleDateString("en-IN")}</span>
         </div>
         <div class="detail-row">
           <span class="label">Status:</span>
