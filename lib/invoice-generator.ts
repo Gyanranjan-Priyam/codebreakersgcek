@@ -227,7 +227,7 @@ export async function generateInvoicePDF(details: InvoiceDetails): Promise<Buffe
   pdf.setFont('courier', 'normal');
   pdf.setFontSize(8);
   pdf.setTextColor(120, 113, 108);
-  pdf.text('contact.gyanranjan@gmail.com', margin + 5, footerY + 5);
+  pdf.text('gcek.codebreakers@gmail.com', margin + 5, footerY + 5);
   pdf.text('CodeBreakers • GCEK Bhawanipatna', margin + 5, footerY + 9);
 
   pdf.text('Prepared for prompt processing.', rightX - 5, footerY + 5, { align: 'right' });

@@ -46,7 +46,7 @@ export function LoginForm() {
   const [unauthorizedError, setUnauthorizedError] = useState<string | null>(null);
 
   useEffect(() => {
-    const errorParam = searchParams.get("error");
+    const errorParam = searchParams?.get("error");
     if (errorParam === "unauthorized" || errorParam === "not_registered") {
       setUnauthorizedError("Unauthorized Access: Only registered members added by an admin can log in. If you are a member, please contact the administrator.");
     } else if (errorParam === "banned") {

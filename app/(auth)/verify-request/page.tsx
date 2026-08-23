@@ -22,7 +22,7 @@ function VerifyRequest() {
     const [otp, setOtp] = useState('');
     const [emailPending, startTransition] = useTransition();
     const params = useSearchParams();
-    const email = params.get('email') || '';
+    const email = params?.get('email') || '';
     const isOtpCompleted = otp.length === 6;
 
     function verifyOtp() {

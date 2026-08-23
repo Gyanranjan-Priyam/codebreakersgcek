@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { getPusherClient } from "@/lib/pusher-client";
+import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,27 +249,33 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 0ms Real-time WebSockets subscription for instant form responses
+  // Real-time Socket.IO subscription for instant form responses
   useEffect(() => {
-    const pusher = getPusherClient();
-    if (!pusher) return;
+    let leaveRoom1: (() => void) | null = null;
+    let leaveRoom2: (() => void) | null = null;
+    let handleNewResponse: (() => void) | null = null;
 
-    const channel1 = pusher.subscribe(`form-${form.id}`);
-    const channel2 = pusher.subscribe(`form-${form.formId}`);
+    initSocket().then((socket) => {
+      if (!socket) return;
 
-    const handleNewResponse = () => {
-      toast.info("New form response received in real-time!");
-      router.refresh();
-    };
+      leaveRoom1 = joinRoom(`form-${form.id}`);
+      leaveRoom2 = joinRoom(`form-${form.formId}`);
 
-    channel1.bind("response-submitted", handleNewResponse);
-    channel2.bind("response-submitted", handleNewResponse);
+      handleNewResponse = () => {
+        toast.info("New form response received in real-time!");
+        router.refresh();
+      };
+
+      socket.on("response-submitted", handleNewResponse);
+    });
 
     return () => {
-      channel1.unbind_all();
-      channel2.unbind_all();
-      pusher.unsubscribe(`form-${form.id}`);
-      pusher.unsubscribe(`form-${form.formId}`);
+      if (leaveRoom1) leaveRoom1();
+      if (leaveRoom2) leaveRoom2();
+      const socket = getSocket();
+      if (socket && handleNewResponse) {
+        socket.off("response-submitted", handleNewResponse);
+      }
     };
   }, [form.id, form.formId, router]);
 

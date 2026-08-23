@@ -23,6 +23,21 @@ export default async function ExternalExamRoomPage({
     redirect("/quiz/system-register");
   }
 
+  // When candidate enters exam room, promote status from IN_PROGRESS to ATTEMPTING
+  if (system.status === "IN_PROGRESS") {
+    try {
+      await prisma.externalQuizSystem.update({
+        where: { id: system.id },
+        data: { status: "ATTEMPTING" },
+      });
+      const { emitSocketEvent } = await import("@/lib/socket-server");
+      emitSocketEvent(`quiz-${system.quiz.id}`, "system-updated", { systemCode: system.systemCode });
+      emitSocketEvent(`system-${system.systemCode}`, "status-changed", { status: "ATTEMPTING" });
+    } catch (e) {
+      console.error("Error setting status to ATTEMPTING:", e);
+    }
+  }
+
   const userId = `ext_${system.id}`;
 
   // Check if candidate is blocked for this quiz

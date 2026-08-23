@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
@@ -11,7 +12,7 @@ import { blockUserFromQuizAction } from "../block-actions";
 import { setSystemAttemptingAction } from "@/app/admin/quizzes/actions";
 import { CloseWindowButton } from "./close-window-button";
 import { toast } from "sonner";
-import { getPusherClient } from "@/lib/pusher-client";
+import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 
 interface Quiz {
   id: string;
@@ -37,7 +38,8 @@ interface User {
 interface Question {
   question: string;
   options: string[];
-  correctAnswer: number;
+  correctAnswer?: number;
+  originalIndex?: number;
 }
 
 interface QuizProctorInterfaceProps {
@@ -77,6 +79,7 @@ export default function QuizProctorInterface({
   const [currentStep, setCurrentStep] = useState<QuizStep>(initialStep || 'user-info');
   const [selectedSet] = useState<string>(assignedSet); // Pre-selected with assigned set
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasEnteredFullscreenOnce, setHasEnteredFullscreenOnce] = useState(false);
   const [tabSwitches, setTabSwitches] = useState(0);
   const [showWarning, setShowWarning] = useState(false);
   const [showFullscreenWarning, setShowFullscreenWarning] = useState(false);
@@ -87,7 +90,14 @@ export default function QuizProctorInterface({
   const blockedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(quiz.duration * 60); // Convert minutes to seconds
   const [answers, setAnswers] = useState<Record<number, number>>({});
+  const answersRef = useRef<Record<number, number>>({});
+  const [showTimeOverModal, setShowTimeOverModal] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
+  // Keep answersRef in sync with answers state at all times
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   // Save question index to localStorage whenever it changes
   useEffect(() => {
@@ -117,36 +127,90 @@ export default function QuizProctorInterface({
     }
   }, [systemCode]);
 
-  // Real-time WebSockets unblock listener inside QuizProctorInterface
+  // Real-time Socket.IO unblock listener inside QuizProctorInterface
   useEffect(() => {
     if (!systemCode) return;
-    const pusher = getPusherClient();
-    if (!pusher) return;
 
-    const channelName = `system-${systemCode}`;
-    const channel = pusher.subscribe(channelName);
+    let leaveRoomFn: (() => void) | null = null;
+    let handleUnblock: (() => void) | null = null;
+    let handleStatusChanged: ((data: { status?: string }) => void) | null = null;
 
-    const handleUnblock = () => {
-      setIsBlocked(false);
-      setShowWarning(false);
-      setShowFullscreenWarning(false);
-      toast.success("You have been unblocked by admin! Resuming your exam...");
-    };
+    initSocket().then((socket) => {
+      if (!socket) return;
 
-    channel.bind("unblocked", handleUnblock);
-    channel.bind("status-changed", (data: { status?: string }) => {
-      if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
-        handleUnblock();
-      } else if (data?.status === "BLOCKED") {
-        setIsBlocked(true);
-      }
+      leaveRoomFn = joinRoom(`system-${systemCode}`);
+
+      handleUnblock = () => {
+        setIsBlocked(false);
+        setShowWarning(false);
+        setShowFullscreenWarning(false);
+        toast.success("You have been unblocked by admin! Resuming your exam...");
+      };
+
+      handleStatusChanged = (data: { status?: string }) => {
+        if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
+          handleUnblock!();
+        } else if (data?.status === "BLOCKED") {
+          setIsBlocked(true);
+        }
+      };
+
+      socket.on("unblocked", handleUnblock);
+      socket.on("status-changed", handleStatusChanged);
     });
 
     return () => {
-      channel.unbind_all();
-      pusher.unsubscribe(channelName);
+      if (leaveRoomFn) leaveRoomFn();
+      const socket = getSocket();
+      if (socket) {
+        if (handleUnblock) socket.off("unblocked", handleUnblock);
+        if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
+      }
     };
   }, [systemCode]);
+
+  // Set system to ATTEMPTING status in database & real-time when quiz starts
+  useEffect(() => {
+    if (currentStep === 'quiz-started' && !isBlocked) {
+      const targetCode = systemCode || (user.username?.startsWith("SYS-") ? user.username : null);
+      if (targetCode) {
+        setSystemAttemptingAction(targetCode).catch((err) => {
+          console.error("Failed to set system status to ATTEMPTING:", err);
+        });
+      }
+    }
+  }, [currentStep, isBlocked, systemCode, user.username]);
+
+  // Automatic and gesture-based fullscreen trigger
+  useEffect(() => {
+    if (currentStep !== 'quiz-started' || isBlocked) return;
+
+    // Check if already in fullscreen
+    if (document.fullscreenElement) {
+      setIsFullscreen(true);
+      setHasEnteredFullscreenOnce(true);
+    } else {
+      // Try immediate automated fullscreen
+      enterFullscreen();
+    }
+
+    // Capture ANY user click, touch, or keydown on the entire window to enter fullscreen immediately
+    const handleGlobalInteraction = () => {
+      if (!document.fullscreenElement && currentStep === 'quiz-started' && !isBlocked) {
+        enterFullscreen();
+      }
+    };
+
+    window.addEventListener('click', handleGlobalInteraction, { capture: true });
+    window.addEventListener('keydown', handleGlobalInteraction, { capture: true });
+    window.addEventListener('pointerdown', handleGlobalInteraction, { capture: true });
+
+    return () => {
+      window.removeEventListener('click', handleGlobalInteraction, { capture: true });
+      window.removeEventListener('keydown', handleGlobalInteraction, { capture: true });
+      window.removeEventListener('pointerdown', handleGlobalInteraction, { capture: true });
+    };
+  }, [currentStep, isBlocked]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<{
@@ -172,15 +236,41 @@ export default function QuizProctorInterface({
     return Array.isArray(questionsData[set]) ? questionsData[set].length : 0;
   };
 
-  // Load questions for the assigned set when quiz starts
+  // Load and deterministically scramble questions per system / candidate
   useEffect(() => {
     if (currentStep === 'quiz-started' && selectedSet) {
-      const questionsForSet = questionsData[selectedSet];
-      if (Array.isArray(questionsForSet)) {
-        setQuestions(questionsForSet as Question[]);
+      const rawQuestions = questionsData[selectedSet];
+      if (Array.isArray(rawQuestions)) {
+        // Unique deterministic seed per system or user
+        const seedStr = `${systemCode || user.username || user.id || "kiosk"}_${selectedSet}_${quiz.id}`;
+        
+        let seed = 0;
+        for (let i = 0; i < seedStr.length; i++) {
+          seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+        }
+
+        const seededRng = () => {
+          seed = (seed + 0x6D2B79F5) >>> 0;
+          let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+
+        const indexedQuestions = rawQuestions.map((q: any, idx: number) => ({
+          ...q,
+          originalIndex: idx,
+        }));
+
+        // Deterministic Fisher-Yates shuffle
+        for (let i = indexedQuestions.length - 1; i > 0; i--) {
+          const j = Math.floor(seededRng() * (i + 1));
+          [indexedQuestions[i], indexedQuestions[j]] = [indexedQuestions[j], indexedQuestions[i]];
+        }
+
+        setQuestions(indexedQuestions as Question[]);
       }
     }
-  }, [currentStep, selectedSet]);
+  }, [currentStep, selectedSet, systemCode, user.id, user.username, quiz.id]);
 
   // Timer countdown
   useEffect(() => {
@@ -190,8 +280,9 @@ export default function QuizProctorInterface({
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Auto-submit when time runs out
-          handleSubmitQuiz();
+          // Show time over modal and auto-submit all attempted answers
+          setShowTimeOverModal(true);
+          handleSubmitQuiz(true, answersRef.current);
           return 0;
         }
         // Show warning when 5 minutes remaining
@@ -219,6 +310,7 @@ export default function QuizProctorInterface({
   const handleAnswerSelect = (questionIndex: number, answerIndex: number) => {
     setAnswers(prev => {
       const next = { ...prev, [questionIndex]: answerIndex };
+      answersRef.current = next;
       if (systemCode) {
         try {
           localStorage.setItem(`cb_answers_${systemCode}`, JSON.stringify(next));
@@ -228,17 +320,43 @@ export default function QuizProctorInterface({
     });
   };
 
-  const handleSubmitQuiz = async () => {
-    if (isSubmitting || Object.keys(answers).length !== questions.length) return;
+  const handleSubmitQuiz = async (isAutoSubmit = false, customAnswers?: Record<number, number>) => {
+    if (isSubmitting) return;
+
+    // Use customAnswers or answersRef or answers state
+    const currentAnswersToSubmit = customAnswers || answersRef.current || answers;
+
+    // If manual submit and questions are unanswered, ask confirmation
+    if (!isAutoSubmit) {
+      const answeredCount = Object.keys(currentAnswersToSubmit).length;
+      if (answeredCount < questions.length) {
+        const confirmPartial = window.confirm(
+          `You have answered ${answeredCount} of ${questions.length} questions. Do you want to submit your quiz now?`
+        );
+        if (!confirmPartial) return;
+      }
+    }
     
     setIsSubmitting(true);
     
     try {
+      // Merge with localStorage if available for external systems
+      let finalAnswers = { ...currentAnswersToSubmit };
+      if (systemCode) {
+        try {
+          const local = localStorage.getItem(`cb_answers_${systemCode}`);
+          if (local) {
+            const parsed = JSON.parse(local);
+            finalAnswers = { ...parsed, ...finalAnswers };
+          }
+        } catch (e) {}
+      }
+
       const submitData = {
         quizId: quiz.quizId,
         quizDbId: quiz.id,
         assignedSet: selectedSet,
-        answers,
+        answers: finalAnswers,
         tabSwitches,
         questionsJson: quiz.questionsJson,
       };
@@ -257,10 +375,6 @@ export default function QuizProctorInterface({
         }
         setSubmissionResult(result.data);
         setCurrentStep('quiz-submitted');
-        // Exit fullscreen
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
-        }
       } else {
         alert(result.message || "Failed to submit quiz. Please try again.");
       }
@@ -298,6 +412,7 @@ export default function QuizProctorInterface({
   };
 
   const currentQuestion = questions[currentQuestionIndex];
+  const currentOrigIndex = currentQuestion ? (currentQuestion.originalIndex ?? currentQuestionIndex) : currentQuestionIndex;
 
   // Prevent tab switching and detect visibility changes
   useEffect(() => {
@@ -378,10 +493,14 @@ export default function QuizProctorInterface({
   // Request fullscreen
   const enterFullscreen = async () => {
     try {
-      await document.documentElement.requestFullscreen();
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
       setIsFullscreen(true);
+      setHasEnteredFullscreenOnce(true);
+      setShowFullscreenWarning(false);
     } catch (error) {
-      console.error("Failed to enter fullscreen:", error);
+      console.warn("Fullscreen request:", error);
     }
   };
 
@@ -400,20 +519,25 @@ export default function QuizProctorInterface({
   // Monitor fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
       
-      if (!document.fullscreenElement && currentStep === 'quiz-started' && !isBlocked && !showFullscreenWarning) {
-        // Show the warning modal with countdown
-        setShowFullscreenWarning(true);
-        setFullscreenWarningTimer(10);
-      } else if (document.fullscreenElement && showFullscreenWarning) {
-        // User returned to fullscreen - clear warning and timer
-        if (countdownIntervalRef.current) {
-          clearInterval(countdownIntervalRef.current);
-          countdownIntervalRef.current = null;
+      if (active) {
+        setHasEnteredFullscreenOnce(true);
+        if (showFullscreenWarning) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          setShowFullscreenWarning(false);
+          setFullscreenWarningTimer(10);
         }
-        setShowFullscreenWarning(false);
-        setFullscreenWarningTimer(10);
+      } else {
+        if (currentStep === 'quiz-started' && !isBlocked && hasEnteredFullscreenOnce && !showFullscreenWarning) {
+          // Show the warning modal with countdown only if they were in fullscreen previously
+          setShowFullscreenWarning(true);
+          setFullscreenWarningTimer(10);
+        }
       }
     };
 
@@ -422,7 +546,7 @@ export default function QuizProctorInterface({
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [currentStep, isBlocked, showFullscreenWarning]);
+  }, [currentStep, isBlocked, showFullscreenWarning, hasEnteredFullscreenOnce]);
 
   // Handle fullscreen warning countdown
   useEffect(() => {
@@ -711,6 +835,39 @@ export default function QuizProctorInterface({
     if (isExternalQuiz) {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          {/* Time-Over Notification Dialog in Fullscreen */}
+          {showTimeOverModal && (
+            <div className="fixed inset-0 bg-black/90 z-70 backdrop-blur-md flex items-center justify-center p-4">
+              <Card className="max-w-md w-full border-amber-500 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <CardHeader className="text-center pb-2">
+                  <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-2 animate-bounce">
+                    <Clock className="h-8 w-8" />
+                  </div>
+                  <CardTitle className="text-2xl font-bold">Time Expired!</CardTitle>
+                  <CardDescription>
+                    The quiz timer has reached 0. All your attempted answers have been automatically submitted and recorded.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-2">
+                  <Alert className="border-amber-500/30 bg-amber-500/5">
+                    <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs">
+                      Your quiz progress has been successfully saved.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button
+                    onClick={() => setShowTimeOverModal(false)}
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 text-base cursor-pointer shadow-lg"
+                    size="lg"
+                  >
+                    View Submission
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <div className="max-w-md w-full space-y-4 text-center p-6 border rounded-xl bg-card shadow-lg">
             <div className="w-16 h-16 rounded-full bg-green-600/10 flex items-center justify-center mx-auto">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
@@ -741,6 +898,39 @@ export default function QuizProctorInterface({
 
     return (
       <div className="min-h-screen bg-linear-to-br from-background to-muted p-4 py-8">
+        {/* Time-Over Notification Dialog in Fullscreen */}
+        {showTimeOverModal && (
+          <div className="fixed inset-0 bg-black/90 z-70 backdrop-blur-md flex items-center justify-center p-4">
+            <Card className="max-w-md w-full border-amber-500 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <CardHeader className="text-center pb-2">
+                <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-2 animate-bounce">
+                  <Clock className="h-8 w-8" />
+                </div>
+                <CardTitle className="text-2xl font-bold">Time Expired!</CardTitle>
+                <CardDescription>
+                  The quiz timer has reached 0. All your attempted answers have been automatically submitted and recorded.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-2">
+                <Alert className="border-amber-500/30 bg-amber-500/5">
+                  <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs">
+                    Your answers were submitted and evaluated automatically.
+                  </AlertDescription>
+                </Alert>
+
+                <Button
+                  onClick={() => setShowTimeOverModal(false)}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 text-base cursor-pointer shadow-lg"
+                  size="lg"
+                >
+                  View My Results
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         <div className="container mx-auto max-w-4xl space-y-6">
           {/* Header Card */}
           <Card>
@@ -1171,7 +1361,7 @@ export default function QuizProctorInterface({
 
               {/* Current Question */}
               {currentQuestion && (
-                <Card className={answers[currentQuestionIndex] !== undefined ? 'border-primary' : ''}>
+                <Card className={answers[currentOrigIndex] !== undefined ? 'border-primary' : ''}>
                   <CardHeader>
                     <CardTitle className="text-xl">
                       Question {currentQuestionIndex + 1}
@@ -1184,20 +1374,20 @@ export default function QuizProctorInterface({
                       {currentQuestion.options.map((option, oIndex) => (
                         <button
                           key={oIndex}
-                          onClick={() => handleAnswerSelect(currentQuestionIndex, oIndex)}
+                          onClick={() => handleAnswerSelect(currentOrigIndex, oIndex)}
                           className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                            answers[currentQuestionIndex] === oIndex
+                            answers[currentOrigIndex] === oIndex
                               ? 'border-primary bg-primary/10'
                               : 'border-muted hover:border-muted-foreground/50'
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              answers[currentQuestionIndex] === oIndex
+                              answers[currentOrigIndex] === oIndex
                                 ? 'border-primary bg-primary'
                                 : 'border-muted-foreground'
                             }`}>
-                              {answers[currentQuestionIndex] === oIndex && (
+                              {answers[currentOrigIndex] === oIndex && (
                                 <div className="w-3 h-3 rounded-full bg-white" />
                               )}
                             </div>
@@ -1207,7 +1397,7 @@ export default function QuizProctorInterface({
                       ))}
                     </div>
 
-                    {answers[currentQuestionIndex] !== undefined && (
+                    {answers[currentOrigIndex] !== undefined && (
                       <div className="flex items-center gap-2 text-sm text-green-600">
                         <Badge variant="outline" className="border-green-600 text-green-600">
                           Answered
@@ -1238,8 +1428,8 @@ export default function QuizProctorInterface({
 
                     {currentQuestionIndex === questions.length - 1 ? (
                       <Button
-                        onClick={handleSubmitQuiz}
-                        disabled={Object.keys(answers).length !== questions.length || isSubmitting}
+                        onClick={() => handleSubmitQuiz(false)}
+                        disabled={isSubmitting}
                         size="lg"
                         className="bg-green-600 hover:bg-green-700 cursor-pointer"
                       >
@@ -1270,23 +1460,27 @@ export default function QuizProctorInterface({
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-5 lg:grid-cols-4 gap-2">
-                    {questions.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleJumpToQuestion(index)}
-                        className={`
-                          aspect-square rounded-lg border-2 font-semibold text-sm transition-all
-                          ${currentQuestionIndex === index
-                            ? 'border-primary bg-primary text-primary-foreground cursor-pointer'
-                            : answers[index] !== undefined
-                            ? 'border-green-600 bg-green-600/10 text-green-600 cursor-pointer'
-                            : 'border-muted hover:border-muted-foreground/50 cursor-pointer'
-                          }
-                        `}
-                      >
-                        {index + 1}
-                      </button>
-                    ))}
+                    {questions.map((q, index) => {
+                      const qOrigIndex = q.originalIndex ?? index;
+                      const isAnswered = answers[qOrigIndex] !== undefined;
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handleJumpToQuestion(index)}
+                          className={`
+                            aspect-square rounded-lg border-2 font-semibold text-sm transition-all
+                            ${currentQuestionIndex === index
+                              ? 'border-primary bg-primary text-primary-foreground cursor-pointer'
+                              : isAnswered
+                              ? 'border-green-600 bg-green-600/10 text-green-600 cursor-pointer'
+                              : 'border-muted hover:border-muted-foreground/50 cursor-pointer'
+                            }
+                          `}
+                        >
+                          {index + 1}
+                        </button>
+                      );
+                    })}
                   </div>
                   
                   <div className="mt-4 pt-4 border-t space-y-2">
@@ -1306,8 +1500,8 @@ export default function QuizProctorInterface({
 
                   <div className="mt-4 pt-4 border-t">
                     <Button
-                      onClick={handleSubmitQuiz}
-                      disabled={Object.keys(answers).length !== questions.length || isSubmitting}
+                      onClick={() => handleSubmitQuiz(false)}
+                      disabled={isSubmitting}
                       className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
                       size="sm"
                     >

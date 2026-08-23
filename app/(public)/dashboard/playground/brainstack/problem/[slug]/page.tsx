@@ -26,7 +26,7 @@ export default function ProblemPage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
-  const slug = params.slug as string;
+  const slug = (params?.slug as string) || "";
 
   const problem = useQuery(api.problems.getBySlug, { slug });
   const createSubmission = useMutation(api.submissions.create);

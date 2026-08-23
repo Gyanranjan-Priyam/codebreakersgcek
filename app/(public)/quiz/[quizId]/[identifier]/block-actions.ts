@@ -82,12 +82,12 @@ export async function blockUserFromQuizAction(params: BlockUserFromQuizParams) {
           data: { status: "BLOCKED" },
         });
 
-        const { triggerPusherEvent } = await import("@/lib/pusher-server");
-        triggerPusherEvent(`quiz-${params.quizId}`, "blocked-updated", { quizId: params.quizId });
-        triggerPusherEvent(`quiz-${params.quizId}`, "system-updated", { quizId: params.quizId, systemCode: systemObj.systemCode });
-        triggerPusherEvent(`quiz-${params.quizIdentifier}`, "blocked-updated", { quizId: params.quizIdentifier });
-        triggerPusherEvent(`quiz-${params.quizIdentifier}`, "system-updated", { quizId: params.quizIdentifier, systemCode: systemObj.systemCode });
-        triggerPusherEvent(`system-${systemObj.systemCode}`, "status-changed", { status: "BLOCKED" });
+        const { emitSocketEvent } = await import("@/lib/socket-server");
+        emitSocketEvent(`quiz-${params.quizId}`, "blocked-updated", { quizId: params.quizId });
+        emitSocketEvent(`quiz-${params.quizId}`, "system-updated", { quizId: params.quizId, systemCode: systemObj.systemCode });
+        emitSocketEvent(`quiz-${params.quizIdentifier}`, "blocked-updated", { quizId: params.quizIdentifier });
+        emitSocketEvent(`quiz-${params.quizIdentifier}`, "system-updated", { quizId: params.quizIdentifier, systemCode: systemObj.systemCode });
+        emitSocketEvent(`system-${systemObj.systemCode}`, "status-changed", { status: "BLOCKED" });
       }
     } else {
       // Internal user -> update global ban status

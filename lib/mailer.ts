@@ -1579,7 +1579,7 @@ export const generateInvoiceDesignHTML = ({
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
                   <td align="left" valign="top">
-                    <p style="margin: 0;">contact.gyanranjan@gmail.com</p>
+                    <p style="margin: 0;">gcek.codebreakers@gmail.com</p>
                     <p style="margin: 0;">CodeBreakers • GCEK Bhawanipatna</p>
                   </td>
                   <td align="right" valign="top">

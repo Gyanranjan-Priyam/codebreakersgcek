@@ -39,6 +39,7 @@ interface System {
   systemCode: string;
   systemNumber: string;
   status: string;
+  assignedResponseId?: string | null;
   assignedStudentName: string | null;
   assignedStudentEmail: string | null;
   assignedSet: string | null;
@@ -505,26 +506,38 @@ export default function SystemsManagementView({
                     <div className="space-y-1 mt-2">
                       <p className="text-[10px] text-muted-foreground font-medium">Or pick from form responses:</p>
                       <div className="max-h-28 overflow-y-auto space-y-1 border rounded bg-background p-1">
-                        {formResponses.map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            className="w-full flex items-center justify-between text-[11px] p-1.5 rounded hover:bg-muted text-left transition-colors"
-                            onClick={() => {
-                              setResponseId(r.id);
-                              setStudentName(r.submittedByName || "");
-                              setStudentEmail(r.submittedByEmail || "");
-                              toast.info(`Selected: ${r.submittedByName || r.id.slice(0, 6)}`);
-                            }}
-                          >
-                            <span className="font-medium truncate max-w-[180px]">
-                              {r.submittedByName || `Response ${r.id.slice(0, 6)}`}
-                            </span>
-                            <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                              {r.id.slice(0, 6)}...
-                            </span>
-                          </button>
-                        ))}
+                        {formResponses.map((r) => {
+                          const alreadySys = systems.find(
+                            (s) => s.assignedResponseId === r.id ||
+                            (s.assignedStudentEmail && r.submittedByEmail && s.assignedStudentEmail.toLowerCase() === r.submittedByEmail.toLowerCase())
+                          );
+                          return (
+                            <button
+                              key={r.id}
+                              type="button"
+                              disabled={!!alreadySys}
+                              className={`w-full flex items-center justify-between text-[11px] p-1.5 rounded text-left transition-colors ${
+                                alreadySys
+                                  ? "opacity-40 cursor-not-allowed bg-muted/30"
+                                  : "hover:bg-muted cursor-pointer"
+                              }`}
+                              onClick={() => {
+                                if (alreadySys) return;
+                                setResponseId(r.id);
+                                setStudentName(r.submittedByName || "");
+                                setStudentEmail(r.submittedByEmail || "");
+                                toast.info(`Selected: ${r.submittedByName || r.id.slice(0, 6)}`);
+                              }}
+                            >
+                              <span className="font-medium truncate max-w-[180px]">
+                                {r.submittedByName || `Response ${r.id.slice(0, 6)}`} {alreadySys ? `(Assigned: ${alreadySys.systemNumber})` : ""}
+                              </span>
+                              <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                                {r.id.slice(0, 6)}...
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

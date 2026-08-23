@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,8 +38,11 @@ import {
   getStudentDetailsByResponseId,
   getQuizMonitorData,
   unblockQuizCandidate,
+  deleteExternalSystem,
+  clearAllExternalSystems,
+  autoShuffleAndAssignSets,
 } from "../../actions";
-import { getPusherClient } from "@/lib/pusher-client";
+import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 import {
   Monitor,
   UserPlus,
@@ -55,6 +58,9 @@ import {
   ShieldAlert,
   Unlock,
   User,
+  Trash2,
+  Shuffle,
+  AlertTriangle,
 } from "lucide-react";
 
 interface FormResponseOption {
@@ -101,8 +107,7 @@ export function ExternalSystemPanel({
   // Blocked member details modal state
   const [selectedBlockedMember, setSelectedBlockedMember] = useState<any>(null);
   const [isUnblocking, setIsUnblocking] = useState(false);
-
-  // Smart optimized polling: single server request, pauses when tab is inactive/hidden
+  // Fetch all monitor data from server
   const fetchMonitorData = async (showToast = false) => {
     setIsRefreshing(true);
     const res = await getQuizMonitorData(quizId);
@@ -116,30 +121,33 @@ export function ExternalSystemPanel({
     setIsRefreshing(false);
   };
 
-  // 0ms Instant Real-time WebSockets subscription with Pusher + smart fallback
+  // Debounce ref for Socket.IO events to prevent thundering herd
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedFetch = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchMonitorData();
+    }, 300);
+  };
+
+  // Real-time Socket.IO subscription + fast fallback polling
   useEffect(() => {
     fetchMonitorData();
 
-    // Subscribe to Pusher channel for 0ms instant WebSockets updates
-    const pusher = getPusherClient();
-    let channel: any = null;
+    // Initialize Socket.IO and subscribe to quiz room
+    let leaveRoom: (() => void) | null = null;
 
-    if (pusher) {
-      const channelName = `quiz-${quizId}`;
-      channel = pusher.subscribe(channelName);
+    initSocket().then((socket) => {
+      if (!socket) return;
 
-      channel.bind("system-updated", () => {
-        fetchMonitorData();
-      });
-      channel.bind("blocked-updated", () => {
-        fetchMonitorData();
-      });
-      channel.bind("quiz-started-all", () => {
-        fetchMonitorData();
-      });
-    }
+      leaveRoom = joinRoom(`quiz-${quizId}`);
 
-    // Activity-aware fallback check (only when active/visible)
+      socket.on("system-updated", debouncedFetch);
+      socket.on("blocked-updated", debouncedFetch);
+      socket.on("quiz-started-all", debouncedFetch);
+    });
+
+    // Fast fallback polling (5s) — ensures updates even if Socket.IO event is missed
     let intervalId: NodeJS.Timeout | null = null;
     const startPolling = () => {
       if (!intervalId) {
@@ -147,7 +155,7 @@ export function ExternalSystemPanel({
           if (document.visibilityState === "visible") {
             fetchMonitorData();
           }
-        }, 12000);
+        }, 5000);
       }
     };
     const stopPolling = () => {
@@ -169,10 +177,14 @@ export function ExternalSystemPanel({
     startPolling();
 
     return () => {
-      if (channel && pusher) {
-        channel.unbind_all();
-        pusher.unsubscribe(`quiz-${quizId}`);
+      if (leaveRoom) leaveRoom();
+      const socket = getSocket();
+      if (socket) {
+        socket.off("system-updated", debouncedFetch);
+        socket.off("blocked-updated", debouncedFetch);
+        socket.off("quiz-started-all", debouncedFetch);
       }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       stopPolling();
     };
@@ -211,7 +223,10 @@ export function ExternalSystemPanel({
     setSelectedResponseId("");
     setCustomName(sys.assignedStudentName || "");
     setCustomEmail(sys.assignedStudentEmail || "");
-    setAssignedSet(sys.assignedSet || "A");
+    const sysIndex = systems.findIndex((s) => s.id === sys.id);
+    const numSets = sets || 1;
+    const alternatingSet = String.fromCharCode(65 + (Math.max(0, sysIndex) % numSets));
+    setAssignedSet(sys.assignedSet || alternatingSet);
     setAssignDialogOpen(true);
   };
 
@@ -294,9 +309,45 @@ export function ExternalSystemPanel({
     setIsUnblocking(false);
   };
 
+  const handleDeleteSystem = async (sysId: string, sysNum: string) => {
+    if (!window.confirm(`Are you sure you want to remove system ${sysNum}? This will disconnect the kiosk.`)) return;
+    const res = await deleteExternalSystem(sysId);
+    if (res.status === "success") {
+      toast.success(`Removed system ${sysNum}`);
+      fetchMonitorData();
+    } else {
+      toast.error(res.message || "Failed to remove system");
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm(`Are you sure you want to clear and disconnect all ${systems.length} systems? This cannot be undone.`)) return;
+    const res = await clearAllExternalSystems(quizId);
+    if (res.status === "success") {
+      toast.success(res.message);
+      fetchMonitorData();
+    } else {
+      toast.error(res.message || "Failed to clear systems");
+    }
+  };
+
+  const [isShufflingSets, setIsShufflingSets] = useState(false);
+
+  const handleAutoShuffleSets = async () => {
+    setIsShufflingSets(true);
+    const res = await autoShuffleAndAssignSets(quizId);
+    if (res.status === "success") {
+      toast.success(res.message);
+      fetchMonitorData();
+    } else {
+      toast.error(res.message || "Failed to shuffle sets");
+    }
+    setIsShufflingSets(false);
+  };
+
   const registeredCount = systems.filter((s) => s.status === "REGISTERED").length;
   const assignedCount = systems.filter((s) => s.status === "ASSIGNED").length;
-  const inProgressCount = systems.filter((s) => s.status === "IN_PROGRESS").length;
+  const attemptingCount = systems.filter((s) => s.status === "ATTEMPTING" || s.status === "IN_PROGRESS").length;
   const completedCount = systems.filter((s) => s.status === "COMPLETED").length;
   const blockedCount = blockedMembers.length;
 
@@ -360,13 +411,13 @@ export function ExternalSystemPanel({
             <div className="text-xs text-muted-foreground mt-0.5">Ready for quiz launch</div>
           </div>
 
-          <div className="p-3.5 rounded-lg border bg-muted/20">
-            <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase">
-              <span>In Progress</span>
-              <Clock className="h-4 w-4 text-amber-500 animate-spin" />
+          <div className="p-3.5 rounded-lg border bg-blue-500/10 border-blue-500/20">
+            <div className="flex items-center justify-between text-blue-600 text-xs font-semibold uppercase">
+              <span>Attempting</span>
+              <Play className="h-4 w-4 text-blue-600 animate-pulse" />
             </div>
-            <div className="text-2xl font-bold mt-2">{inProgressCount}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Currently taking quiz</div>
+            <div className="text-2xl font-bold text-blue-600 mt-2">{attemptingCount}</div>
+            <div className="text-xs text-blue-600/80 mt-0.5">Currently taking quiz</div>
           </div>
 
           <div className="p-3.5 rounded-lg border bg-muted/20">
@@ -429,6 +480,19 @@ export function ExternalSystemPanel({
               Blocked Members ({blockedCount})
             </Button>
 
+            {sets > 1 && systems.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAutoShuffleSets}
+                disabled={isShufflingSets}
+                className="border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+              >
+                <Shuffle className={`h-4 w-4 mr-1.5 ${isShufflingSets ? "animate-spin" : ""}`} />
+                Shuffle & Assign Sets
+              </Button>
+            )}
+
             {assignedCount > 0 && (
               <Button
                 size="sm"
@@ -437,6 +501,18 @@ export function ExternalSystemPanel({
               >
                 <Zap className="h-4 w-4 mr-2" />
                 Start Quiz for All Assigned ({assignedCount})
+              </Button>
+            )}
+
+            {systems.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearAll}
+                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Clear All Systems ({systems.length})
               </Button>
             )}
           </div>
@@ -509,12 +585,7 @@ export function ExternalSystemPanel({
                           Ready to Start
                         </Badge>
                       )}
-                      {sys.status === "IN_PROGRESS" && (
-                        <Badge variant="outline" className="border-amber-500/40 text-amber-500">
-                          Exam Launched
-                        </Badge>
-                      )}
-                      {sys.status === "ATTEMPTING" && (
+                      {(sys.status === "ATTEMPTING" || sys.status === "IN_PROGRESS") && (
                         <Badge variant="default" className="bg-blue-600 text-white animate-pulse">
                           Attempting
                         </Badge>
@@ -564,11 +635,7 @@ export function ExternalSystemPanel({
                           </>
                         )}
 
-                        {sys.status === "IN_PROGRESS" && (
-                          <span className="text-xs text-amber-500 font-medium">Exam Launched</span>
-                        )}
-
-                        {sys.status === "ATTEMPTING" && (
+                        {(sys.status === "ATTEMPTING" || sys.status === "IN_PROGRESS") && (
                           <span className="text-xs text-blue-600 font-semibold animate-pulse">Attempting Exam...</span>
                         )}
 
@@ -579,6 +646,16 @@ export function ExternalSystemPanel({
                         {sys.status === "BLOCKED" && (
                           <span className="text-xs text-destructive font-semibold">Blocked</span>
                         )}
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteSystem(sys.id, sys.systemNumber)}
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                          title="Remove System"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -733,15 +810,44 @@ export function ExternalSystemPanel({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="custom">-- Custom / Manual Entry --</SelectItem>
-                    {formResponses.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.submittedByName || "Unnamed"} ({r.submittedByEmail || r.id})
-                      </SelectItem>
-                    ))}
+                    {formResponses.map((r) => {
+                      const alreadySys = systems.find(
+                        (s) => s.id !== selectedSystem?.id && (
+                          s.assignedResponseId === r.id ||
+                          (s.assignedStudentEmail && r.submittedByEmail && s.assignedStudentEmail.toLowerCase() === r.submittedByEmail.toLowerCase())
+                        )
+                      );
+                      return (
+                        <SelectItem key={r.id} value={r.id} disabled={!!alreadySys}>
+                          {r.submittedByName || "Unnamed"} ({r.submittedByEmail || r.id}) {alreadySys ? `[Assigned: ${alreadySys.systemNumber}]` : ""}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
             )}
+
+            {/* Duplicate Assignment Warning Banner */}
+            {(() => {
+              const duplicateSys = systems.find(
+                (s) => s.id !== selectedSystem?.id && (
+                  (s.assignedResponseId && selectedResponseId && selectedResponseId !== "custom" && s.assignedResponseId === selectedResponseId) ||
+                  (s.assignedStudentEmail && customEmail && s.assignedStudentEmail.toLowerCase() === customEmail.trim().toLowerCase())
+                )
+              );
+              if (duplicateSys) {
+                return (
+                  <div className="text-xs p-2.5 rounded-lg border border-destructive/40 bg-destructive/10 text-destructive font-medium flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>
+                      <strong>Candidate Already Assigned:</strong> This participant is already assigned to {duplicateSys.systemNumber}. They cannot be assigned again.
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Auto-filled Name */}
             <div className="space-y-1.5">

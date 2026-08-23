@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { prisma } from "@/lib/db";
@@ -10,6 +11,45 @@ interface SubmitQuizData {
   answers: Record<number, number>;
   tabSwitches: number;
   questionsJson: string;
+}
+
+function findCorrectAnswerIndex(question: any): number {
+  if (!question || !Array.isArray(question.options)) return -1;
+  const rawAnswer = question.answer !== undefined ? question.answer : question.correctAnswer;
+  if (rawAnswer === undefined || rawAnswer === null) return -1;
+
+  // 1. Direct number index (e.g. 0, 1, 2)
+  if (typeof rawAnswer === "number" && rawAnswer >= 0 && rawAnswer < question.options.length) {
+    return rawAnswer;
+  }
+
+  // 2. Numeric string index (e.g. "0", "1")
+  if (typeof rawAnswer === "string" && /^\d+$/.test(rawAnswer.trim())) {
+    const parsed = parseInt(rawAnswer.trim(), 10);
+    if (parsed >= 0 && parsed < question.options.length) {
+      return parsed;
+    }
+  }
+
+  // 3. Letter index (e.g. "A", "B", "C", "D" or "a", "b", "c", "d")
+  if (typeof rawAnswer === "string" && /^[A-Za-z]$/.test(rawAnswer.trim())) {
+    const letterIdx = rawAnswer.trim().toUpperCase().charCodeAt(0) - 65;
+    if (letterIdx >= 0 && letterIdx < question.options.length) {
+      return letterIdx;
+    }
+  }
+
+  // 4. Exact or trimmed / case-insensitive match against option strings
+  if (typeof rawAnswer === "string") {
+    const cleaned = rawAnswer.trim().toLowerCase();
+    const matchIdx = question.options.findIndex(
+      (opt: string) => typeof opt === "string" && opt.trim().toLowerCase() === cleaned
+    );
+    if (matchIdx !== -1) return matchIdx;
+  }
+
+  // 5. Direct equality fallback
+  return question.options.findIndex((opt: string) => opt == rawAnswer);
 }
 
 export async function submitQuizAttempt(data: SubmitQuizData) {
@@ -77,41 +117,41 @@ export async function submitQuizAttempt(data: SubmitQuizData) {
       };
     }
 
-    // Calculate correct answers
+    // Calculate correct answers accurately
     let correctAnswers = 0;
-    const answersArray = Object.entries(data.answers).map(([qIndex, aIndex]) => {
-      const question = questions[parseInt(qIndex)];
-      // Convert string answer to index by finding which option matches
-      const correctAnswerIndex = question?.options?.findIndex((opt: string) => opt === question.answer) ?? -1;
-      const isCorrect = correctAnswerIndex === aIndex;
+    const answersArray = Object.entries(data.answers).map(([qIndexStr, aIndex]) => {
+      const questionIndex = parseInt(qIndexStr, 10);
+      const question = questions[questionIndex];
+      const correctAnswerIndex = findCorrectAnswerIndex(question);
+      const isCorrect = correctAnswerIndex !== -1 && correctAnswerIndex === aIndex;
       if (isCorrect) correctAnswers++;
       return {
-        questionIndex: parseInt(qIndex),
+        questionIndex,
         answerIndex: aIndex,
         correct: isCorrect,
       };
     });
 
     // Create detailed results for frontend
-    const detailedResults = Object.entries(data.answers).map(([qIndex, userAnswer]) => {
-      const questionIndex = parseInt(qIndex);
+    const detailedResults = Object.entries(data.answers).map(([qIndexStr, userAnswer]) => {
+      const questionIndex = parseInt(qIndexStr, 10);
       const question = questions[questionIndex];
-      // Convert string answer to index by finding which option matches
-      const correctAnswerIndex = question.options.findIndex((opt: string) => opt === question.answer);
+      const correctAnswerIndex = findCorrectAnswerIndex(question);
       return {
         questionIndex,
-        question: question.question,
+        question: question ? question.question : "",
         userAnswer,
         correctAnswer: correctAnswerIndex,
-        isCorrect: correctAnswerIndex === userAnswer,
-        options: question.options,
+        isCorrect: correctAnswerIndex !== -1 && correctAnswerIndex === userAnswer,
+        options: question ? question.options : [],
       };
     });
 
     const totalQuestions = questions.length;
-    const score = Math.round((correctAnswers / totalQuestions) * 100);
+    const score = totalQuestions > 0 ? Number(((correctAnswers / totalQuestions) * 100).toFixed(2)) : 0;
     
-    const pointsEarned = correctAnswers * (quiz?.pointsPerQuestion || 1);
+    const pointsPerQ = Number(quiz?.pointsPerQuestion ?? 1);
+    const pointsEarned = Number((correctAnswers * pointsPerQ).toFixed(2));
 
     // Convert set letter to number (A=0, B=1, etc.)
     const setNumber = data.assignedSet.charCodeAt(0) - 65;

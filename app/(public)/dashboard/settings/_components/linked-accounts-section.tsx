@@ -19,8 +19,8 @@ export function LinkedAccountsSection({ githubUsername }: LinkedAccountsSectionP
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const github = searchParams.get("github");
-    const error = searchParams.get("error");
+    const github = searchParams?.get("github");
+    const error = searchParams?.get("error");
 
     if (github === "linked") {
       toast.success("GitHub account linked successfully!");

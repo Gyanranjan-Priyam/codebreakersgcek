@@ -188,7 +188,7 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
             {/* Footer */}
             <footer className="pt-8 border-t border-[#E7E5DE] text-[11px] text-[#78716C] flex flex-col sm:flex-row justify-between gap-4">
               <div>
-                <p>contact.gyanranjan@gmail.com</p>
+                <p>gcek.codebreakers@gmail.com</p>
                 <p>CodeBreakers • GCEK Bhawanipatna</p>
               </div>
               <div className="sm:text-right">

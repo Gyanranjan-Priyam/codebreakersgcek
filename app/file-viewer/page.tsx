@@ -57,8 +57,8 @@ const FileViewer = () => {
   const [error, setError] = useState<string | null>(null);
   
   const searchParams = useSearchParams();
-  const attachmentId = searchParams.get("id");
-  const type = searchParams.get("type"); // "user" or "response"
+  const attachmentId = searchParams?.get("id");
+  const type = searchParams?.get("type"); // "user" or "response"
 
   useEffect(() => {
     if (!attachmentId) {

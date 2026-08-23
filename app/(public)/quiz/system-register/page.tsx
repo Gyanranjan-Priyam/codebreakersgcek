@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { registerExternalSystem, getSystemState } from "@/app/admin/quizzes/actions";
+import { registerExternalSystem, getSystemState, unregisterExternalSystem } from "@/app/admin/quizzes/actions";
 import { Monitor, Key, Loader2, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
-import { getPusherClient } from "@/lib/pusher-client";
+import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 
 export default function SystemRegisterPage() {
   const router = useRouter();
@@ -39,7 +39,7 @@ export default function SystemRegisterPage() {
     }
   }, []);
 
-  // Real-time WebSockets subscription with Pusher + fallback check
+  // Real-time Socket.IO subscription + fast polling fallback for quiz start & assign
   useEffect(() => {
     if (!activeSession?.systemCode) return;
 
@@ -47,33 +47,103 @@ export default function SystemRegisterPage() {
       const res = await getSystemState(activeSession.systemCode);
       if (res.status === "success" && res.data) {
         setLiveState(res.data);
+        
+        // Auto-enter fullscreen if candidate is assigned or in-progress
+        if (res.data.status === "ASSIGNED" || res.data.status === "IN_PROGRESS") {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }
+
         if (res.data.status === "IN_PROGRESS") {
           toast.success("Quiz started! Launching exam environment...");
           router.push(`/quiz-external/${activeSession.systemCode}`);
         }
+      } else {
+        // System was deleted or cleared on server
+        localStorage.removeItem("cb_external_system_session");
+        try {
+          localStorage.removeItem(`cb_answers_${activeSession.systemCode}`);
+          localStorage.removeItem(`cb_qidx_${activeSession.systemCode}`);
+        } catch (e) {}
+        setActiveSession(null);
+        setLiveState(null);
+        toast.info("System registration was reset");
       }
     };
 
     checkState();
 
-    // Subscribe to Pusher channel for 0ms instant WebSockets updates
-    const pusher = getPusherClient();
-    if (pusher) {
-      const channelName = `system-${activeSession.systemCode}`;
-      const channel = pusher.subscribe(channelName);
-      channel.bind("status-changed", () => {
-        checkState();
-      });
-      channel.bind("quiz-started", () => {
-        toast.success("Quiz started! Launching exam environment...");
-        router.push(`/quiz-external/${activeSession.systemCode}`);
-      });
+    // Auto-enter fullscreen on any interaction while on waiting screen
+    const handleAutoFullscreenInteraction = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    };
+    window.addEventListener("click", handleAutoFullscreenInteraction, { capture: true });
+    window.addEventListener("pointerdown", handleAutoFullscreenInteraction, { capture: true });
+    window.addEventListener("keydown", handleAutoFullscreenInteraction, { capture: true });
 
-      return () => {
-        channel.unbind_all();
-        pusher.unsubscribe(channelName);
+    // Subscribe to Socket.IO for instant updates
+    let leaveRoomFn: (() => void) | null = null;
+    let handleStatusChanged: ((data: any) => void) | null = null;
+    let handleQuizStarted: (() => void) | null = null;
+
+    initSocket().then((socket) => {
+      if (!socket) return;
+
+      leaveRoomFn = joinRoom(`system-${activeSession.systemCode}`);
+
+      handleStatusChanged = (data: any) => {
+        if (data?.status === "DISCONNECTED") {
+          localStorage.removeItem("cb_external_system_session");
+          try {
+            localStorage.removeItem(`cb_answers_${activeSession.systemCode}`);
+            localStorage.removeItem(`cb_qidx_${activeSession.systemCode}`);
+          } catch (e) {}
+          setActiveSession(null);
+          setLiveState(null);
+          toast.info("System registration cleared");
+          return;
+        }
+
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+        checkState();
       };
-    }
+
+      handleQuizStarted = async () => {
+        toast.success("Quiz started! Launching exam environment...");
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+        router.push(`/quiz-external/${activeSession.systemCode}`);
+      };
+
+      socket.on("status-changed", handleStatusChanged);
+      socket.on("quiz-started", handleQuizStarted);
+    });
+
+    // Fast polling fallback (3s) — guarantees start detection even if Socket.IO misses
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        checkState();
+      }
+    }, 3000);
+
+    return () => {
+      if (leaveRoomFn) leaveRoomFn();
+      const socket = getSocket();
+      if (socket) {
+        if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
+        if (handleQuizStarted) socket.off("quiz-started", handleQuizStarted);
+      }
+      window.removeEventListener("click", handleAutoFullscreenInteraction, { capture: true });
+      window.removeEventListener("pointerdown", handleAutoFullscreenInteraction, { capture: true });
+      window.removeEventListener("keydown", handleAutoFullscreenInteraction, { capture: true });
+      clearInterval(pollInterval);
+    };
   }, [activeSession, router]);
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -85,6 +155,15 @@ export default function SystemRegisterPage() {
     if (!systemNumber.trim()) {
       toast.error("Please enter your System / Desk Number");
       return;
+    }
+
+    // Auto-enter fullscreen immediately when user clicks register button (direct user gesture)
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (err) {
+      console.warn("Auto fullscreen on registration:", err);
     }
 
     setIsSubmitting(true);
@@ -106,11 +185,18 @@ export default function SystemRegisterPage() {
     setIsSubmitting(false);
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    if (activeSession?.systemCode) {
+      await unregisterExternalSystem(activeSession.systemCode);
+      try {
+        localStorage.removeItem(`cb_answers_${activeSession.systemCode}`);
+        localStorage.removeItem(`cb_qidx_${activeSession.systemCode}`);
+      } catch (e) {}
+    }
     localStorage.removeItem("cb_external_system_session");
     setActiveSession(null);
     setLiveState(null);
-    toast.info("System registration cleared");
+    toast.info("System registration cleared and removed from admin dashboard");
   };
 
   // ── Registered & Waiting Screen ──
@@ -159,14 +245,15 @@ export default function SystemRegisterPage() {
                   <Alert>
                     <Clock className="h-4 w-4" />
                     <AlertDescription className="text-sm">
-                      Waiting for admin to start the quiz...
+                      Waiting for admin to start the quiz... Fullscreen will launch automatically.
                     </AlertDescription>
                   </Alert>
                 </>
               ) : liveState?.status === "IN_PROGRESS" ? (
-                <Alert>
+                <Alert className="bg-green-600/10 border-green-600/30 text-green-700 dark:text-green-400">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-sm font-semibold">
-                    Exam starting — redirecting now...
+                    Exam is starting — redirecting to full screen exam environment...
                   </AlertDescription>
                 </Alert>
               ) : (

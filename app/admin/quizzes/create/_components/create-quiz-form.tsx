@@ -66,7 +66,7 @@ const formSchema = z.object({
   feedbackFormId: z.string().optional(),
   sets: z.number().min(1).max(8),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
-  pointsPerQuestion: z.number().min(1, "Points must be at least 1"),
+  pointsPerQuestion: z.number().min(0.01, "Points must be greater than 0"),
   startDateTime: z.date(),
   endDateTime: z.date(),
   questionsJson: z.string().optional(),
@@ -392,7 +392,7 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
               <FormItem>
                 <FormLabel>Points / Question</FormLabel>
                 <FormControl>
-                  <Input type="number" min={1} {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                  <Input type="number" step="any" min={0.01} {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

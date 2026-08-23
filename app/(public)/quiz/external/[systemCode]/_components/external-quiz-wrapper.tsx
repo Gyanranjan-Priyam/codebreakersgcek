@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import QuizProctorInterface from "@/app/(public)/quiz/[quizId]/[identifier]/_components/quiz-proctor-interface";
 import { submitExternalQuizAttemptFromInterface } from "../actions";
-import { getSystemState } from "@/app/admin/quizzes/actions";
+import { getSystemState, setSystemAttemptingAction } from "@/app/admin/quizzes/actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ShieldAlert, FileText } from "lucide-react";
-import { getPusherClient } from "@/lib/pusher-client";
+import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 import { toast } from "sonner";
 
 interface ExternalQuizWrapperProps {
@@ -46,33 +46,65 @@ export default function ExternalQuizWrapper({
     setLiveIsBlocked(isBlocked);
   }, [isBlocked]);
 
-  // Pusher WebSockets real-time unblock listener + rapid status check when blocked
+  // Set system to ATTEMPTING status on mount
+  useEffect(() => {
+    if (systemCode && (isAttempting || !liveIsBlocked) && !isCompleted) {
+      setSystemAttemptingAction(systemCode).catch((err) => {
+        console.error("Failed to set system status to ATTEMPTING:", err);
+      });
+    }
+  }, [systemCode, isAttempting, liveIsBlocked, isCompleted]);
+
+  // Auto-enter fullscreen when quiz is started by admin
+  useEffect(() => {
+    if ((isAttempting || !liveIsBlocked) && !isCompleted) {
+      const tryFullscreen = async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (e) {
+          // Fullscreen may be blocked by browser until user interaction
+          console.warn("Auto-fullscreen blocked by browser:", e);
+        }
+      };
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(tryFullscreen, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAttempting, liveIsBlocked, isCompleted]);
+
+  // Socket.IO real-time unblock listener + fast polling when blocked
   useEffect(() => {
     if (!systemCode) return;
 
-    // 1. WebSockets channel listener
-    const pusher = getPusherClient();
-    let channel: any = null;
+    let leaveRoomFn: (() => void) | null = null;
+    let handleUnblocked: (() => void) | null = null;
+    let handleStatusChanged: ((data: { status?: string }) => void) | null = null;
 
-    if (pusher) {
-      const channelName = `system-${systemCode}`;
-      channel = pusher.subscribe(channelName);
+    initSocket().then((socket) => {
+      if (!socket) return;
 
-      channel.bind("unblocked", () => {
+      leaveRoomFn = joinRoom(`system-${systemCode}`);
+
+      handleUnblocked = () => {
         setLiveIsBlocked(false);
         toast.success("You have been unblocked by the administrator! Resuming exam...");
-      });
+      };
 
-      channel.bind("status-changed", (data: { status?: string }) => {
+      handleStatusChanged = (data: { status?: string }) => {
         if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
           setLiveIsBlocked(false);
         } else if (data?.status === "BLOCKED") {
           setLiveIsBlocked(true);
         }
-      });
-    }
+      };
 
-    // 2. Rapid status polling fallback when blocked to guarantee instant unblock
+      socket.on("unblocked", handleUnblocked);
+      socket.on("status-changed", handleStatusChanged);
+    });
+
+    // Fast polling fallback when blocked (2s) to guarantee instant unblock
     let pollTimer: NodeJS.Timeout | null = null;
     if (liveIsBlocked) {
       pollTimer = setInterval(async () => {
@@ -87,9 +119,11 @@ export default function ExternalQuizWrapper({
     }
 
     return () => {
-      if (channel && pusher) {
-        channel.unbind_all();
-        pusher.unsubscribe(`system-${systemCode}`);
+      if (leaveRoomFn) leaveRoomFn();
+      const socket = getSocket();
+      if (socket) {
+        if (handleUnblocked) socket.off("unblocked", handleUnblocked);
+        if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
       }
       if (pollTimer) {
         clearInterval(pollTimer);

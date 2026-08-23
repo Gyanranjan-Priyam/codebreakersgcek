@@ -417,7 +417,7 @@ model Quiz {
   description       String               @db.Text // Description and rules
   sets              Int                  @default(1) // Number of sets (1-8)
   duration          Int                  // Duration in minutes
-  pointsPerQuestion Int                  @default(1) // Points awarded per correct answer
+  pointsPerQuestion Float                @default(1) // Points awarded per correct answer
   startDateTime     DateTime?            // Quiz start date and time
   endDateTime       DateTime?            // Quiz end date and time
   questionsJson     String               @db.Text // JSON string of questions
@@ -479,10 +479,10 @@ model QuizAttempt {
   participantEmail String?   // For external participants
   externalSystemId String?   // Linked ExternalQuizSystem ID
   setNumber        Int       // Which set (1 for A, 2 for B, etc.)
-  score            Int       @default(0)
+  score            Float     @default(0)
   totalQuestions   Int
   correctAnswers   Int       @default(0)
-  pointsEarned     Int       @default(0)
+  pointsEarned     Float     @default(0)
   startedAt        DateTime  @default(now())
   completedAt      DateTime?
   answersJson      String?   @db.Text // JSON string of user's answers

@@ -78,8 +78,8 @@ const AttachmentListViewer = () => {
 
   useEffect(() => {
     try {
-      const ticketParam = searchParams.get("ticketNumber");
-      const attachmentsParam = searchParams.get("attachments");
+      const ticketParam = searchParams?.get("ticketNumber");
+      const attachmentsParam = searchParams?.get("attachments");
 
       if (!ticketParam || !attachmentsParam) {
         setError("Missing ticket information");

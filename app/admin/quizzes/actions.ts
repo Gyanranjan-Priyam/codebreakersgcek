@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
 import { revalidatePath } from "next/cache";
-import { triggerPusherEvent } from "@/lib/pusher-server";
+import { emitSocketEvent, emitSocketEventToRooms } from "@/lib/socket-server";
 
 export interface QuizData {
   id: string;
@@ -403,17 +403,56 @@ export async function registerExternalSystem(accessCode: string, systemNumber: s
     // Check existing systems to compute alternating set for conjugate system
     const existing = await prisma.externalQuizSystem.findMany({
       where: { quizId: quiz.id },
-      select: { systemNumber: true },
+      select: { systemNumber: true, assignedSet: true },
     });
 
-    const allSysNumbers = Array.from(new Set([...existing.map((s) => s.systemNumber), cleanSysNumber]));
+    // Clean up any stale uncompleted system with the same systemNumber on this quiz
+    const staleSystems = await prisma.externalQuizSystem.findMany({
+      where: {
+        quizId: quiz.id,
+        systemNumber: cleanSysNumber,
+        status: { in: ["REGISTERED", "ASSIGNED"] },
+      },
+    });
+
+    if (staleSystems.length > 0) {
+      const staleIds = staleSystems.map((s) => s.id);
+      await prisma.externalQuizSystem.deleteMany({
+        where: { id: { in: staleIds } },
+      });
+    }
+
+    const sortedExisting = existing.sort((a, b) =>
+      a.systemNumber.localeCompare(b.systemNumber, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    const allSysNumbers = Array.from(new Set([...sortedExisting.map((s) => s.systemNumber), cleanSysNumber]));
     allSysNumbers.sort((a, b) =>
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
     );
 
     const sortedIndex = allSysNumbers.indexOf(cleanSysNumber);
     const numSets = quiz.sets || 1;
-    const autoAssignedSet = String.fromCharCode(65 + (sortedIndex % numSets));
+    let autoAssignedSet = "A";
+
+    if (numSets > 1) {
+      const setLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
+      const prevSysNum = sortedIndex > 0 ? allSysNumbers[sortedIndex - 1] : null;
+      const nextSysNum = sortedIndex < allSysNumbers.length - 1 ? allSysNumbers[sortedIndex + 1] : null;
+
+      const prevSys = sortedExisting.find((s) => s.systemNumber === prevSysNum);
+      const nextSys = sortedExisting.find((s) => s.systemNumber === nextSysNum);
+
+      const neighborSets = new Set([prevSys?.assignedSet, nextSys?.assignedSet].filter(Boolean));
+      const validSets = setLetters.filter((s) => !neighborSets.has(s));
+
+      if (validSets.length > 0) {
+        autoAssignedSet = validSets[Math.floor(Math.random() * validSets.length)];
+      } else {
+        const nonPrev = setLetters.filter((s) => s !== prevSys?.assignedSet);
+        autoAssignedSet = (nonPrev.length > 0 ? nonPrev[Math.floor(Math.random() * nonPrev.length)] : null) || setLetters[sortedIndex % numSets];
+      }
+    }
 
     const systemCode = `SYS-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -427,8 +466,8 @@ export async function registerExternalSystem(accessCode: string, systemNumber: s
       },
     });
 
-    triggerPusherEvent(`quiz-${quiz.id}`, "system-updated", { systemCode: system.systemCode, quizId: quiz.id });
-    triggerPusherEvent(`quiz-${quiz.quizId}`, "system-updated", { systemCode: system.systemCode, quizId: quiz.quizId });
+    emitSocketEvent(`quiz-${quiz.id}`, "system-updated", { systemCode: system.systemCode, quizId: quiz.id });
+    emitSocketEvent(`quiz-${quiz.quizId}`, "system-updated", { systemCode: system.systemCode, quizId: quiz.quizId });
 
     return {
       status: "success" as const,
@@ -443,6 +482,107 @@ export async function registerExternalSystem(accessCode: string, systemNumber: s
   } catch (error) {
     console.error("Error registering external system:", error);
     return { status: "error" as const, message: "Failed to register system" };
+  }
+}
+
+export async function unregisterExternalSystem(systemCode: string) {
+  try {
+    const cleanCode = systemCode.trim();
+    if (!cleanCode) {
+      return { status: "error" as const, message: "System code is required" };
+    }
+
+    const system = await prisma.externalQuizSystem.findUnique({
+      where: { systemCode: cleanCode },
+      include: { quiz: { select: { id: true, quizId: true } } },
+    });
+
+    if (!system) {
+      return { status: "success" as const, message: "System not found or already cleared" };
+    }
+
+    await prisma.externalQuizSystem.delete({
+      where: { id: system.id },
+    });
+
+    emitSocketEvent(`quiz-${system.quiz.id}`, "system-updated", { systemCode: system.systemCode, quizId: system.quiz.id, action: "removed" });
+    emitSocketEvent(`quiz-${system.quiz.quizId}`, "system-updated", { systemCode: system.systemCode, quizId: system.quiz.quizId, action: "removed" });
+    emitSocketEvent(`system-${system.systemCode}`, "status-changed", { status: "DISCONNECTED" });
+
+    revalidatePath(`/admin/quizzes/${system.quiz.id}`);
+
+    return { status: "success" as const, message: "System registration cleared successfully" };
+  } catch (error) {
+    console.error("Error unregistering external system:", error);
+    return { status: "error" as const, message: "Failed to clear registration" };
+  }
+}
+
+export async function deleteExternalSystem(systemId: string) {
+  await requireAdmin();
+
+  try {
+    const system = await prisma.externalQuizSystem.findUnique({
+      where: { id: systemId },
+      include: { quiz: { select: { id: true, quizId: true } } },
+    });
+
+    if (!system) {
+      return { status: "error" as const, message: "System not found" };
+    }
+
+    await prisma.externalQuizSystem.delete({
+      where: { id: systemId },
+    });
+
+    emitSocketEvent(`quiz-${system.quiz.id}`, "system-updated", { systemCode: system.systemCode, quizId: system.quiz.id, action: "removed" });
+    emitSocketEvent(`quiz-${system.quiz.quizId}`, "system-updated", { systemCode: system.systemCode, quizId: system.quiz.quizId, action: "removed" });
+    emitSocketEvent(`system-${system.systemCode}`, "status-changed", { status: "DISCONNECTED" });
+
+    revalidatePath(`/admin/quizzes/${system.quiz.id}`);
+
+    return { status: "success" as const, message: "System removed successfully" };
+  } catch (error) {
+    console.error("Error deleting external system:", error);
+    return { status: "error" as const, message: "Failed to delete system" };
+  }
+}
+
+export async function clearAllExternalSystems(quizId: string) {
+  await requireAdmin();
+
+  try {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, quizId: true },
+    });
+
+    if (!quiz) {
+      return { status: "error" as const, message: "Quiz not found" };
+    }
+
+    const systems = await prisma.externalQuizSystem.findMany({
+      where: { quizId: quiz.id },
+      select: { systemCode: true },
+    });
+
+    await prisma.externalQuizSystem.deleteMany({
+      where: { quizId: quiz.id },
+    });
+
+    systems.forEach((s) => {
+      emitSocketEvent(`system-${s.systemCode}`, "status-changed", { status: "DISCONNECTED" });
+    });
+
+    emitSocketEvent(`quiz-${quiz.id}`, "system-updated", { quizId: quiz.id, action: "cleared-all" });
+    emitSocketEvent(`quiz-${quiz.quizId}`, "system-updated", { quizId: quiz.quizId, action: "cleared-all" });
+
+    revalidatePath(`/admin/quizzes/${quiz.id}`);
+
+    return { status: "success" as const, message: `Cleared ${systems.length} systems successfully` };
+  } catch (error) {
+    console.error("Error clearing all external systems:", error);
+    return { status: "error" as const, message: "Failed to clear systems" };
   }
 }
 
@@ -503,19 +643,58 @@ export async function assignStudentToSystem({
       return { status: "error" as const, message: "System ID or System Code is required" };
     }
 
+    const existingSys = await prisma.externalQuizSystem.findUnique({
+      where: whereClause,
+      include: { quiz: { select: { id: true, quizId: true, sets: true } } },
+    });
+
+    if (!existingSys) {
+      return { status: "error" as const, message: "System not found" };
+    }
+
+    const cleanEmail = studentEmail.trim().toLowerCase();
+    const cleanResponseId = formResponseId && formResponseId !== "custom" ? formResponseId.trim() : null;
+
+    // Check if another system in the same quiz already has this response ID or email assigned
+    const duplicateSystem = await prisma.externalQuizSystem.findFirst({
+      where: {
+        quizId: existingSys.quizId,
+        id: { not: existingSys.id },
+        OR: [
+          ...(cleanResponseId ? [{ assignedResponseId: cleanResponseId }] : []),
+          ...(cleanEmail ? [{ assignedStudentEmail: cleanEmail }] : []),
+        ],
+      },
+    });
+
+    if (duplicateSystem) {
+      const matchReason = (cleanResponseId && duplicateSystem.assignedResponseId === cleanResponseId)
+        ? `Response ID (${cleanResponseId})`
+        : `Email (${cleanEmail})`;
+      return {
+        status: "error" as const,
+        message: `This candidate with ${matchReason} is already assigned to ${duplicateSystem.systemNumber}. A candidate cannot be assigned to multiple systems.`,
+      };
+    }
+
+    let finalAssignedSet = assignedSet;
+    if (!finalAssignedSet || finalAssignedSet === "AUTO") {
+      finalAssignedSet = existingSys?.assignedSet || "A";
+    }
+
     const system = await prisma.externalQuizSystem.update({
       where: whereClause,
       data: {
-        assignedResponseId: formResponseId || null,
+        assignedResponseId: cleanResponseId,
         assignedStudentName: studentName.trim(),
-        assignedStudentEmail: studentEmail.trim().toLowerCase(),
-        assignedSet,
+        assignedStudentEmail: cleanEmail,
+        assignedSet: finalAssignedSet,
         status: "ASSIGNED",
       },
     });
 
-    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
-    triggerPusherEvent(`system-${system.systemCode}`, "status-changed", { status: "ASSIGNED", assignedStudentName: system.assignedStudentName, assignedSet: system.assignedSet });
+    emitSocketEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
+    emitSocketEvent(`system-${system.systemCode}`, "status-changed", { status: "ASSIGNED", assignedStudentName: system.assignedStudentName, assignedSet: system.assignedSet });
 
     revalidatePath(`/admin/quizzes/${system.quizId}`);
 
@@ -541,8 +720,8 @@ export async function unassignStudentFromSystem(systemId: string) {
       },
     });
 
-    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
-    triggerPusherEvent(`system-${system.systemCode}`, "status-changed", { status: "REGISTERED" });
+    emitSocketEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
+    emitSocketEvent(`system-${system.systemCode}`, "status-changed", { status: "REGISTERED" });
 
     revalidatePath(`/admin/quizzes/${system.quizId}`);
 
@@ -550,6 +729,87 @@ export async function unassignStudentFromSystem(systemId: string) {
   } catch (error) {
     console.error("Error unassigning student:", error);
     return { status: "error" as const, message: "Failed to unassign student" };
+  }
+}
+
+export async function autoShuffleAndAssignSets(quizId: string) {
+  await requireAdmin();
+
+  try {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, quizId: true, sets: true },
+    });
+
+    if (!quiz) {
+      return { status: "error" as const, message: "Quiz not found" };
+    }
+
+    const numSets = quiz.sets || 1;
+    if (numSets <= 1) {
+      return { status: "error" as const, message: "This quiz only has 1 question set (Set A)." };
+    }
+
+    const systems = await prisma.externalQuizSystem.findMany({
+      where: { quizId: quiz.id },
+    });
+
+    if (systems.length === 0) {
+      return { status: "error" as const, message: "No systems registered to assign sets." };
+    }
+
+    // Sort systems naturally by system number
+    systems.sort((a, b) =>
+      a.systemNumber.localeCompare(b.systemNumber, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    // Available set letters (e.g. ['A', 'B', 'C'])
+    const setLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
+
+    // Generate non-consecutive shuffled set sequence
+    const assignedSequence: string[] = [];
+    let lastSet = "";
+
+    for (let i = 0; i < systems.length; i++) {
+      // Valid options excluding the immediately preceding system's set
+      const validOptions = setLetters.filter((s) => s !== lastSet);
+      // Pick a random set from validOptions
+      const chosenSet = validOptions[Math.floor(Math.random() * validOptions.length)] || setLetters[i % numSets];
+      assignedSequence.push(chosenSet);
+      lastSet = chosenSet;
+    }
+
+    // Update each system with its newly shuffled set
+    const updatePromises = systems.map((sys, idx) =>
+      prisma.externalQuizSystem.update({
+        where: { id: sys.id },
+        data: { assignedSet: assignedSequence[idx] },
+      })
+    );
+
+    await Promise.all(updatePromises);
+
+    // Emit real-time events to all systems and quiz room
+    systems.forEach((sys, idx) => {
+      emitSocketEvent(`system-${sys.systemCode}`, "status-changed", {
+        status: sys.status,
+        assignedStudentName: sys.assignedStudentName,
+        assignedSet: assignedSequence[idx],
+      });
+    });
+
+    emitSocketEvent(`quiz-${quiz.id}`, "system-updated", { quizId: quiz.id, action: "sets-shuffled" });
+    emitSocketEvent(`quiz-${quiz.quizId}`, "system-updated", { quizId: quiz.quizId, action: "sets-shuffled" });
+
+    revalidatePath(`/admin/quizzes/${quiz.id}`);
+
+    return {
+      status: "success" as const,
+      message: `Successfully shuffled and auto-assigned sets across ${systems.length} systems! (Consecutive systems have non-matching sets)`,
+    };
+  } catch (error) {
+    console.error("Error auto-shuffling sets:", error);
+    return { status: "error" as const, message: "Failed to auto-assign sets" };
   }
 }
 
@@ -565,9 +825,9 @@ export async function startSystemQuiz(systemId: string) {
       },
     });
 
-    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
-    triggerPusherEvent(`system-${system.systemCode}`, "status-changed", { status: "IN_PROGRESS" });
-    triggerPusherEvent(`system-${system.systemCode}`, "quiz-started", { systemCode: system.systemCode });
+    emitSocketEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
+    emitSocketEvent(`system-${system.systemCode}`, "status-changed", { status: "IN_PROGRESS" });
+    emitSocketEvent(`system-${system.systemCode}`, "quiz-started", { systemCode: system.systemCode });
 
     revalidatePath(`/admin/quizzes/${system.quizId}`);
 
@@ -582,6 +842,20 @@ export async function startAllSystems(quizId: string) {
   await requireAdmin();
 
   try {
+    // First fetch all ASSIGNED systems so we can send per-system events
+    const assignedSystems = await prisma.externalQuizSystem.findMany({
+      where: {
+        quizId,
+        status: "ASSIGNED",
+      },
+      select: { id: true, systemCode: true },
+    });
+
+    if (assignedSystems.length === 0) {
+      return { status: "error" as const, message: "No assigned systems to start" };
+    }
+
+    // Batch update all to IN_PROGRESS
     await prisma.externalQuizSystem.updateMany({
       where: {
         quizId,
@@ -593,12 +867,26 @@ export async function startAllSystems(quizId: string) {
       },
     });
 
-    triggerPusherEvent(`quiz-${quizId}`, "system-updated", { quizId });
-    triggerPusherEvent(`quiz-${quizId}`, "quiz-started-all", { quizId });
+    // Notify admin dashboard
+    emitSocketEvent(`quiz-${quizId}`, "system-updated", { quizId });
+    emitSocketEvent(`quiz-${quizId}`, "quiz-started-all", { quizId });
+
+    // Send per-system events so EVERY student client auto-starts without refresh
+    const systemRooms = assignedSystems.map((s) => `system-${s.systemCode}`);
+    emitSocketEventToRooms(
+      systemRooms,
+      "quiz-started",
+      { quizId }
+    );
+    emitSocketEventToRooms(
+      systemRooms,
+      "status-changed",
+      { status: "IN_PROGRESS" }
+    );
 
     revalidatePath(`/admin/quizzes/${quizId}`);
 
-    return { status: "success" as const, message: "Started quiz for all assigned systems" };
+    return { status: "success" as const, message: `Started quiz for ${assignedSystems.length} systems` };
   } catch (error) {
     console.error("Error starting all systems:", error);
     return { status: "error" as const, message: "Failed to start all systems" };
@@ -1065,9 +1353,9 @@ export async function setSystemAttemptingAction(systemCode: string) {
       data: { status: "ATTEMPTING" },
     });
 
-    const { triggerPusherEvent } = await import("@/lib/pusher-server");
-    triggerPusherEvent(`quiz-${system.quizId}`, "system-updated", { systemCode });
-    triggerPusherEvent(`system-${systemCode}`, "status-changed", { status: "ATTEMPTING" });
+    const { emitSocketEvent } = await import("@/lib/socket-server");
+    emitSocketEvent(`quiz-${system.quizId}`, "system-updated", { systemCode });
+    emitSocketEvent(`system-${systemCode}`, "status-changed", { status: "ATTEMPTING" });
 
     return { status: "success" as const };
   } catch (error) {
@@ -1107,7 +1395,7 @@ export async function unblockQuizCandidate(quizId: string, userId: string) {
       },
     });
 
-    const { triggerPusherEvent } = await import("@/lib/pusher-server");
+    const { emitSocketEvent } = await import("@/lib/socket-server");
 
     if (sys) {
       await prisma.externalQuizSystem.update({
@@ -1115,13 +1403,13 @@ export async function unblockQuizCandidate(quizId: string, userId: string) {
         data: { status: "ATTEMPTING" },
       });
 
-      triggerPusherEvent(`system-${sys.systemCode}`, "unblocked", { systemCode: sys.systemCode });
-      triggerPusherEvent(`system-${sys.systemCode}`, "status-changed", { status: "ATTEMPTING" });
-      triggerPusherEvent(`quiz-${sys.quizId}`, "system-updated", { systemCode: sys.systemCode });
+      emitSocketEvent(`system-${sys.systemCode}`, "unblocked", { systemCode: sys.systemCode });
+      emitSocketEvent(`system-${sys.systemCode}`, "status-changed", { status: "ATTEMPTING" });
+      emitSocketEvent(`quiz-${sys.quizId}`, "system-updated", { systemCode: sys.systemCode });
     }
 
-    triggerPusherEvent(`quiz-${quizId}`, "blocked-updated", { quizId, userId });
-    triggerPusherEvent(`quiz-${quizId}`, "system-updated", { quizId });
+    emitSocketEvent(`quiz-${quizId}`, "blocked-updated", { quizId, userId });
+    emitSocketEvent(`quiz-${quizId}`, "system-updated", { quizId });
 
     revalidatePath(`/admin/quizzes/${quizId}`);
 
