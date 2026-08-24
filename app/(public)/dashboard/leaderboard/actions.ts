@@ -37,9 +37,7 @@ export async function getOverallLeaderboard(targetBatchId?: string | null) {
     let effectiveBatchId: string | null = null;
     let studentBatchInfo: { id: string; name: string; code: string } | null = null;
 
-    if (targetBatchId !== undefined) {
-      effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
-    } else if (session?.user?.id) {
+    if (session?.user?.id) {
       const currentUser = await prisma.user.findUnique({
         where: { id: session.user.id },
         select: {
@@ -49,11 +47,21 @@ export async function getOverallLeaderboard(targetBatchId?: string | null) {
         },
       });
 
-      // If non-admin student is in a batch, restrict to their batch
-      if (currentUser?.batchId) {
-        effectiveBatchId = currentUser.batchId;
-        studentBatchInfo = currentUser.batch;
+      // If user is a student/member (non-admin) with a batch assigned,
+      // STRICTLY lock the leaderboard to their batch only (batch X students only)
+      if (currentUser?.role !== "admin") {
+        if (currentUser?.batchId) {
+          effectiveBatchId = currentUser.batchId;
+          studentBatchInfo = currentUser.batch;
+        }
+      } else {
+        // Admin can filter by targetBatchId or view all
+        if (targetBatchId !== undefined) {
+          effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
+        }
       }
+    } else if (targetBatchId !== undefined) {
+      effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
     }
 
     // Get all eligible users
@@ -235,9 +243,7 @@ export async function getMonthlyLeaderboard(
     let effectiveBatchId: string | null = null;
     let studentBatchInfo: { id: string; name: string; code: string } | null = null;
 
-    if (targetBatchId !== undefined) {
-      effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
-    } else if (session?.user?.id) {
+    if (session?.user?.id) {
       const currentUser = await prisma.user.findUnique({
         where: { id: session.user.id },
         select: {
@@ -247,10 +253,21 @@ export async function getMonthlyLeaderboard(
         },
       });
 
-      if (currentUser?.batchId) {
-        effectiveBatchId = currentUser.batchId;
-        studentBatchInfo = currentUser.batch;
+      // If user is a student/member (non-admin) with a batch assigned,
+      // STRICTLY lock the leaderboard to their batch only (batch X students only)
+      if (currentUser?.role !== "admin") {
+        if (currentUser?.batchId) {
+          effectiveBatchId = currentUser.batchId;
+          studentBatchInfo = currentUser.batch;
+        }
+      } else {
+        // Admin can filter by targetBatchId or view all
+        if (targetBatchId !== undefined) {
+          effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
+        }
       }
+    } else if (targetBatchId !== undefined) {
+      effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
     }
 
     // Calculate start and end of month

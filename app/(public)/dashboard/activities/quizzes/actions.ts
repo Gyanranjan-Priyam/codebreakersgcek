@@ -25,22 +25,17 @@ export async function getActiveQuizzes() {
     const quizzes = await prisma.quiz.findMany({
       where: {
         isActive: true,
-        OR: [
-          { targetAudience: "EXTERNAL" },
-          {
-            targetAudience: "INTERNAL",
-            ...(userBatchId
-              ? {
-                  OR: [
-                    { targetBatchIds: { equals: [] } },
-                    { targetBatchIds: { has: userBatchId } },
-                  ],
-                }
-              : {
-                  targetBatchIds: { equals: [] },
-                }),
-          },
-        ],
+        targetAudience: "INTERNAL", // Strictly internal quizzes only in member dashboard
+        ...(userBatchId
+          ? {
+              OR: [
+                { targetBatchIds: { equals: [] } },
+                { targetBatchIds: { has: userBatchId } },
+              ],
+            }
+          : {
+              targetBatchIds: { equals: [] },
+            }),
       },
       orderBy: {
         createdAt: 'desc',

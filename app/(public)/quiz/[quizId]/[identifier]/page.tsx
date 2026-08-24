@@ -46,6 +46,43 @@ export default async function QuizProctorPage({
     notFound();
   }
 
+  // Verify internal audience and batch targeting
+  if (quiz.targetAudience === "EXTERNAL") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <h1 className="text-2xl font-bold mb-2">External Quiz</h1>
+          <p className="text-muted-foreground">
+            This quiz is configured for external participants and must be accessed via external systems.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // If quiz is targeted to specific batches, check student's batch
+  if (quiz.targetBatchIds && quiz.targetBatchIds.length > 0) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { batchId: true, role: true },
+    });
+
+    if (dbUser?.role !== "admin") {
+      if (!dbUser?.batchId || !quiz.targetBatchIds.includes(dbUser.batchId)) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="text-center max-w-md">
+              <h1 className="text-2xl font-bold mb-2">Batch Restricted Quiz</h1>
+              <p className="text-muted-foreground">
+                This quiz is exclusively available to students in specific batches/cohorts.
+              </p>
+            </div>
+          </div>
+        );
+      }
+    }
+  }
+
   // Check if user is blocked from this specific quiz
   const quizBlock = await prisma.quizBlock.findUnique({
     where: {

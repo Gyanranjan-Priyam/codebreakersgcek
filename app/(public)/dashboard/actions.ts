@@ -36,6 +36,11 @@ export async function getUserDashboardData() {
     }
 
     const userId = session.user.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { batchId: true, role: true },
+    });
+    const userBatchId = user?.batchId || null;
 
     // Parallel data fetching for performance
     const [
@@ -113,10 +118,21 @@ export async function getUserDashboardData() {
           submissions: { none: { userId } }
         }
       }),
-      // 8. Active Quizzes Count
+      // 8. Active Quizzes Count (Internal only & Batch-scoped)
       prisma.quiz.count({
         where: {
           isActive: true,
+          targetAudience: "INTERNAL",
+          ...(userBatchId
+            ? {
+                OR: [
+                  { targetBatchIds: { equals: [] } },
+                  { targetBatchIds: { has: userBatchId } },
+                ],
+              }
+            : {
+                targetBatchIds: { equals: [] },
+              }),
           OR: [
             { endDateTime: null },
             { endDateTime: { gte: new Date() } }
