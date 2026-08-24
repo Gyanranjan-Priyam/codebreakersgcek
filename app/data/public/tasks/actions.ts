@@ -30,6 +30,19 @@ export interface UserTaskSubmission {
 
 export async function getActiveTasks() {
   try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    
+    let userBatchId: string | null = null;
+    if (session?.user?.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { batchId: true },
+      });
+      userBatchId = user?.batchId || null;
+    }
+
     const now = new Date();
     
     const tasks = await prisma.task.findMany({
@@ -37,6 +50,16 @@ export async function getActiveTasks() {
         startDate: {
           lte: now,
         },
+        ...(userBatchId
+          ? {
+              OR: [
+                { targetBatchIds: { equals: [] } },
+                { targetBatchIds: { has: userBatchId } },
+              ],
+            }
+          : {
+              targetBatchIds: { equals: [] },
+            }),
       },
       orderBy: {
         dueDate: 'asc',
@@ -58,7 +81,30 @@ export async function getActiveTasks() {
 
 export async function getAllPublicTasks() {
   try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    
+    let userBatchId: string | null = null;
+    if (session?.user?.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { batchId: true },
+      });
+      userBatchId = user?.batchId || null;
+    }
+
     const tasks = await prisma.task.findMany({
+      where: userBatchId
+        ? {
+            OR: [
+              { targetBatchIds: { equals: [] } },
+              { targetBatchIds: { has: userBatchId } },
+            ],
+          }
+        : {
+            targetBatchIds: { equals: [] },
+          },
       orderBy: {
         taskNumber: 'desc',
       },

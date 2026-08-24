@@ -132,6 +132,7 @@ export async function createQuiz(data: {
   questionsJson: string;
   createdBy: string;
   targetAudience?: string;
+  targetBatchIds?: string[];
   accessCode?: string | null;
   formId?: string | null;
   feedbackFormId?: string | null;
@@ -211,6 +212,7 @@ export async function createQuiz(data: {
         questionsJson: data.questionsJson,
         createdBy: data.createdBy,
         targetAudience: data.targetAudience || "INTERNAL",
+        targetBatchIds: data.targetBatchIds || [],
         accessCode: data.accessCode || null,
         formId: data.formId || null,
         feedbackFormId: data.feedbackFormId || null,
@@ -249,6 +251,7 @@ export async function updateQuiz(
     questionsJson: string;
     isActive: boolean;
     targetAudience?: string;
+    targetBatchIds?: string[];
     accessCode?: string | null;
     formId?: string | null;
     feedbackFormId?: string | null;
@@ -316,6 +319,7 @@ export async function updateQuiz(
         questionsJson: data.questionsJson,
         isActive: data.isActive,
         targetAudience: data.targetAudience,
+        ...(data.targetBatchIds !== undefined ? { targetBatchIds: data.targetBatchIds } : {}),
         accessCode: data.accessCode,
         formId: data.formId,
         feedbackFormId: data.feedbackFormId,

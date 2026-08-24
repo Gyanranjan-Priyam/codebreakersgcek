@@ -27,7 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, Plus } from "lucide-react";
+import { CalendarIcon, Loader2, Plus, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -35,7 +35,17 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { createTask } from "../actions";
+import { getActiveBatchesList } from "@/app/admin/batches/actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const formSchema = z.object({
   taskNumber: z.number().min(1, "Task number must be at least 1"),
@@ -48,6 +58,7 @@ const formSchema = z.object({
     message: "Please select a due date",
   }),
   points: z.number().min(0, "Points must be at least 0"),
+  targetBatchIds: z.array(z.string()).optional(),
 }).refine((data) => data.dueDate >= data.startDate, {
   message: "Due date must be after or equal to start date",
   path: ["dueDate"],
@@ -63,6 +74,11 @@ export default function CreateTaskDialog({ userId }: CreateTaskDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string }[]>([]);
+
+  useEffect(() => {
+    getActiveBatchesList().then((list) => setBatchesList(list));
+  }, []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -71,6 +87,7 @@ export default function CreateTaskDialog({ userId }: CreateTaskDialogProps) {
       title: "",
       description: "",
       points: 10,
+      targetBatchIds: [],
     },
   });
 
@@ -84,6 +101,7 @@ export default function CreateTaskDialog({ userId }: CreateTaskDialogProps) {
         startDate: data.startDate,
         dueDate: data.dueDate,
         points: data.points,
+        targetBatchIds: data.targetBatchIds || [],
         createdBy: userId,
       });
 
@@ -284,6 +302,55 @@ export default function CreateTaskDialog({ userId }: CreateTaskDialogProps) {
                   <FormMessage />
                 </FormItem>
               )}
+            />
+
+            <FormField
+              control={form.control}
+              name="targetBatchIds"
+              render={({ field }) => {
+                const currentValue =
+                  field.value && field.value.length > 0 ? field.value[0] : "all";
+
+                return (
+                  <FormItem>
+                    <FormLabel>Target Batch</FormLabel>
+                    <div className="relative">
+                      <Layers className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <Select
+                        value={currentValue}
+                        onValueChange={(val) => {
+                          if (val === "all") {
+                            field.onChange([]);
+                          } else {
+                            field.onChange([val]);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="pl-10">
+                            <SelectValue placeholder="Select Target Batch" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            All Batches (Global - Open to all students)
+                          </SelectItem>
+                          {batchesList.map((batch) => (
+                            <SelectItem key={batch.id} value={batch.id}>
+                              {batch.name} ({batch.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Select which batch should receive and see this task on their dashboard.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <DialogFooter>

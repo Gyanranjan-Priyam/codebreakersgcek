@@ -7,6 +7,7 @@ import {
   Settings,
   Brain,
   Users,
+  Layers,
   Trophy,
   ListChecks,
   QrCode,
@@ -49,6 +50,11 @@ const data = {
       title: "Members",
       url: "/admin/members",
       icon: Users,
+    },
+    {
+      title: "Batches",
+      url: "/admin/batches",
+      icon: Layers,
     },
     {
       title: "Attendance",

@@ -97,7 +97,7 @@ export function DataCleanup() {
           <Button 
             variant="destructive" 
             size="sm"
-            className="w-full cursor-pointer"
+            className="w-fit"
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Clean Up Data

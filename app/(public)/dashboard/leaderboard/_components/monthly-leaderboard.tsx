@@ -25,12 +25,14 @@ interface MonthlyLeaderboardProps {
   initialData: LeaderboardEntry[];
   currentYear: number;
   currentMonth: number;
+  batchId?: string | null;
 }
 
 export default function MonthlyLeaderboard({ 
   initialData, 
   currentYear, 
-  currentMonth 
+  currentMonth,
+  batchId,
 }: MonthlyLeaderboardProps) {
   const [data, setData] = useState<LeaderboardEntry[]>(initialData);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -56,7 +58,7 @@ export default function MonthlyLeaderboard({
   const handleMonthYearChange = async (year: number, month: number) => {
     setLoading(true);
     try {
-      const result = await getMonthlyLeaderboard(year, month);
+      const result = await getMonthlyLeaderboard(year, month, batchId);
       if (result.status === "success") {
         setData(result.data);
       } else {
@@ -208,6 +210,7 @@ export default function MonthlyLeaderboard({
                 <TableRow>
                   <TableHead className="w-20">Rank</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Batch</TableHead>
                   <TableHead>Registration</TableHead>
                   <TableHead className="text-center">Attendance</TableHead>
                   <TableHead className="text-center">Tasks</TableHead>
@@ -228,6 +231,15 @@ export default function MonthlyLeaderboard({
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">{entry.userName}</TableCell>
+                      <TableCell>
+                        {entry.batch ? (
+                          <Badge variant="outline" className="text-[10px] font-mono bg-primary/5 text-primary border-primary/20">
+                            {entry.batch.code}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {entry.registration || (
                           <span className="text-muted-foreground text-sm">-</span>

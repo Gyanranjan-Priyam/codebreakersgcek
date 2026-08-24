@@ -11,6 +11,7 @@ export default async function AdminTransactionsPage() {
   const result = await getAdminTransactions();
   const transactions = result.data || [];
   const paymentForms = result.paymentForms || [];
+  const formsSummary = result.formsSummary || [];
 
   return (
     <div className="container mx-auto px-2 sm:px-4 lg:px-2 py-3 sm:py-6 max-w-8xl">
@@ -21,7 +22,11 @@ export default async function AdminTransactionsPage() {
       />
 
       <div className="mt-6 sm:mt-8">
-        <TransactionsClient initialTransactions={transactions} initialPaymentForms={paymentForms} />
+        <TransactionsClient
+          initialTransactions={transactions}
+          initialPaymentForms={paymentForms}
+          initialFormsSummary={formsSummary}
+        />
       </div>
     </div>
   );

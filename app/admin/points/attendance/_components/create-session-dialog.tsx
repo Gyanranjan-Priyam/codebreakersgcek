@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, Plus } from "lucide-react";
+import { CalendarIcon, Loader2, Plus, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,7 +34,10 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { createAttendanceSession } from "../actions";
+import { getActiveBatchesList } from "@/app/admin/batches/actions";
+import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const formSchema = z.object({
   sessionNumber: z.number().min(1, "Session number must be at least 1"),
@@ -42,6 +45,7 @@ const formSchema = z.object({
   date: z.date({
     message: "Please select a date",
   }),
+  targetBatchIds: z.array(z.string()).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -54,12 +58,18 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string }[]>([]);
+
+  useEffect(() => {
+    getActiveBatchesList().then((list) => setBatchesList(list));
+  }, []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       sessionNumber: 1,
       title: "",
+      targetBatchIds: [],
     },
   });
 
@@ -80,6 +90,7 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
         title: data.title,
         date: data.date,
         day,
+        targetBatchIds: data.targetBatchIds || [],
         createdBy: userId,
       });
 
@@ -197,6 +208,54 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
                       Day: <span className="font-medium">{getDayName(selectedDate)}</span>
                     </p>
                   )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="targetBatchIds"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-xs">Target Batches (Optional)</FormLabel>
+                    <span className="text-[11px] text-muted-foreground">
+                      {(field.value?.length || 0) === 0 ? "All Batches" : `${field.value?.length} selected`}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 p-2 rounded-md border bg-muted/20">
+                    <Badge
+                      variant={(field.value?.length || 0) === 0 ? "default" : "outline"}
+                      className="cursor-pointer text-xs"
+                      onClick={() => field.onChange([])}
+                    >
+                      All Batches (Global)
+                    </Badge>
+                    {batchesList.map((batch) => {
+                      const isSelected = field.value?.includes(batch.id);
+                      return (
+                        <Badge
+                          key={batch.id}
+                          variant={isSelected ? "default" : "outline"}
+                          className="cursor-pointer text-xs font-mono"
+                          onClick={() => {
+                            const current = field.value || [];
+                            if (isSelected) {
+                              field.onChange(current.filter((id) => id !== batch.id));
+                            } else {
+                              field.onChange([...current, batch.id]);
+                            }
+                          }}
+                        >
+                          {batch.code}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    If selected, only students in the target batch(es) will appear on the attendance roster.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

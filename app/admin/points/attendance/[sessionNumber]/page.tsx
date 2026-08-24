@@ -41,8 +41,8 @@ export default async function SessionDetailPage({ params }: PageProps) {
     redirect("/login");
   }
 
-  // Fetch all members
-  const membersResult = await getAllMembers();
+  // Fetch members for this session (filtered by batch if restricted)
+  const membersResult = await getAllMembers(session.targetBatchIds);
   const members = membersResult.status === "success" ? membersResult.data : [];
 
   // Fetch attendance data for this session

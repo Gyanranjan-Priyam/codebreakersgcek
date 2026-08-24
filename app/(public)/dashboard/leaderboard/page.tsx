@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trophy, Calendar } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Trophy, Calendar, Layers } from "lucide-react";
 import { getOverallLeaderboard, getMonthlyLeaderboard } from "./actions";
 import OverallLeaderboard from "./_components/overall-leaderboard";
 import MonthlyLeaderboard from "./_components/monthly-leaderboard";
@@ -14,26 +15,48 @@ export const metadata: Metadata = {
 // Disable caching for this page to ensure leaderboard updates immediately
 export const dynamic = "force-dynamic";
 
-export default async function LeaderboardPage() {
+interface LeaderboardPageProps {
+  searchParams?: Promise<{ batch?: string }>;
+}
+
+export default async function LeaderboardPage({ searchParams }: LeaderboardPageProps) {
+  const resolvedParams = searchParams ? await searchParams : undefined;
+  const requestedBatch = resolvedParams?.batch;
+
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  const overallResult = await getOverallLeaderboard();
+  const overallResult = await getOverallLeaderboard(requestedBatch);
   const overallData = overallResult.status === "success" ? overallResult.data : [];
+  const studentBatch = overallResult.studentBatch;
 
-  const monthlyResult = await getMonthlyLeaderboard(currentYear, currentMonth);
+  const monthlyResult = await getMonthlyLeaderboard(currentYear, currentMonth, requestedBatch);
   const monthlyData = monthlyResult.status === "success" ? monthlyResult.data : [];
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Leaderboard
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Track top performers based on points earned
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Leaderboard
+          </h1>
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+            Track top performers based on points earned
+          </p>
+        </div>
+
+        {studentBatch && (
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Badge
+              variant="outline"
+              className="px-3 py-1 text-xs gap-1.5 bg-primary/5 text-primary border-primary/20 font-medium"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>Cohort: {studentBatch.name} ({studentBatch.code})</span>
+            </Badge>
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="overall" className="w-full">
@@ -55,7 +78,9 @@ export default async function LeaderboardPage() {
             <CardHeader>
               <CardTitle>Overall Top Performers</CardTitle>
               <CardDescription>
-                All-time leaderboard based on total points
+                {studentBatch
+                  ? `All-time leaderboard ranking for ${studentBatch.name}`
+                  : "All-time leaderboard based on total points"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -69,7 +94,9 @@ export default async function LeaderboardPage() {
             <CardHeader>
               <CardTitle>Monthly Top Performers</CardTitle>
               <CardDescription>
-                Leaderboard for selected month based on points earned
+                {studentBatch
+                  ? `Leaderboard for selected month (${studentBatch.name})`
+                  : "Leaderboard for selected month based on points earned"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -77,6 +104,7 @@ export default async function LeaderboardPage() {
                 initialData={monthlyData}
                 currentYear={currentYear}
                 currentMonth={currentMonth}
+                batchId={studentBatch?.id || requestedBatch}
               />
             </CardContent>
           </Card>

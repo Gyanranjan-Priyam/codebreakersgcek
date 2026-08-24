@@ -1,6 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 export interface LeaderboardEntry {
   userId: string;
@@ -9,6 +11,12 @@ export interface LeaderboardEntry {
   registration: string | null;
   branch: string | null;
   admissionYear: string | null;
+  batchId?: string | null;
+  batch?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   totalPoints: number;
   attendancePoints: number;
   taskPoints: number;
@@ -20,13 +28,40 @@ export interface LeaderboardEntry {
   quizzesTaken: number;
 }
 
-export async function getOverallLeaderboard() {
+export async function getOverallLeaderboard(targetBatchId?: string | null) {
   try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    let effectiveBatchId: string | null = null;
+    let studentBatchInfo: { id: string; name: string; code: string } | null = null;
+
+    if (targetBatchId !== undefined) {
+      effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
+    } else if (session?.user?.id) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          role: true,
+          batchId: true,
+          batch: { select: { id: true, name: true, code: true } },
+        },
+      });
+
+      // If non-admin student is in a batch, restrict to their batch
+      if (currentUser?.batchId) {
+        effectiveBatchId = currentUser.batchId;
+        studentBatchInfo = currentUser.batch;
+      }
+    }
+
     // Get all eligible users
     const users = await prisma.user.findMany({
       where: {
         profileComplete: true,
         role: { not: "admin" },
+        ...(effectiveBatchId ? { batchId: effectiveBatchId } : {}),
       },
       select: {
         id: true,
@@ -35,6 +70,14 @@ export async function getOverallLeaderboard() {
         registration: true,
         branch: true,
         admissionYear: true,
+        batchId: true,
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
       },
     });
 
@@ -150,6 +193,8 @@ export async function getOverallLeaderboard() {
           registration: user.registration,
           branch: user.branch,
           admissionYear: user.admissionYear,
+          batchId: user.batchId,
+          batch: user.batch,
           totalPoints,
           attendancePoints,
           taskPoints,
@@ -166,6 +211,7 @@ export async function getOverallLeaderboard() {
     return {
       status: "success" as const,
       data: leaderboard,
+      studentBatch: studentBatchInfo,
     };
   } catch (error) {
     console.error("Error fetching overall leaderboard:", error);
@@ -176,8 +222,37 @@ export async function getOverallLeaderboard() {
   }
 }
 
-export async function getMonthlyLeaderboard(year: number, month: number) {
+export async function getMonthlyLeaderboard(
+  year: number,
+  month: number,
+  targetBatchId?: string | null
+) {
   try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    let effectiveBatchId: string | null = null;
+    let studentBatchInfo: { id: string; name: string; code: string } | null = null;
+
+    if (targetBatchId !== undefined) {
+      effectiveBatchId = targetBatchId && targetBatchId !== "all" ? targetBatchId : null;
+    } else if (session?.user?.id) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          role: true,
+          batchId: true,
+          batch: { select: { id: true, name: true, code: true } },
+        },
+      });
+
+      if (currentUser?.batchId) {
+        effectiveBatchId = currentUser.batchId;
+        studentBatchInfo = currentUser.batch;
+      }
+    }
+
     // Calculate start and end of month
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
@@ -187,6 +262,7 @@ export async function getMonthlyLeaderboard(year: number, month: number) {
       where: {
         profileComplete: true,
         role: { not: "admin" },
+        ...(effectiveBatchId ? { batchId: effectiveBatchId } : {}),
       },
       select: {
         id: true,
@@ -195,6 +271,14 @@ export async function getMonthlyLeaderboard(year: number, month: number) {
         registration: true,
         branch: true,
         admissionYear: true,
+        batchId: true,
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
       },
     });
 
@@ -340,6 +424,8 @@ export async function getMonthlyLeaderboard(year: number, month: number) {
           registration: user.registration,
           branch: user.branch,
           admissionYear: user.admissionYear,
+          batchId: user.batchId,
+          batch: user.batch,
           totalPoints,
           attendancePoints,
           taskPoints,
@@ -356,6 +442,7 @@ export async function getMonthlyLeaderboard(year: number, month: number) {
     return {
       status: "success" as const,
       data: leaderboard,
+      studentBatch: studentBatchInfo,
     };
   } catch (error) {
     console.error("Error fetching monthly leaderboard:", error);

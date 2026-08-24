@@ -2,11 +2,16 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { TransactionItem, PaymentFormOption, resendTransactionReceipt } from "../actions";
+import {
+  TransactionItem,
+  PaymentFormOption,
+  FormTransactionSummary,
+  resendTransactionReceipt,
+} from "../actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -57,30 +62,46 @@ import {
   IndianRupee,
   Filter,
   ExternalLink,
-  X,
+  ArrowLeft,
+  ArrowRight,
   FileSpreadsheet,
+  Layers,
+  Inbox,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TransactionsClientProps {
   initialTransactions: TransactionItem[];
   initialPaymentForms?: PaymentFormOption[];
+  initialFormsSummary?: FormTransactionSummary[];
 }
 
 export function TransactionsClient({
   initialTransactions,
   initialPaymentForms = [],
+  initialFormsSummary = [],
 }: TransactionsClientProps) {
   const router = useRouter();
   const [transactions] = useState<TransactionItem[]>(initialTransactions);
   const [paymentForms] = useState<PaymentFormOption[]>(initialPaymentForms);
+  const [formsSummary] = useState<FormTransactionSummary[]>(initialFormsSummary);
+
+  // Active form view: null means "All Forms Overview", string formId means "Viewing Form Details"
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+
+  // Filters for All Forms View
+  const [formSearchQuery, setFormSearchQuery] = useState("");
+
+  // Filters for Transactions View
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [formFilter, setFormFilter] = useState<string>("all");
+
+  // Sheet / Drawer for single transaction response view
   const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
 
-  // Overall Statistics calculation
-  const stats = useMemo(() => {
+  // Overall Statistics calculation (across all forms)
+  const globalStats = useMemo(() => {
     let totalVerifiedRevenue = 0;
     let verifiedCount = 0;
     let pendingCount = 0;
@@ -104,59 +125,41 @@ export function TransactionsClient({
       pendingCount,
       fakeCount,
       totalCount: transactions.length,
+      totalFormsCount: formsSummary.length,
     };
-  }, [transactions]);
+  }, [transactions, formsSummary]);
 
-  // Selected Form Payment Details Overview
-  const selectedFormInfo = useMemo(() => {
-    if (formFilter === "all") return null;
-    const formOpt = paymentForms.find((f) => f.formId === formFilter);
-    const formTxs = transactions.filter((tx) => tx.formId === formFilter);
-    const formTitle = formOpt?.title || formTxs[0]?.formTitle || "Selected Form";
-    const formAmount = formOpt?.paymentAmount || formTxs[0]?.paymentAmount || 0;
+  // Selected Form's Summary
+  const activeFormSummary = useMemo(() => {
+    if (!selectedFormId) return null;
+    return formsSummary.find((f) => f.formId === selectedFormId) || null;
+  }, [selectedFormId, formsSummary]);
 
-    let verifiedCount = 0;
-    let pendingCount = 0;
-    let fakeCount = 0;
-    let totalVerifiedRevenue = 0;
+  // Filtered Forms for the Overview View
+  const filteredFormsSummary = useMemo(() => {
+    if (!formSearchQuery.trim()) return formsSummary;
+    const q = formSearchQuery.toLowerCase().trim();
+    return formsSummary.filter(
+      (f) =>
+        f.title.toLowerCase().includes(q) ||
+        f.formId.toLowerCase().includes(q)
+    );
+  }, [formsSummary, formSearchQuery]);
 
-    for (const tx of formTxs) {
-      if (tx.paymentStatus === "verified") {
-        verifiedCount++;
-        totalVerifiedRevenue += tx.paymentAmount;
-      } else if (tx.paymentStatus === "pending") {
-        pendingCount++;
-      }
-      if (tx.isFakeOrSuspicious) {
-        fakeCount++;
-      }
-    }
+  // Filtered Transactions for the Selected Form's Details View
+  const filteredFormTransactions = useMemo(() => {
+    if (!selectedFormId) return [];
 
-    return {
-      formId: formFilter,
-      title: formTitle,
-      paymentAmount: formAmount,
-      totalCount: formTxs.length,
-      verifiedCount,
-      pendingCount,
-      fakeCount,
-      totalVerifiedRevenue,
-    };
-  }, [formFilter, paymentForms, transactions]);
-
-  const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
+      if (tx.formId !== selectedFormId) return false;
+
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
         tx.recipientName.toLowerCase().includes(q) ||
         tx.recipientEmail.toLowerCase().includes(q) ||
         tx.receiptNumber.toLowerCase().includes(q) ||
-        (tx.transactionId && tx.transactionId.toLowerCase().includes(q)) ||
-        tx.formTitle.toLowerCase().includes(q) ||
-        tx.formId.toLowerCase().includes(q);
-
-      const matchesForm = formFilter === "all" || tx.formId === formFilter;
+        (tx.transactionId && tx.transactionId.toLowerCase().includes(q));
 
       let matchesStatus = true;
       if (statusFilter === "verified") {
@@ -166,19 +169,22 @@ export function TransactionsClient({
       } else if (statusFilter === "rejected") {
         matchesStatus = tx.paymentStatus === "rejected";
       } else if (statusFilter === "fake") {
-        matchesStatus = tx.isFakeOrSuspicious || (!tx.transactionId && tx.paymentStatus !== "verified");
+        matchesStatus =
+          tx.isFakeOrSuspicious || (!tx.transactionId && tx.paymentStatus !== "verified");
       }
 
-      return matchesSearch && matchesForm && matchesStatus;
+      return matchesSearch && matchesStatus;
     });
-  }, [transactions, searchQuery, formFilter, statusFilter]);
+  }, [transactions, selectedFormId, searchQuery, statusFilter]);
 
-  const handleExportCSV = () => {
+  // Export CSV for a given form
+  const handleExportFormCSV = (formId: string, formTitle: string) => {
+    const formTxs = transactions.filter((tx) => tx.formId === formId);
     const headers = [
       "Sl No.",
       "Name",
       "Email",
-      "Form / Remark",
+      "Form Title",
       "Form ID",
       "Receipt Number",
       "Transaction ID",
@@ -188,7 +194,7 @@ export function TransactionsClient({
       "Submitted At",
       "Verified At",
     ];
-    const rows = filteredTransactions.map((tx, idx) => [
+    const rows = formTxs.map((tx, idx) => [
       idx + 1,
       `"${tx.recipientName.replace(/"/g, '""')}"`,
       `"${tx.recipientEmail.replace(/"/g, '""')}"`,
@@ -198,7 +204,11 @@ export function TransactionsClient({
       `"${tx.transactionId || "N/A"}"`,
       tx.paymentAmount.toFixed(2),
       tx.paymentStatus.toUpperCase(),
-      tx.paymentStatus === "verified" ? "VALID" : tx.isFakeOrSuspicious ? "SUSPICIOUS/FAKE" : "UNVERIFIED",
+      tx.paymentStatus === "verified"
+        ? "VALID"
+        : tx.isFakeOrSuspicious
+        ? "SUSPICIOUS/FAKE"
+        : "UNVERIFIED",
       `"${new Date(tx.createdAt).toLocaleString("en-IN")}"`,
       `"${tx.verifiedAt ? new Date(tx.verifiedAt).toLocaleString("en-IN") : "N/A"}"`,
     ]);
@@ -208,8 +218,11 @@ export function TransactionsClient({
     const link = document.createElement("a");
     link.setAttribute("href", url);
 
-    const formPrefix = selectedFormInfo ? selectedFormInfo.title.replace(/[^a-zA-Z0-9]/g, "_") : "All_Forms";
-    link.setAttribute("download", `Transactions_${formPrefix}_${new Date().toISOString().slice(0, 10)}.csv`);
+    const formPrefix = formTitle.replace(/[^a-zA-Z0-9]/g, "_");
+    link.setAttribute(
+      "download",
+      `Transactions_${formPrefix}_${new Date().toISOString().slice(0, 10)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -233,369 +246,610 @@ export function TransactionsClient({
 
   return (
     <div className="space-y-6">
-      {/* ═══ STATS CARDS ═══ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-card">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Verified Revenue</p>
-              <h3 className="text-xl font-bold font-mono mt-1 text-emerald-600 dark:text-emerald-400">
-                ₹{stats.totalVerifiedRevenue.toFixed(2)}
-              </h3>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
-              <IndianRupee className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Verified & Valid</p>
-              <h3 className="text-xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">
-                {stats.verifiedCount} <span className="text-xs font-normal text-muted-foreground">/ {stats.totalCount}</span>
-              </h3>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Pending Verification</p>
-              <h3 className="text-xl font-bold mt-1 text-amber-600 dark:text-amber-400">
-                {stats.pendingCount}
-              </h3>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
-              <Clock className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Unverified / Dummy ID</p>
-              <h3 className="text-xl font-bold mt-1 text-red-600 dark:text-red-400">
-                {stats.fakeCount}
-              </h3>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ═══ SELECTED FORM PAYMENT DETAILS PANEL ═══ */}
-      {selectedFormInfo && (
-        <Card className="border-primary/30 bg-primary/5 dark:bg-primary/10 transition-all shadow-sm">
-          <CardContent className="p-5 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className="bg-primary text-primary-foreground text-xs font-semibold">Selected Form Payment Details</Badge>
-                  <Badge variant="outline" className="font-mono text-xs">{selectedFormInfo.formId}</Badge>
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* VIEW 1: ALL FORMS TRANSACTIONS & COLLECTION OVERVIEW       */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {!selectedFormId && (
+        <div className="space-y-6">
+          {/* Top Level Global Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-card">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Total Verified Revenue
+                  </p>
+                  <h3 className="text-xl font-bold font-mono mt-1 text-emerald-600 dark:text-emerald-400">
+                    ₹{globalStats.totalVerifiedRevenue.toFixed(2)}
+                  </h3>
                 </div>
-                <h3 className="text-lg font-bold text-foreground">{selectedFormInfo.title}</h3>
-              </div>
+                <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                  <IndianRupee className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => router.push(`/admin/forms/${selectedFormInfo.formId}/responses`)}
-                  className="h-8 text-xs gap-1.5 bg-background"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  View Responses & Form
-                </Button>
+            <Card className="bg-card">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Verified Transactions
+                  </p>
+                  <h3 className="text-xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">
+                    {globalStats.verifiedCount}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      / {globalStats.totalCount}
+                    </span>
+                  </h3>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
 
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleExportCSV}
-                  className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  Export Selected Form CSV ({filteredTransactions.length})
-                </Button>
+            <Card className="bg-card">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Payment Forms
+                  </p>
+                  <h3 className="text-xl font-bold mt-1 text-foreground">
+                    {globalStats.totalFormsCount}
+                  </h3>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <Layers className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
 
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setFormFilter("all")}
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                  title="Clear Form Filter"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <Card className="bg-card">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Pending Verification
+                  </p>
+                  <h3 className="text-xl font-bold mt-1 text-amber-600 dark:text-amber-400">
+                    {globalStats.pendingCount}
+                  </h3>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
+                  <Clock className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 border-t border-primary/15 text-xs">
-              <div>
-                <p className="text-muted-foreground font-medium">Standard Payment Fee</p>
-                <p className="text-sm font-bold font-mono mt-0.5">₹{selectedFormInfo.paymentAmount.toFixed(2)}</p>
+          {/* Forms List Header & Search */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle className="text-lg">Form Transactions & Collections</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Select a form to view its individual participant transaction responses and receipts.
+                  </CardDescription>
+                </div>
+
+                <div className="w-full sm:w-72">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search forms by title or ID..."
+                      value={formSearchQuery}
+                      onChange={(e) => setFormSearchQuery(e.target.value)}
+                      className="pl-8 text-xs h-9"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-muted-foreground font-medium">Total Form Submissions</p>
-                <p className="text-sm font-bold font-mono mt-0.5">{selectedFormInfo.totalCount}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground font-medium">Verified Payments</p>
-                <p className="text-sm font-bold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400">
-                  {selectedFormInfo.verifiedCount} ({selectedFormInfo.totalCount > 0 ? Math.round((selectedFormInfo.verifiedCount / selectedFormInfo.totalCount) * 100) : 0}%)
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground font-medium">Verified Collection</p>
-                <p className="text-sm font-bold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400">
-                  ₹{selectedFormInfo.totalVerifiedRevenue.toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              {filteredFormsSummary.length === 0 ? (
+                <div className="text-center py-16 px-4 space-y-3">
+                  <Inbox className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {formSearchQuery
+                      ? "No forms match your search query."
+                      : "No forms with payments or transactions found."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead className="w-[35%]">Form</TableHead>
+                        <TableHead>Fee per Entry</TableHead>
+                        <TableHead>Submissions</TableHead>
+                        <TableHead>Status Breakdown</TableHead>
+                        <TableHead className="text-right">Total Collected</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredFormsSummary.map((f, index) => (
+                        <TableRow
+                          key={f.formId}
+                          className="hover:bg-muted/40 cursor-pointer transition-colors"
+                          onClick={() => setSelectedFormId(f.formId)}
+                        >
+                          {/* Serial Number */}
+                          <TableCell className="py-4 font-mono text-xs text-muted-foreground">
+                            {index + 1}
+                          </TableCell>
+
+                          {/* Form Title & ID */}
+                          <TableCell className="py-4 font-medium">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-foreground hover:underline">
+                                {f.title}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+                                  {f.formId}
+                                </Badge>
+                                {f.lastSubmissionDate && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Last entry: {new Date(f.lastSubmissionDate).toLocaleDateString("en-IN")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* Fee per entry */}
+                          <TableCell className="py-4">
+                            <span className="font-mono font-medium text-sm">
+                              ₹{f.paymentAmount.toFixed(2)}
+                            </span>
+                          </TableCell>
+
+                          {/* Submissions count */}
+                          <TableCell className="py-4">
+                            <span className="font-mono font-medium text-sm">
+                              {f.totalSubmissions}
+                            </span>
+                          </TableCell>
+
+                          {/* Status breakdown */}
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge
+                                variant="outline"
+                                className="text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 text-xs gap-1"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                {f.verifiedCount} Paid
+                              </Badge>
+
+                              {f.pendingCount > 0 && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-950/40 text-xs gap-1"
+                                >
+                                  <Clock className="h-3 w-3" />
+                                  {f.pendingCount} Pending
+                                </Badge>
+                              )}
+
+                              {f.fakeOrSuspiciousCount > 0 && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-red-600 border-red-200 bg-red-50 dark:bg-red-950/40 text-xs gap-1"
+                                >
+                                  <AlertTriangle className="h-3 w-3" />
+                                  {f.fakeOrSuspiciousCount} Unverified
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* Total collected */}
+                          <TableCell className="py-4 text-right">
+                            <div className="space-y-0.5">
+                              <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                                ₹{f.totalCollectedRevenue.toFixed(2)}
+                              </span>
+                            </div>
+                          </TableCell>
+
+                          {/* Action Dropdown Menu */}
+                          <TableCell className="py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-xs font-medium gap-1.5 cursor-pointer"
+                                  >
+                                    <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 text-xs">
+                                  <DropdownMenuItem
+                                    onClick={() => setSelectedFormId(f.formId)}
+                                    className="cursor-pointer font-medium"
+                                  >
+                                    <Eye className="h-3.5 w-3.5 mr-2 text-primary" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleExportFormCSV(f.formId, f.title)}
+                                    className="cursor-pointer"
+                                  >
+                                    <FileSpreadsheet className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                                    Export CSV
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      router.push(`/admin/forms/${f.formId}/responses`)
+                                    }
+                                    className="cursor-pointer"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                    Open Form Responses
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
-      {/* ═══ MAIN TRANSACTIONS CARD ═══ */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-            <div>
-              <CardTitle className="text-lg">
-                {selectedFormInfo ? `${selectedFormInfo.title} Transactions` : "Form Payment Transactions"} ({filteredTransactions.length})
-              </CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {selectedFormInfo
-                  ? `Showing transaction records for ${selectedFormInfo.title} (${selectedFormInfo.formId}).`
-                  : "Only showing form responses that have payment fields or transactions."}
-              </p>
-            </div>
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* VIEW 2: SELECTED FORM TRANSACTIONS DETAILS PAGE            */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {selectedFormId && activeFormSummary && (
+        <div className="space-y-6">
+          {/* Back button navigation */}
+          <div className="flex items-center justify-between gap-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedFormId(null);
+                setSearchQuery("");
+                setStatusFilter("all");
+              }}
+              className="gap-2 text-xs font-medium cursor-pointer"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to All Forms</span>
+            </Button>
 
-            <div className="flex w-full xl:w-auto flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
-              {/* Form Filter Selector */}
-              {paymentForms.length > 0 && (
-                <Select value={formFilter} onValueChange={setFormFilter}>
-                  <SelectTrigger className="w-full sm:w-[220px] text-xs">
-                    <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                    <SelectValue placeholder="All Payment Forms" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Payment Forms ({paymentForms.length})</SelectItem>
-                    {paymentForms.map((pf) => (
-                      <SelectItem key={pf.formId} value={pf.formId}>
-                        {pf.title} (₹{pf.paymentAmount})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {/* Status & Validity Filter */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[170px] text-xs">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses & Validity</SelectItem>
-                  <SelectItem value="verified">Verified / Valid</SelectItem>
-                  <SelectItem value="pending">Pending Verification</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="fake">Dummy / Unverified ID</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Search */}
-              <div className="relative w-full sm:w-auto min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search name, email, Tx ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9 text-xs"
-                />
-              </div>
-
-              {/* Export Button */}
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
-                variant="outline"
                 size="sm"
-                onClick={handleExportCSV}
-                className="w-full sm:w-auto h-9 text-xs gap-1.5 shrink-0"
+                variant="outline"
+                onClick={() =>
+                  handleExportFormCSV(activeFormSummary.formId, activeFormSummary.title)
+                }
+                className="h-8 text-xs gap-1.5"
               >
-                <Download className="h-3.5 w-3.5" />
-                {selectedFormInfo ? "Export Selected Form CSV" : "Export CSV"}
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <span>Export Form CSV ({filteredFormTransactions.length})</span>
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  router.push(`/admin/forms/${activeFormSummary.formId}/responses`)
+                }
+                className="h-8 text-xs gap-1.5"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>Form Builder & Responses</span>
               </Button>
             </div>
           </div>
-        </CardHeader>
 
-        <CardContent>
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">Sl</TableHead>
-                  <TableHead className="min-w-40">Participant</TableHead>
-                  <TableHead className="min-w-32">Receipt No.</TableHead>
-                  <TableHead className="min-w-36">Transaction ID</TableHead>
-                  <TableHead className="min-w-36">Form Details</TableHead>
-                  <TableHead className="min-w-24 text-right">Amount</TableHead>
-                  <TableHead className="min-w-28">Status</TableHead>
-                  <TableHead className="min-w-36">Submitted Date</TableHead>
-                  <TableHead className="text-right min-w-16">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTransactions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
-                      <div className="flex flex-col items-center gap-2">
-                        <Receipt className="h-8 w-8 opacity-30" />
-                        <p className="text-sm">
-                          {searchQuery || statusFilter !== "all" || formFilter !== "all"
-                            ? "No payment transactions found matching your selected form / search criteria."
-                            : "No form transactions recorded yet."}
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredTransactions.map((tx, index) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="text-xs text-muted-foreground">{index + 1}</TableCell>
+          {/* Selected Form Summary Banner */}
+          <Card className="border-primary/20 bg-muted/20">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {activeFormSummary.formId}
+                    </Badge>
+                    <Badge className="bg-primary text-primary-foreground text-xs">
+                      Registration Fee: ₹{activeFormSummary.paymentAmount.toFixed(2)}
+                    </Badge>
+                  </div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {activeFormSummary.title}
+                  </h2>
+                </div>
 
-                      <TableCell className="font-medium">
-                        <div className="text-sm">{tx.recipientName}</div>
-                        <div className="text-xs text-muted-foreground font-normal">{tx.recipientEmail}</div>
-                      </TableCell>
+                <div className="text-left md:text-right">
+                  <p className="text-xs text-muted-foreground font-medium">Total Collected</p>
+                  <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                    ₹{activeFormSummary.totalCollectedRevenue.toFixed(2)}
+                  </p>
+                </div>
+              </div>
 
-                      <TableCell className="text-xs font-mono">#{tx.receiptNumber}</TableCell>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 border-t border-border text-xs">
+                <div>
+                  <p className="text-muted-foreground">Total Transactions</p>
+                  <p className="text-sm font-bold font-mono mt-0.5">
+                    {activeFormSummary.totalSubmissions}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Verified & Paid</p>
+                  <p className="text-sm font-bold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400">
+                    {activeFormSummary.verifiedCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Pending Verification</p>
+                  <p className="text-sm font-bold font-mono mt-0.5 text-amber-600 dark:text-amber-400">
+                    {activeFormSummary.pendingCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Unverified / Dummy</p>
+                  <p className="text-sm font-bold font-mono mt-0.5 text-red-600 dark:text-red-400">
+                    {activeFormSummary.fakeOrSuspiciousCount}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                      <TableCell className="text-xs font-mono">
-                        {tx.transactionId ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="bg-muted px-2 py-0.5 rounded font-semibold text-foreground">
-                              {tx.transactionId}
+          {/* Form Transactions Responses Table */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle className="text-lg">
+                    Transaction Responses ({filteredFormTransactions.length})
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Individual participant payment submissions, transaction IDs, and receipts.
+                  </CardDescription>
+                </div>
+
+                <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                  {/* Status filter */}
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-[160px] text-xs h-9">
+                      <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="verified">Verified Only</SelectItem>
+                      <SelectItem value="pending">Pending Only</SelectItem>
+                      <SelectItem value="rejected">Rejected Only</SelectItem>
+                      <SelectItem value="fake">Unverified / Dummy</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Search query */}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search participant, txId..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-8 text-xs h-9"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              {filteredFormTransactions.length === 0 ? (
+                <div className="text-center py-16 px-4 space-y-3">
+                  <Inbox className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {searchQuery || statusFilter !== "all"
+                      ? "No transaction responses match your filter criteria."
+                      : "No transaction responses recorded for this form yet."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Participant</TableHead>
+                        <TableHead>Transaction ID / Receipt</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredFormTransactions.map((tx, index) => (
+                        <TableRow
+                          key={tx.id}
+                          className="hover:bg-muted/40 cursor-pointer"
+                          onClick={() => setSelectedTx(tx)}
+                        >
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {index + 1}
+                          </TableCell>
+
+                          {/* Participant Name & Email */}
+                          <TableCell>
+                            <div className="space-y-0.5">
+                              <p className="font-medium text-sm text-foreground">
+                                {tx.recipientName}
+                              </p>
+                              <p className="font-mono text-xs text-muted-foreground">
+                                {tx.recipientEmail}
+                              </p>
+                            </div>
+                          </TableCell>
+
+                          {/* Transaction ID & Receipt */}
+                          <TableCell>
+                            <div className="space-y-0.5">
+                              <p className="font-mono text-xs font-semibold text-foreground">
+                                {tx.transactionId || "—"}
+                              </p>
+                              <p className="font-mono text-[11px] text-muted-foreground">
+                                #{tx.receiptNumber}
+                              </p>
+                            </div>
+                          </TableCell>
+
+                          {/* Amount */}
+                          <TableCell>
+                            <span className="font-mono font-semibold text-sm">
+                              ₹{tx.paymentAmount.toFixed(2)}
                             </span>
-                            {tx.isFakeOrSuspicious && tx.paymentStatus !== "verified" && (
-                              <span title="Unverified or suspicious transaction ID format" className="text-amber-500">
-                                <AlertTriangle className="h-3.5 w-3.5 inline" />
-                              </span>
+                          </TableCell>
+
+                          {/* Status Badge */}
+                          <TableCell>
+                            {tx.paymentStatus === "verified" ? (
+                              <Badge
+                                variant="outline"
+                                className="text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 flex items-center gap-1 text-xs w-fit"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>Verified</span>
+                              </Badge>
+                            ) : tx.paymentStatus === "rejected" ? (
+                              <Badge
+                                variant="destructive"
+                                className="flex items-center gap-1 text-xs w-fit"
+                              >
+                                <XCircle className="h-3 w-3" />
+                                <span>Rejected</span>
+                              </Badge>
+                            ) : tx.isFakeOrSuspicious ? (
+                              <Badge
+                                variant="outline"
+                                className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/40 flex items-center gap-1 text-xs w-fit"
+                              >
+                                <AlertTriangle className="h-3 w-3" />
+                                <span>Unverified / Dummy</span>
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="secondary"
+                                className="flex items-center gap-1 text-xs w-fit"
+                              >
+                                <Clock className="h-3 w-3" />
+                                <span>Pending</span>
+                              </Badge>
                             )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground italic">— No Tx ID —</span>
-                        )}
-                      </TableCell>
+                          </TableCell>
 
-                      <TableCell className="text-xs">
-                        <Badge variant="outline" className="font-normal text-xs">
-                          {tx.formTitle}
-                        </Badge>
-                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{tx.formId}</div>
-                      </TableCell>
+                          {/* Date */}
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(tx.createdAt).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </TableCell>
 
-                      <TableCell className="text-sm font-mono text-right font-semibold">
-                        ₹{tx.paymentAmount.toFixed(2)}
-                      </TableCell>
+                          {/* Actions */}
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => setSelectedTx(tx)}
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
 
-                      <TableCell>
-                        {tx.paymentStatus === "verified" ? (
-                          <Badge
-                            variant="outline"
-                            className="flex items-center gap-1 w-fit text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 text-xs"
-                          >
-                            <CheckCircle2 className="h-3 w-3" /> Verified
-                          </Badge>
-                        ) : tx.paymentStatus === "rejected" ? (
-                          <Badge variant="destructive" className="flex items-center gap-1 w-fit text-xs">
-                            <XCircle className="h-3 w-3" /> Rejected
-                          </Badge>
-                        ) : tx.isFakeOrSuspicious ? (
-                          <Badge variant="outline" className="flex items-center gap-1 w-fit text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-xs">
-                            <AlertTriangle className="h-3 w-3" /> Dummy / Pending
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="flex items-center gap-1 w-fit text-xs">
-                            <Clock className="h-3 w-3" /> Pending
-                          </Badge>
-                        )}
-                      </TableCell>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => router.push(`/admin/receipt/${tx.id}`)}
+                                title="View Receipt"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
 
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(tx.createdAt).toLocaleString("en-IN", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        })}
-                      </TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44 text-xs">
+                                  <DropdownMenuItem onClick={() => setSelectedTx(tx)}>
+                                    <Eye className="h-3.5 w-3.5 mr-2" />
+                                    View Response Data
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/admin/receipt/${tx.id}`)}
+                                  >
+                                    <FileText className="h-3.5 w-3.5 mr-2" />
+                                    Official Receipt
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    disabled={resendingId === tx.id}
+                                    onClick={() => handleResendReceipt(tx.id)}
+                                  >
+                                    {resendingId === tx.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                                    ) : (
+                                      <Send className="h-3.5 w-3.5 mr-2" />
+                                    )}
+                                    Resend Receipt Email
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="cursor-pointer text-xs"
-                              onClick={() => setSelectedTx(tx)}
-                            >
-                              <Eye className="mr-2 h-3.5 w-3.5" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer text-xs"
-                              onClick={() => router.push(`/admin/receipt/${tx.id}`)}
-                            >
-                              <FileText className="mr-2 h-3.5 w-3.5" />
-                              View Receipt
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer text-xs"
-                              disabled={resendingId === tx.id}
-                              onClick={() => handleResendReceipt(tx.id)}
-                            >
-                              {resendingId === tx.id ? (
-                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Send className="mr-2 h-3.5 w-3.5" />
-                              )}
-                              Resend Email Receipt
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ═══ TRANSACTION DETAILS SHEET ═══ */}
-      <Sheet open={Boolean(selectedTx)} onOpenChange={(open) => { if (!open) setSelectedTx(null); }}>
-        <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex h-dvh max-h-screen flex-col overflow-hidden">
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* TRANSACTION DETAILS SLIDE-OVER SHEET                       */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <Sheet open={!!selectedTx} onOpenChange={(open) => !open && setSelectedTx(null)}>
+        <SheetContent
+          side="right"
+          className="flex h-full flex-col p-0 sm:max-w-md w-full overflow-hidden"
+        >
           {selectedTx && (
             <>
               {/* Fixed Header */}
@@ -625,7 +879,9 @@ export function TransactionsClient({
                   </p>
                   <div className="rounded-md border p-3 bg-muted/40 text-sm space-y-1">
                     <p className="font-semibold">{selectedTx.formTitle}</p>
-                    <p className="text-xs font-mono text-muted-foreground">Form ID: {selectedTx.formId}</p>
+                    <p className="text-xs font-mono text-muted-foreground">
+                      Form ID: {selectedTx.formId}
+                    </p>
                   </div>
                 </div>
 
@@ -655,7 +911,9 @@ export function TransactionsClient({
                         return mobile ? (
                           <span className="font-mono text-xs">{mobile}</span>
                         ) : (
-                          <span className="text-muted-foreground italic text-xs">Not Available</span>
+                          <span className="text-muted-foreground italic text-xs">
+                            Not Available
+                          </span>
                         );
                       })()}
                     </div>
@@ -670,7 +928,9 @@ export function TransactionsClient({
                   <div className="rounded-md border divide-y text-sm">
                     <div className="flex justify-between px-3 py-2">
                       <span className="text-muted-foreground">Amount</span>
-                      <span className="font-mono font-semibold">₹{selectedTx.paymentAmount.toFixed(2)}</span>
+                      <span className="font-mono font-semibold">
+                        ₹{selectedTx.paymentAmount.toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between px-3 py-2">
                       <span className="text-muted-foreground">Transaction ID</span>
@@ -681,7 +941,10 @@ export function TransactionsClient({
                     <div className="flex justify-between items-center px-3 py-2">
                       <span className="text-muted-foreground">Verification Status</span>
                       {selectedTx.paymentStatus === "verified" ? (
-                        <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 flex items-center gap-1 text-xs">
+                        <Badge
+                          variant="outline"
+                          className="text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 flex items-center gap-1 text-xs"
+                        >
                           <CheckCircle2 className="h-3 w-3" /> Verified Real Transaction
                         </Badge>
                       ) : selectedTx.paymentStatus === "rejected" ? (
@@ -689,7 +952,10 @@ export function TransactionsClient({
                           <XCircle className="h-3 w-3" /> Rejected
                         </Badge>
                       ) : selectedTx.isFakeOrSuspicious ? (
-                        <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/40 flex items-center gap-1 text-xs">
+                        <Badge
+                          variant="outline"
+                          className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/40 flex items-center gap-1 text-xs"
+                        >
                           <AlertTriangle className="h-3 w-3" /> Unverified / Dummy ID
                         </Badge>
                       ) : (
@@ -705,6 +971,25 @@ export function TransactionsClient({
                   </div>
                 </div>
 
+                {/* All Submission Answers */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5" /> Form Submission Answers
+                  </p>
+                  <div className="rounded-md border divide-y text-xs">
+                    {Object.entries(selectedTx.answers).map(([key, val]) => (
+                      <div key={key} className="flex justify-between gap-2 px-3 py-2">
+                        <span className="text-muted-foreground capitalize font-medium">
+                          {key.replace(/([A-Z])/g, " $1")}
+                        </span>
+                        <span className="font-mono text-foreground text-right truncate max-w-[200px]">
+                          {typeof val === "object" ? JSON.stringify(val) : String(val ?? "—")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Timeline */}
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -713,7 +998,9 @@ export function TransactionsClient({
                   <div className="rounded-md border divide-y text-sm">
                     <div className="flex justify-between px-3 py-2">
                       <span className="text-muted-foreground">Submitted At</span>
-                      <span className="font-mono text-xs">{new Date(selectedTx.createdAt).toLocaleString("en-IN")}</span>
+                      <span className="font-mono text-xs">
+                        {new Date(selectedTx.createdAt).toLocaleString("en-IN")}
+                      </span>
                     </div>
                     {selectedTx.verifiedAt && (
                       <div className="flex justify-between px-3 py-2">

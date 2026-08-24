@@ -54,7 +54,7 @@ export function GitHubOrgSettings({ initialValue }: GitHubOrgSettingsProps) {
           Enter the GitHub organization name to fetch all repositories
         </p>
       </div>
-      <Button type="submit" disabled={isLoading} className="w-full">
+      <Button type="submit" disabled={isLoading}>
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

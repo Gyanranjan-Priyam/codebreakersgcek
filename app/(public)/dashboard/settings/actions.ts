@@ -151,11 +151,13 @@ export async function updateUserProfileData(data: UserProfileData) {
 
     const validatedData = validation.data;
 
+    const isEmailChanging = validatedData.email.toLowerCase() !== session.user.email.toLowerCase();
+
     // Check if email is being changed and if it's already taken by another user
-    if (validatedData.email !== session.user.email) {
+    if (isEmailChanging) {
       const existingUser = await prisma.user.findFirst({
         where: {
-          email: validatedData.email,
+          email: validatedData.email.toLowerCase(),
           id: { not: session.user.id },
         },
       });
@@ -185,14 +187,13 @@ export async function updateUserProfileData(data: UserProfileData) {
       }
     }
 
-    // Update user profile in a transaction
+    // Update user profile (keep current email if changed until verified)
     const updatedUser = await prisma.$transaction(async (tx) => {
-      // Update user profile
       return await tx.user.update({
         where: { id: session.user.id },
         data: {
           name: validatedData.name,
-          email: validatedData.email,
+          email: isEmailChanging ? session.user.email : validatedData.email,
           mobileNumber: validatedData.mobileNumber,
           whatsappNumber: validatedData.whatsappNumber || null,
           aadhaarNumber: validatedData.aadhaarNumber,
@@ -216,23 +217,6 @@ export async function updateUserProfileData(data: UserProfileData) {
           updatedAt: new Date(),
         },
       });
-
-      // // Update all user's participations with the new data
-      // await tx.participation.updateMany({
-      //   where: { userId: session.user.id },
-      //   data: {
-      //     fullName: validatedData.name,
-      //     email: validatedData.email,
-      //     mobileNumber: validatedData.mobileNumber,
-      //     whatsappNumber: validatedData.whatsappNumber || null,
-      //     aadhaarNumber: validatedData.aadhaarNumber,
-      //     state: validatedData.state,
-      //     district: validatedData.district,
-      //     collegeName: validatedData.collegeName,
-      //     collegeAddress: validatedData.collegeAddress,
-      //     updatedAt: new Date(),
-      //   },
-      // });
     });
 
     // Revalidate all paths where user data is displayed
@@ -241,9 +225,28 @@ export async function updateUserProfileData(data: UserProfileData) {
     revalidatePath("/leaderboard");
     revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
 
+    if (isEmailChanging) {
+      // Send OTP to the new email address
+      const { requestEmailChangeOTP } = await import("@/lib/email-change-service");
+      const otpResult = await requestEmailChangeOTP(validatedData.email);
+
+      if (otpResult.status === "error") {
+        return {
+          status: "error" as const,
+          message: `Profile saved, but failed to send verification code to ${validatedData.email}: ${otpResult.message}`,
+        };
+      }
+
+      return {
+        status: "requires_email_verification" as const,
+        pendingEmail: validatedData.email.toLowerCase(),
+        message: `Profile details saved. A 6-digit verification code has been sent to ${validatedData.email} to confirm the email update.`,
+      };
+    }
+
     return {
       status: "success" as const,
-      message: "Profile updated successfully. All your event registrations have been updated.",
+      message: "Profile updated successfully.",
     };
   } catch (error) {
     console.error("Error updating user profile:", error);

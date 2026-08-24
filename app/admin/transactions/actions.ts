@@ -22,6 +22,19 @@ export interface TransactionItem {
   isFakeOrSuspicious: boolean;
 }
 
+export interface FormTransactionSummary {
+  formId: string;
+  title: string;
+  paymentAmount: number;
+  totalSubmissions: number;
+  verifiedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  fakeOrSuspiciousCount: number;
+  totalCollectedRevenue: number;
+  lastSubmissionDate: string | null;
+}
+
 export interface PaymentFormOption {
   formId: string;
   title: string;
@@ -111,20 +124,47 @@ export async function getAdminTransactions(): Promise<{
   success: boolean;
   data?: TransactionItem[];
   paymentForms?: PaymentFormOption[];
+  formsSummary?: FormTransactionSummary[];
   error?: string;
 }> {
   try {
-    const responses = await prisma.formResponse.findMany({
-      include: {
-        form: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const [allForms, responses] = await Promise.all([
+      prisma.form.findMany({
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.formResponse.findMany({
+        include: {
+          form: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+    ]);
 
     const paymentFormsMap = new Map<string, { title: string; paymentAmount: number }>();
+    const formsSummaryMap = new Map<string, FormTransactionSummary>();
     const items: TransactionItem[] = [];
+
+    // Pre-populate forms with payment field
+    for (const f of allForms) {
+      if (hasFormPaymentField(f.definition)) {
+        const amt = extractPaymentAmount(f.definition);
+        paymentFormsMap.set(f.formId, { title: f.title, paymentAmount: amt });
+        formsSummaryMap.set(f.formId, {
+          formId: f.formId,
+          title: f.title,
+          paymentAmount: amt,
+          totalSubmissions: 0,
+          verifiedCount: 0,
+          pendingCount: 0,
+          rejectedCount: 0,
+          fakeOrSuspiciousCount: 0,
+          totalCollectedRevenue: 0,
+          lastSubmissionDate: null,
+        });
+      }
+    }
 
     for (const res of responses) {
       const formDef = res.form?.definition;
@@ -137,6 +177,8 @@ export async function getAdminTransactions(): Promise<{
       }
 
       const amount = extractPaymentAmount(formDef);
+      const formId = res.form?.formId || "unassigned";
+      const formTitle = res.form?.title || "Form Registration";
 
       if (res.form?.formId && res.form?.title) {
         paymentFormsMap.set(res.form.formId, { title: res.form.title, paymentAmount: amount });
@@ -146,10 +188,46 @@ export async function getAdminTransactions(): Promise<{
       const status = res.paymentStatus || "pending";
       const { isValid, isFakeOrSuspicious } = checkTransactionValidity(txId, status);
 
+      // Update formsSummaryMap
+      let formSummary = formsSummaryMap.get(formId);
+      if (!formSummary) {
+        formSummary = {
+          formId,
+          title: formTitle,
+          paymentAmount: amount,
+          totalSubmissions: 0,
+          verifiedCount: 0,
+          pendingCount: 0,
+          rejectedCount: 0,
+          fakeOrSuspiciousCount: 0,
+          totalCollectedRevenue: 0,
+          lastSubmissionDate: null,
+        };
+        formsSummaryMap.set(formId, formSummary);
+      }
+
+      formSummary.totalSubmissions += 1;
+      if (status === "verified") {
+        formSummary.verifiedCount += 1;
+        formSummary.totalCollectedRevenue += amount;
+      } else if (status === "rejected") {
+        formSummary.rejectedCount += 1;
+      } else {
+        formSummary.pendingCount += 1;
+      }
+
+      if (isFakeOrSuspicious) {
+        formSummary.fakeOrSuspiciousCount += 1;
+      }
+
+      if (!formSummary.lastSubmissionDate || new Date(res.createdAt) > new Date(formSummary.lastSubmissionDate)) {
+        formSummary.lastSubmissionDate = res.createdAt.toISOString();
+      }
+
       items.push({
         id: res.id,
-        formId: res.form?.formId || "N/A",
-        formTitle: res.form?.title || "Form Registration",
+        formId,
+        formTitle,
         receiptNumber: `CB-INV-${res.id.slice(0, 8).toUpperCase()}`,
         transactionId: txId,
         paymentStatus: status,
@@ -169,7 +247,11 @@ export async function getAdminTransactions(): Promise<{
       ([formId, info]) => ({ formId, title: info.title, paymentAmount: info.paymentAmount })
     );
 
-    return { success: true, data: items, paymentForms };
+    const formsSummary: FormTransactionSummary[] = Array.from(formsSummaryMap.values()).sort(
+      (a, b) => b.totalCollectedRevenue - a.totalCollectedRevenue || b.totalSubmissions - a.totalSubmissions
+    );
+
+    return { success: true, data: items, paymentForms, formsSummary };
   } catch (err: unknown) {
     console.error("Error fetching admin transactions:", err);
     return { success: false, error: err instanceof Error ? err.message : "Failed to load transactions." };

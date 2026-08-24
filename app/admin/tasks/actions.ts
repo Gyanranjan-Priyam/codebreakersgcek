@@ -12,6 +12,7 @@ export interface TaskData {
   startDate: Date;
   dueDate: Date;
   points: number;
+  targetBatchIds?: string[];
   createdAt: Date;
 }
 
@@ -45,6 +46,7 @@ export async function createTask(data: {
   startDate: Date;
   dueDate: Date;
   points: number;
+  targetBatchIds?: string[];
   createdBy: string;
 }) {
   await requireAdmin();
@@ -70,6 +72,7 @@ export async function createTask(data: {
         startDate: data.startDate,
         dueDate: data.dueDate,
         points: data.points,
+        targetBatchIds: data.targetBatchIds || [],
         createdBy: data.createdBy,
       },
     });
@@ -156,6 +159,7 @@ export async function updateTask(
     startDate: Date;
     dueDate: Date;
     points: number;
+    targetBatchIds?: string[];
   }
 ) {
   await requireAdmin();
@@ -182,6 +186,7 @@ export async function updateTask(
         startDate: data.startDate,
         dueDate: data.dueDate,
         points: data.points,
+        ...(data.targetBatchIds !== undefined ? { targetBatchIds: data.targetBatchIds } : {}),
       },
     });
 

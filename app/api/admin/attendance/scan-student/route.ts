@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
         registration: true,
         rollNumber: true,
         branch: true,
+        batchId: true,
         profileImageKey: true,
         banned: true,
         banReason: true,
@@ -134,6 +135,19 @@ export async function POST(req: NextRequest) {
         },
         { status: 403 }
       );
+    }
+
+    // Check batch eligibility if session is targeted
+    if (session.targetBatchIds && session.targetBatchIds.length > 0) {
+      if (!user.batchId || !session.targetBatchIds.includes(user.batchId)) {
+        return NextResponse.json(
+          {
+            error: `Session restricted: ${user.name} is not in the assigned batch for this session.`,
+            user,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Check if attendance already marked

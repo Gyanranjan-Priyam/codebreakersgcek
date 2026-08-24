@@ -1598,8 +1598,8 @@ export const sendPaymentConfirmationEmail = async ({
 export const generateWelcomeEmailHTML = ({
   firstName = "there",
   companyName = "CodeBreakers",
-  getStartedUrl = "https://codebreakersgcek.tech",
-  supportEmail = "contact.gcekbhawanipatna@gmail.com",
+  getStartedUrl = "https://app.codebreakersgcek.tech/login",
+  supportEmail = "codebreakersgcekalahandi@gmail.com",
   companyAddress = "GCEK, Bhawanipatna, Odisha",
 }: {
   firstName?: string;
@@ -1608,7 +1608,90 @@ export const generateWelcomeEmailHTML = ({
   supportEmail?: string;
   companyAddress?: string;
 }) => {
-  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="width=device-width" name="viewport"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta name="x-apple-disable-message-reformatting"/><meta content="telephone=no,address=no,email=no,date=no,url=no" name="format-detection"/><title>Start achieving more with your new account and tools.</title><style>@media (prefers-color-scheme: dark){li::marker{color:#c4c4c4}}</style></head><body dir="ltr" lang="en"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">Start achieving more with your new account and tools.<div>                                                                                                                                                  </div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td dir="ltr" lang="en" style="font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:1em;min-height:100%;line-height:155%"><table align="left" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;align:left;width:100%;border-radius:0px;line-height:155%"><tbody><tr style="width:100%"><td style="padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px"><h1 style="margin:0;padding:0;font-size:28px;line-height:1.44em;padding-top:0.389em;font-weight:700;color:#111827;margin-bottom:16px;text-align:left">Welcome to ${companyName}, ${firstName} 👋</h1><p style="margin:0;padding:0;font-size:1em;padding-top:8px;padding-bottom:0.5em">We're thrilled to have you on board. Your account is ready, and you can now access all the tools and features designed to help you get more done.</p><p style="margin:0;padding:0;font-size:1em;padding-top:16px;padding-bottom:0.5em">To help you get started quickly, here are a few things you can do right away:</p><ul style="margin:0;padding:0;padding-left:1.1em;padding-bottom:1em"><li style="margin:0;padding:0;margin-left:1em;padding-bottom:0.3em;padding-top:0.3em"><p style="margin:0;padding:0"><strong>Complete your profile </strong>so we can personalize your experience.</p></li><li style="margin:0;padding:0;margin-left:1em;padding-bottom:0.3em;padding-top:0.3em"><p style="margin:0;padding:0"><strong>Explore the dashboard </strong>to see everything available to you.</p></li><li style="margin:0;padding:0;margin-left:1em;padding-bottom:0.3em;padding-top:0.3em"><p style="margin:0;padding:0"><strong>Invite your team </strong>to collaborate on projects together.</p></li></ul><table width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="box-sizing:border-box"><tbody><tr><td style="padding:10px 20px 10px 20px;padding-top:24px;padding-bottom:24px"><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody style="width:100%"><tr style="width:100%"><td align="left" data-id="__react-email-column"><a class="button" href="${getStartedUrl}" style="line-height:100%;text-decoration:none;display:inline-block;max-width:100%;mso-padding-alt:0px;margin:0;padding:0;padding-top:12px;padding-right:28px;padding-bottom:12px;padding-left:28px;background-color:#000000;color:#ffffff;border-radius:4px;font-weight:500;font-size:0.875em;text-align:center" target="_blank"><span><!--[if mso]><i style="mso-font-width:466.6666666666667%;mso-text-raise:18px" hidden>&#8202;&#8202;&#8202;</i><![endif]--></span><span style="max-width:100%;display:inline-block;line-height:120%;mso-padding-alt:0px;mso-text-raise:9px">Get started</span><span><!--[if mso]><i style="mso-font-width:466.6666666666667%" hidden>&#8202;&#8202;&#8202;&#8203;</i><![endif]--></span></a></td></tr></tbody></table></td></tr></tbody></table><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">If you have any questions or need a hand, our support team is always ready to help. Just reply to this email or reach out to us at ${supportEmail}.</p><p style="margin:0;padding:0;font-size:1em;padding-top:16px;padding-bottom:0.5em">Welcome aboard,<br/>The ${companyName} Team</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" class="node-footer" style="font-size:0.8em"><tbody><tr><td style="padding-top:40px"><hr class="divider" style="width:100%;border:none;border-color:transparent;border-top:1px solid #eaeaea;padding-bottom:1em;border-style:solid;border-width:0;border-top-width:2px"/><p style="margin:0;padding:0;font-size:12px;padding-top:16px;padding-bottom:0.5em;color:#9ca3af;text-align:center">${companyName} • ${companyAddress}<br/>© 2026 ${companyName}. All rights reserved.</p></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>`;
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
+<head>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  <title>Welcome to ${companyName}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+    }
+    @media only screen and (max-width: 620px) {
+      .email-card {
+        padding: 28px 20px !important;
+      }
+      .email-wrapper {
+        padding: 16px 8px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table class="email-wrapper" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f8fafc;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table class="email-card" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;padding:40px 36px;box-sizing:border-box;text-align:left;">
+          <tr>
+            <td>
+              <h1 style="margin:0 0 18px 0;font-size:24px;font-weight:700;color:#0f172a;line-height:1.3;letter-spacing:-0.02em;">
+                Welcome to ${companyName}, ${firstName}👋
+              </h1>
+
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+                We're thrilled to have you on board. Your account is ready, and you can now access all the tools and features designed to help you get more done.
+              </p>
+
+              <p style="margin:0 0 12px 0;font-size:15px;line-height:1.6;color:#334155;">
+                To help you get started quickly, here are a few things you can do right away:
+              </p>
+
+              <ul style="margin:0 0 28px 0;padding-left:22px;font-size:15px;line-height:1.75;color:#334155;">
+                <li style="margin-bottom:6px;">
+                  <strong style="color:#0f172a;">Complete your profile</strong> so we can personalize your experience.
+                </li>
+                <li style="margin-bottom:6px;">
+                  <strong style="color:#0f172a;">Explore the dashboard</strong> to see everything available to you.
+                </li>
+                <li style="margin-bottom:6px;">
+                  <strong style="color:#0f172a;">Invite your team</strong> to collaborate on projects together.
+                </li>
+              </ul>
+
+              <div style="text-align:center;margin:32px 0;">
+                <a href="${getStartedUrl}" style="display:inline-block;background-color:#000000;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 32px;border-radius:6px;letter-spacing:0.01em;" target="_blank">
+                  Get started
+                </a>
+              </div>
+
+              <p style="margin:28px 0 16px 0;font-size:14px;line-height:1.6;color:#475569;">
+                If you have any questions or need a hand, our support team is always ready to help. Just reply to this email or reach out to us at <a href="mailto:${supportEmail}" style="color:#2563eb;text-decoration:underline;">${supportEmail}</a>.
+              </p>
+
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#475569;">
+                Welcome aboard,<br />
+                <strong style="color:#0f172a;">The ${companyName} Team</strong>
+              </p>
+
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:28px 0 16px 0;" />
+
+              <div style="text-align:center;font-size:12px;color:#94a3b8;line-height:1.6;">
+                ${companyName} &bull; ${companyAddress}<br />
+                &copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 };
 
 // Generate Form Submission Confirmation Email HTML Template

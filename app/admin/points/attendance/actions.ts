@@ -10,6 +10,7 @@ export interface AttendanceSessionData {
   title: string;
   date: Date;
   day: string;
+  targetBatchIds?: string[];
   createdAt: Date;
 }
 
@@ -23,15 +24,22 @@ export interface MemberForAttendance {
   rollNumber: string | null;
   branch: string | null;
   admissionYear: string | null;
+  batchId?: string | null;
   mobileNumber: string | null;
   role: string | null;
 }
 
-export async function getAllMembers() {
+export async function getAllMembers(targetBatchIds?: string[]) {
   await requireAdmin();
   
   try {
+    const whereClause =
+      targetBatchIds && targetBatchIds.length > 0
+        ? { batchId: { in: targetBatchIds } }
+        : {};
+
     const members = await prisma.user.findMany({
+      where: whereClause,
       select: {
         id: true,
         name: true,
@@ -42,6 +50,7 @@ export async function getAllMembers() {
         rollNumber: true,
         branch: true,
         admissionYear: true,
+        batchId: true,
         mobileNumber: true,
         role: true,
       },
@@ -91,6 +100,7 @@ export async function createAttendanceSession(data: {
   title: string;
   date: Date;
   day: string;
+  targetBatchIds?: string[];
   createdBy: string;
 }) {
   await requireAdmin();
@@ -114,6 +124,7 @@ export async function createAttendanceSession(data: {
         title: data.title,
         date: data.date,
         day: data.day,
+        targetBatchIds: data.targetBatchIds || [],
         createdBy: data.createdBy,
       },
     });
@@ -197,6 +208,7 @@ export async function updateAttendanceSession(
     title: string;
     date: Date;
     day: string;
+    targetBatchIds?: string[];
   }
 ) {
   await requireAdmin();
@@ -221,6 +233,7 @@ export async function updateAttendanceSession(
         title: data.title,
         date: data.date,
         day: data.day,
+        ...(data.targetBatchIds !== undefined ? { targetBatchIds: data.targetBatchIds } : {}),
       },
     });
 

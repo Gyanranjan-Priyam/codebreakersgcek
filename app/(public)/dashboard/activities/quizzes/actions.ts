@@ -2,14 +2,45 @@
 
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/app/data/admin/get-current-user";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 export async function getActiveQuizzes() {
   try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    let userBatchId: string | null = null;
+    if (session?.user?.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { batchId: true },
+      });
+      userBatchId = user?.batchId || null;
+    }
+
     const now = new Date();
     
     const quizzes = await prisma.quiz.findMany({
       where: {
         isActive: true,
+        OR: [
+          { targetAudience: "EXTERNAL" },
+          {
+            targetAudience: "INTERNAL",
+            ...(userBatchId
+              ? {
+                  OR: [
+                    { targetBatchIds: { equals: [] } },
+                    { targetBatchIds: { has: userBatchId } },
+                  ],
+                }
+              : {
+                  targetBatchIds: { equals: [] },
+                }),
+          },
+        ],
       },
       orderBy: {
         createdAt: 'desc',

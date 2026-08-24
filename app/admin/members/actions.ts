@@ -3,8 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
+import { revalidatePath } from "next/cache";
 import {
-  sendMemberInvitationEmail,
   sendMemberWelcomeEmail,
 } from "@/lib/mailer";
 import { env } from "@/lib/env";
@@ -63,6 +63,12 @@ export interface MemberData {
   registration: string | null;
   rollNumber: string | null;
   branch: string | null;
+  batchId?: string | null;
+  batch?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   mobileNumber: string | null;
   whatsappNumber: string | null;
   collegeName: string | null;
@@ -83,6 +89,7 @@ const createMemberSchema = z.object({
   mobileNumber: z.string().min(10, "Mobile number is required"),
   whatsappNumber: z.string().min(10, "WhatsApp number is required"),
   branch: z.string().min(1, "Branch is required"),
+  batchId: z.string().optional().nullable(),
 });
 
 export async function getAllMembers() {
@@ -104,6 +111,15 @@ export async function getAllMembers() {
         registration: true,
         rollNumber: true,
         branch: true,
+        admissionYear: true,
+        batchId: true,
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
         mobileNumber: true,
         whatsappNumber: true,
         collegeName: true,
@@ -141,6 +157,7 @@ export async function createMember(input: {
   mobileNumber: string;
   whatsappNumber: string;
   branch: string;
+  batchId?: string | null;
 }) {
   await requireAdmin();
 
@@ -189,6 +206,7 @@ export async function createMember(input: {
             mobileNumber: data.mobileNumber.trim(),
             whatsappNumber: data.whatsappNumber.trim(),
             branch: data.branch,
+            batchId: data.batchId || null,
             role: "member",
             emailVerified: false,
             profileComplete: false,
@@ -219,27 +237,23 @@ export async function createMember(input: {
 
     const appUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
 
-    const emailResults = await Promise.allSettled([
-      sendMemberInvitationEmail({
-        to: normalizedEmail,
-        memberName: fullName,
-        loginUrl: `${appUrl}/login`,
-      }),
-      sendMemberWelcomeEmail({
+    let emailSent = true;
+    try {
+      await sendMemberWelcomeEmail({
         to: normalizedEmail,
         memberName: fullName,
         dashboardUrl: `${appUrl}/login`,
-      }),
-    ]);
-
-    const emailFailures = emailResults.filter((result) => result.status === "rejected");
+      });
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError);
+      emailSent = false;
+    }
 
     return {
       status: "success" as const,
-      message:
-        emailFailures.length > 0
-          ? "Member added, but one or more emails could not be sent"
-          : "Member added successfully and invitation emails sent",
+      message: emailSent
+        ? "Member added successfully and welcome email sent"
+        : "Member added, but welcome email could not be sent",
       data: member,
     };
   } catch (error) {
@@ -690,3 +704,424 @@ export async function getMemberStats(userId: string) {
     };
   }
 }
+
+export async function assignMemberBatch(userId: string, batchId: string | null) {
+  await requireAdmin();
+  try {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { batchId: batchId || null },
+      include: {
+        batch: {
+          select: { id: true, name: true, code: true },
+        },
+      },
+    });
+
+    revalidatePath("/admin/members");
+    revalidatePath("/admin/batches");
+    return {
+      status: "success" as const,
+      message: batchId
+        ? `Assigned to batch "${updated.batch?.name}".`
+        : "Removed from batch.",
+      data: updated,
+    };
+  } catch (error) {
+    console.error("Error updating member batch:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update member batch",
+    };
+  }
+}
+
+export async function bulkAssignMembersBatch(userIds: string[], batchId: string | null) {
+  await requireAdmin();
+  try {
+    if (!userIds.length) {
+      return { status: "error" as const, message: "No members selected" };
+    }
+
+    await prisma.user.updateMany({
+      where: { id: { in: userIds } },
+      data: { batchId: batchId || null },
+    });
+
+    revalidatePath("/admin/members");
+    revalidatePath("/admin/batches");
+    return {
+      status: "success" as const,
+      message: `Updated batch for ${userIds.length} member(s).`,
+    };
+  } catch (error) {
+    console.error("Error bulk updating member batches:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to bulk update batches",
+    };
+  }
+}
+
+export interface FormCandidateItem {
+  id: string;
+  name: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  email: string;
+  mobileNumber: string;
+  whatsappNumber: string;
+  branch: string;
+  rollNumber: string;
+  admissionYear: string;
+  isAlreadyMember: boolean;
+  submittedAt: Date;
+}
+
+export async function getFormsListForMemberImport() {
+  await requireAdmin();
+  try {
+    const forms = await prisma.form.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        formId: true,
+        title: true,
+        _count: {
+          select: { responses: true },
+        },
+      },
+    });
+    return forms.map((f) => ({
+      id: f.id,
+      formId: f.formId,
+      title: f.title,
+      responseCount: f._count.responses,
+    }));
+  } catch (error) {
+    console.error("Error fetching forms for member import:", error);
+    return [];
+  }
+}
+
+function extractCandidateFromResponse(
+  res: {
+    id: string;
+    answers: unknown;
+    createdAt: Date;
+    form?: { id?: string; title?: string; formId?: string; definition?: unknown } | null;
+  },
+  existingEmails: Set<string>,
+  existingRolls: Set<string>
+): FormCandidateItem & { formTitle?: string } {
+  const answers = (res.answers || {}) as Record<string, unknown>;
+
+  // Build field label map if form definition exists
+  const fieldLabelMap = new Map<string, string>();
+  if (res.form?.definition) {
+    try {
+      const def = res.form.definition as {
+        sections?: {
+          fields?: {
+            id: string;
+            label: string;
+            type?: string;
+            subQuestions?: { id: string; label: string }[];
+          }[];
+        }[];
+      };
+      if (def?.sections) {
+        for (const section of def.sections) {
+          for (const field of section.fields || []) {
+            if (field.id && field.label) {
+              fieldLabelMap.set(field.id, field.label);
+            }
+            if (field.subQuestions) {
+              for (const sub of field.subQuestions) {
+                if (sub.id && sub.label) {
+                  fieldLabelMap.set(sub.id, sub.label);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore definition parsing issues
+    }
+  }
+
+  // Flatten answers (including multi_input and nested objects)
+  const flattened: { key: string; label: string; value: string }[] = [];
+  for (const [k, v] of Object.entries(answers)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === "object" && !Array.isArray(v)) {
+      for (const [subK, subV] of Object.entries(v as Record<string, unknown>)) {
+        if (subV !== null && subV !== undefined) {
+          const valStr = String(subV).trim();
+          const label = fieldLabelMap.get(subK) || fieldLabelMap.get(k) || subK;
+          flattened.push({ key: subK, label, value: valStr });
+        }
+      }
+    } else {
+      const valStr = String(v).trim();
+      const label = fieldLabelMap.get(k) || k;
+      flattened.push({ key: k, label, value: valStr });
+    }
+  }
+
+  let rawName = "";
+  let rawEmail = "";
+  let rawMobile = "";
+  let rawWhatsapp = "";
+  let rawBranch = "";
+  let rawRoll = "";
+  let rawYear = "";
+
+  for (const item of flattened) {
+    const k = (item.key + " " + item.label).toLowerCase();
+    const v = item.value;
+    if (!v) continue;
+
+    // Email
+    if (!rawEmail && (k.includes("email") || k.includes("mail") || (v.includes("@") && v.includes(".")))) {
+      rawEmail = v;
+    }
+    // WhatsApp Number (prioritize explicit WhatsApp labels)
+    else if (!rawWhatsapp && (k.includes("whatsapp") || k.includes("wa number") || k.includes("watsapp") || k.includes("wp number"))) {
+      rawWhatsapp = v;
+    }
+    // Mobile / Phone / Contact
+    else if (!rawMobile && (k.includes("mobile") || k.includes("phone") || k.includes("contact") || k.includes("calling") || k.includes("cell") || k.includes("tel") || k.includes("number"))) {
+      rawMobile = v;
+    }
+    // Name
+    else if (!rawName && (k.includes("name") || k.includes("fullname") || k.includes("applicant") || k.includes("student"))) {
+      rawName = v;
+    }
+    // Branch
+    else if (!rawBranch && (k.includes("branch") || k.includes("dept") || k.includes("department") || k.includes("stream"))) {
+      rawBranch = v;
+    }
+    // Roll / Registration
+    else if (!rawRoll && (k.includes("roll") || k.includes("registration") || k.includes("reg_no") || k.includes("regd") || k.includes("sic"))) {
+      rawRoll = v;
+    }
+    // Year
+    else if (!rawYear && (k.includes("year") || k.includes("batch") || k.includes("admission"))) {
+      rawYear = v;
+    }
+  }
+
+  // Fallback: Pattern matching for 10-12 digit mobile numbers if not matched by label
+  if (!rawMobile) {
+    for (const item of flattened) {
+      const cleanDigits = item.value.replace(/\D/g, "");
+      if (cleanDigits.length === 10 || (cleanDigits.length === 12 && cleanDigits.startsWith("91"))) {
+        rawMobile = item.value;
+        break;
+      }
+    }
+  }
+
+  // Clean phone numbers: normalize to 10 digits when prefixed with +91 or 91
+  if (rawMobile) {
+    rawMobile = rawMobile.replace(/[^\d+]/g, "").trim();
+    if (rawMobile.startsWith("+91") && rawMobile.length === 13) {
+      rawMobile = rawMobile.slice(3);
+    } else if (rawMobile.startsWith("91") && rawMobile.length === 12) {
+      rawMobile = rawMobile.slice(2);
+    }
+  }
+
+  if (rawWhatsapp) {
+    rawWhatsapp = rawWhatsapp.replace(/[^\d+]/g, "").trim();
+    if (rawWhatsapp.startsWith("+91") && rawWhatsapp.length === 13) {
+      rawWhatsapp = rawWhatsapp.slice(3);
+    } else if (rawWhatsapp.startsWith("91") && rawWhatsapp.length === 12) {
+      rawWhatsapp = rawWhatsapp.slice(2);
+    }
+  } else if (rawMobile) {
+    rawWhatsapp = rawMobile;
+  }
+
+  // Name splitting
+  let firstName = "";
+  let middleName = "";
+  let lastName = "";
+  if (rawName) {
+    const parts = rawName.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) {
+      firstName = parts[0];
+      lastName = "";
+    } else if (parts.length === 2) {
+      firstName = parts[0];
+      lastName = parts[1];
+    } else {
+      firstName = parts[0];
+      middleName = parts.slice(1, -1).join(" ");
+      lastName = parts[parts.length - 1];
+    }
+  }
+
+  // Branch normalization
+  let branch = "";
+  if (rawBranch) {
+    const upper = rawBranch.toUpperCase();
+    if (upper.includes("CSE") || upper.includes("COMPUTER")) branch = "CSE";
+    else if (upper.includes("ECE") || upper.includes("ELECTRONICS") || upper.includes("ETC")) branch = "ECE";
+    else if (upper.includes("EE") || upper.includes("ELECTRICAL")) branch = "EE";
+    else if (upper.includes("ME") || upper.includes("MECHANICAL")) branch = "ME";
+    else if (upper.includes("CE") || upper.includes("CIVIL")) branch = "CE";
+    else branch = upper.slice(0, 10);
+  }
+
+  const isAlreadyMember =
+    (rawEmail && existingEmails.has(rawEmail.toLowerCase())) ||
+    (rawRoll && existingRolls.has(rawRoll.toLowerCase())) ||
+    false;
+
+  return {
+    id: res.id,
+    name: rawName || "Unnamed Applicant",
+    firstName,
+    middleName,
+    lastName,
+    email: rawEmail,
+    mobileNumber: rawMobile,
+    whatsappNumber: rawWhatsapp,
+    branch,
+    rollNumber: rawRoll,
+    admissionYear: rawYear,
+    isAlreadyMember,
+    submittedAt: res.createdAt,
+    formTitle: res.form?.title,
+  };
+}
+
+export async function getFormCandidatesForMemberImport(formId: string): Promise<FormCandidateItem[]> {
+  await requireAdmin();
+  try {
+    const form = await prisma.form.findFirst({
+      where: {
+        OR: [{ id: formId }, { formId: formId }],
+      },
+      include: {
+        responses: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!form || !form.responses.length) {
+      return [];
+    }
+
+    const existingUsers = await prisma.user.findMany({
+      select: { email: true, rollNumber: true },
+    });
+    const existingEmails = new Set(existingUsers.map((u) => u.email.toLowerCase().trim()));
+    const existingRolls = new Set(
+      existingUsers.filter((u) => u.rollNumber).map((u) => u.rollNumber!.toLowerCase().trim())
+    );
+
+    return form.responses.map((res) =>
+      extractCandidateFromResponse(
+        { ...res, form: { id: form.id, title: form.title, formId: form.formId, definition: form.definition } },
+        existingEmails,
+        existingRolls
+      )
+    );
+  } catch (error) {
+    console.error("Error fetching form candidates:", error);
+    return [];
+  }
+}
+
+export async function getFormCandidateByResponseId(identifier: string): Promise<{
+  success: boolean;
+  data?: FormCandidateItem & { formTitle?: string };
+  error?: string;
+}> {
+  await requireAdmin();
+  try {
+    let cleanId = identifier.trim();
+    if (!cleanId) {
+      return { success: false, error: "Response ID is required." };
+    }
+
+    if (cleanId.startsWith("#")) {
+      cleanId = cleanId.slice(1).trim();
+    }
+
+    let res = await prisma.formResponse.findFirst({
+      where: {
+        OR: [
+          { id: cleanId },
+          { transactionId: cleanId },
+          { id: { equals: cleanId, mode: "insensitive" } },
+          { transactionId: { equals: cleanId, mode: "insensitive" } },
+          { id: { startsWith: cleanId, mode: "insensitive" } },
+          { transactionId: { startsWith: cleanId, mode: "insensitive" } },
+          { id: { contains: cleanId, mode: "insensitive" } },
+          { transactionId: { contains: cleanId, mode: "insensitive" } },
+        ],
+      },
+      include: {
+        form: {
+          select: { id: true, title: true, formId: true, definition: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Fallback: search across recent responses if cleanId is email, roll, phone, or name
+    if (!res) {
+      const recentResponses = await prisma.formResponse.findMany({
+        take: 300,
+        orderBy: { createdAt: "desc" },
+        include: {
+          form: {
+            select: { id: true, title: true, formId: true, definition: true },
+          },
+        },
+      });
+
+      const q = cleanId.toLowerCase();
+      res =
+        recentResponses.find((r) => {
+          if (r.id.toLowerCase().includes(q) || (r.transactionId && r.transactionId.toLowerCase().includes(q))) {
+            return true;
+          }
+          const ansStr = JSON.stringify(r.answers || {}).toLowerCase();
+          return ansStr.includes(q);
+        }) || null;
+    }
+
+    if (!res) {
+      return { success: false, error: `No form response found matching: "${identifier.trim()}"` };
+    }
+
+    const existingUsers = await prisma.user.findMany({
+      select: { email: true, rollNumber: true },
+    });
+    const existingEmails = new Set(existingUsers.map((u) => u.email.toLowerCase().trim()));
+    const existingRolls = new Set(
+      existingUsers.filter((u) => u.rollNumber).map((u) => u.rollNumber!.toLowerCase().trim())
+    );
+
+    const candidate = extractCandidateFromResponse(res, existingEmails, existingRolls);
+    return {
+      success: true,
+      data: candidate,
+    };
+  } catch (error) {
+    console.error("Error fetching form response by ID:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch response.",
+    };
+  }
+}
+

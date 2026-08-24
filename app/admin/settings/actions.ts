@@ -162,11 +162,13 @@ export async function updateUserProfile(data: ProfileUpdateData) {
 
     const validatedData = validation.data;
 
+    const isEmailChanging = validatedData.email.toLowerCase() !== session.user.email.toLowerCase();
+
     // Check if email is being changed and if it's already taken by another user
-    if (validatedData.email !== session.user.email) {
+    if (isEmailChanging) {
       const existingUser = await prisma.user.findFirst({
         where: {
-          email: validatedData.email,
+          email: validatedData.email.toLowerCase(),
           id: { not: session.user.id },
         },
       });
@@ -196,12 +198,12 @@ export async function updateUserProfile(data: ProfileUpdateData) {
       }
     }
 
-    // Update user profile
+    // Update user profile (keep existing email if email is changing until verified)
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
       data: {
         name: validatedData.name,
-        email: validatedData.email,
+        email: isEmailChanging ? session.user.email : validatedData.email,
         mobileNumber: validatedData.mobileNumber || null,
         whatsappNumber: validatedData.whatsappNumber || null,
         upiId: validatedData.upiId || null,
@@ -258,7 +260,26 @@ export async function updateUserProfile(data: ProfileUpdateData) {
     // Revalidate all paths where admin data is displayed
     revalidatePath("/admin", "layout");
     revalidatePath("/admin/settings");
-    revalidatePath("/", "layout"); // Revalidate root layout to update sidebar
+
+    if (isEmailChanging) {
+      // Send OTP to the new email address
+      const { requestEmailChangeOTP } = await import("@/lib/email-change-service");
+      const otpResult = await requestEmailChangeOTP(validatedData.email);
+
+      if (otpResult.status === "error") {
+        return {
+          status: "error" as const,
+          message: `Profile saved, but failed to send verification code to ${validatedData.email}: ${otpResult.message}`,
+        };
+      }
+
+      return {
+        status: "requires_email_verification" as const,
+        pendingEmail: validatedData.email.toLowerCase(),
+        message: `Profile details saved. A 6-digit verification code has been sent to ${validatedData.email} to confirm the email update.`,
+        data: updatedUser,
+      };
+    }
 
     return {
       status: "success" as const,

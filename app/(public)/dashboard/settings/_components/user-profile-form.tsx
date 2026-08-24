@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -15,9 +14,11 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, Save, User, Mail, Phone, MessageCircle, IdCard, MapPin, Building, BookOpen } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { updateUserProfileData, type UserProfileData } from "../actions";
 import statesDistrictsData from "@/lib/new/states-districts.json";
+import { cn } from "@/lib/utils";
+import { VerifyEmailDialog } from "@/components/email-verification/verify-email-dialog";
 
 interface UserProfileFormProps {
   initialData: {
@@ -37,13 +38,80 @@ interface UserProfileFormProps {
     registration?: string | null;
     rollNumber?: string | null;
     branch?: string | null;
-    address?: string | null;
     admissionYear?: string | null;
+    address?: string | null;
     postOffice?: string | null;
     policeStation?: string | null;
     block?: string | null;
     pinCode?: string | null;
   };
+}
+
+const FIELD_LIMITS: Partial<Record<string, number>> = {
+  name: 60,
+  username: 30,
+  firstName: 30,
+  middleName: 30,
+  lastName: 30,
+};
+
+function FieldCounter({ value, max }: { value: string; max: number }) {
+  const len = (value || "").length;
+  return (
+    <span
+      className={cn(
+        "text-xs tabular-nums",
+        len > max ? "text-destructive" : "text-muted-foreground"
+      )}
+    >
+      {len}/{max}
+    </span>
+  );
+}
+
+function FormField({
+  id,
+  label,
+  required,
+  hint,
+  maxLength,
+  children,
+  value,
+}: {
+  id: string;
+  label: string;
+  required?: boolean;
+  hint?: string;
+  maxLength?: number;
+  children: React.ReactNode;
+  value?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label htmlFor={id} className="text-sm font-medium text-foreground">
+          {label}
+          {required && <span className="text-destructive ml-0.5">*</span>}
+        </Label>
+        {maxLength !== undefined && value !== undefined && (
+          <FieldCounter value={value} max={maxLength} />
+        )}
+      </div>
+      {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function SubHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="pt-2">
+      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+        {children}
+      </p>
+      <Separator />
+    </div>
+  );
 }
 
 export function UserProfileForm({ initialData }: UserProfileFormProps) {
@@ -63,8 +131,8 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
     lastName: initialData.lastName || "",
     registration: initialData.registration || "",
     rollNumber: initialData.rollNumber || "",
-    admissionYear: initialData.admissionYear || "",
     branch: initialData.branch || "",
+    admissionYear: initialData.admissionYear || "",
     address: initialData.address || "",
     postOffice: initialData.postOffice || "",
     policeStation: initialData.policeStation || "",
@@ -72,7 +140,18 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
     pinCode: initialData.pinCode || "",
   });
 
+  const [currentSavedEmail, setCurrentSavedEmail] = useState(initialData.email || "");
+  const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null);
+  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+
   const [selectedState, setSelectedState] = useState(initialData.state || "");
+  const [selectedCollege, setSelectedCollege] = useState(
+    initialData.collegeName === "GOVERNMENT COLLEGE OF ENGINEERING KALAHANDI, BHAWANIPATNA"
+      ? initialData.collegeName
+      : initialData.collegeName
+      ? "Other"
+      : ""
+  );
   const [pending, startTransition] = useTransition();
 
   const availableDistricts = useMemo(() => {
@@ -83,14 +162,43 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
     return stateData?.districts || [];
   }, [selectedState]);
 
+  const currentYear = new Date().getFullYear();
+  const admissionYears = Array.from({ length: currentYear - 2022 + 2 }, (_, i) => 2023 + i);
+
+  const set = (field: string, value: string) =>
+    setFormData((prev) => ({ ...prev, [field]: value }));
+
+  const handleStateChange = (value: string) => {
+    setSelectedState(value);
+    setFormData((prev) => ({ ...prev, state: value, district: "" }));
+  };
+
+  const handleCollegeChange = (value: string) => {
+    setSelectedCollege(value);
+    if (value === "GOVERNMENT COLLEGE OF ENGINEERING KALAHANDI, BHAWANIPATNA") {
+      setFormData((prev) => ({
+        ...prev,
+        collegeName: value,
+        collegeAddress: "AT-KANDHABANDO PALA, PO- RISIGAON, BHWANIPATNA, KALAHANDI, ODISHA, 766003",
+      }));
+    } else if (value === "Other") {
+      setFormData((prev) => ({ ...prev, collegeName: "", collegeAddress: "" }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     startTransition(async () => {
       try {
         const result = await updateUserProfileData(formData as any);
-        
-        if (result.status === "success") {
+
+        if (result.status === "requires_email_verification") {
+          toast.info(result.message);
+          setPendingVerifyEmail(result.pendingEmail || formData.email);
+          setIsVerifyDialogOpen(true);
+        } else if (result.status === "success") {
+          setCurrentSavedEmail(formData.email);
           toast.success(result.message);
         } else {
           toast.error(result.message);
@@ -101,433 +209,408 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
     });
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+  const handleEmailVerificationSuccess = (newEmail: string) => {
+    setCurrentSavedEmail(newEmail);
+    setFormData((prev) => ({ ...prev, email: newEmail }));
+    setPendingVerifyEmail(null);
+    setIsVerifyDialogOpen(false);
   };
 
-  const handleStateChange = (value: string) => {
-    setSelectedState(value);
-    setFormData(prev => ({
-      ...prev,
-      state: value,
-      district: "", // Reset district when state changes
-    }));
+  const handleEmailVerificationCancel = () => {
+    // Revert form email to current active email
+    setFormData((prev) => ({ ...prev, email: currentSavedEmail }));
+    setPendingVerifyEmail(null);
+    setIsVerifyDialogOpen(false);
   };
 
   return (
-    <div className="space-y-6">
+    <>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Personal Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <User className="w-4 h-4 sm:w-5 sm:h-5" />
-              Personal Information
-            </CardTitle>
-            <CardDescription className="text-sm">
-              Update your personal details and contact information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Username */}
-            <div className="space-y-2">
-              <Label htmlFor="username" className="flex items-center gap-2 text-sm">
-                <User className="w-3 h-3 sm:w-4 sm:h-4" />
-                Username
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                value={formData.username}
-                onChange={(e) => handleInputChange("username", e.target.value)}
-                placeholder="Enter your username"
-                disabled={pending}
-                className="h-10 text-sm"
-              />
-            </div>
+      {/* ── Personal ── */}
+      <SubHeading>Personal Information</SubHeading>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              {/* First Name */}
-              <div className="space-y-2">
-                <Label htmlFor="firstName" className="text-sm">First Name *</Label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange("firstName", e.target.value)}
-                  placeholder="First name"
-                  required
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
+      <div className="space-y-4 pt-2">
+        {/* Display name */}
+        <FormField
+          id="name"
+          label="Display name"
+          required
+          maxLength={FIELD_LIMITS.name}
+          value={formData.name}
+        >
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="Your full name"
+            maxLength={FIELD_LIMITS.name}
+            disabled={pending}
+            className="h-9"
+          />
+        </FormField>
 
-              {/* Middle Name */}
-              <div className="space-y-2">
-                <Label htmlFor="middleName" className="text-sm">Middle Name</Label>
-                <Input
-                  id="middleName"
-                  type="text"
-                  value={formData.middleName}
-                  onChange={(e) => handleInputChange("middleName", e.target.value)}
-                  placeholder="Middle name"
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
+        {/* Username */}
+        <FormField
+          id="username"
+          label="Username"
+          maxLength={FIELD_LIMITS.username}
+          value={formData.username}
+          hint="*Username can only be changed once per 14 days"
+        >
+          <Input
+            id="username"
+            value={formData.username}
+            onChange={(e) => set("username", e.target.value)}
+            placeholder="username"
+            maxLength={FIELD_LIMITS.username}
+            disabled={pending}
+            className="h-9"
+          />
+        </FormField>
 
-              {/* Last Name */}
-              <div className="space-y-2">
-                <Label htmlFor="lastName" className="text-sm">Last Name *</Label>
-                <Input
-                  id="lastName"
-                  type="text"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange("lastName", e.target.value)}
-                  placeholder="Last name"
-                  required
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center gap-2 text-sm">
-                  <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
-                  Email Address *
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  placeholder="Enter your email address"
-                  required
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              {/* Mobile Number */}
-              <div className="space-y-2">
-                <Label htmlFor="mobileNumber" className="flex items-center gap-2 text-sm">
-                  <Phone className="w-3 h-3 sm:w-4 sm:h-4" />
-                  Mobile Number *
-                </Label>
-                <Input
-                  id="mobileNumber"
-                  type="tel"
-                  value={formData.mobileNumber}
-                  onChange={(e) => handleInputChange("mobileNumber", e.target.value)}
-                  placeholder="+91 9876543210"
-                  required
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              {/* WhatsApp Number */}
-              <div className="space-y-2">
-                <Label htmlFor="whatsappNumber" className="flex items-center gap-2 text-sm">
-                  <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                  WhatsApp Number
-                </Label>
-                <Input
-                  id="whatsappNumber"
-                  type="tel"
-                  value={formData.whatsappNumber}
-                  onChange={(e) => handleInputChange("whatsappNumber", e.target.value)}
-                  placeholder="+91 9876543210"
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              {/* Aadhaar Number */}
-              <div className="space-y-2">
-                <Label htmlFor="aadhaarNumber" className="flex items-center gap-2 text-sm">
-                  <IdCard className="w-3 h-3 sm:w-4 sm:h-4" />
-                  Aadhaar Number *
-                </Label>
-                <Input
-                  id="aadhaarNumber"
-                  type="text"
-                  value={formData.aadhaarNumber}
-                  onChange={(e) => handleInputChange("aadhaarNumber", e.target.value.replace(/\D/g, '').slice(0, 12))}
-                  placeholder="123456789012"
-                  required
-                  disabled={pending}
-                  maxLength={12}
-                  className="h-10 text-sm"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Academic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
-              Academic Information
-            </CardTitle>
-            <CardDescription className="text-sm">
-              Your educational and academic details
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              {/* Registration Number */}
-              <div className="space-y-2">
-                <Label htmlFor="registration" className="text-sm">Registration No</Label>
-                <Input
-                  id="registration"
-                  type="text"
-                  value={formData.registration}
-                  onChange={(e) => handleInputChange("registration", e.target.value)}
-                  placeholder="Registration number"
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              {/* Roll Number */}
-              <div className="space-y-2">
-                <Label htmlFor="rollNumber" className="text-sm">Roll No</Label>
-                <Input
-                  id="rollNumber"
-                  type="text"
-                  value={formData.rollNumber}
-                  onChange={(e) => handleInputChange("rollNumber", e.target.value)}
-                  placeholder="Roll number"
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              {/* Branch */}
-              <div className="space-y-2">
-                <Label htmlFor="branch" className="text-sm">Branch</Label>
-                <Select
-                  value={formData.branch}
-                  onValueChange={(value) => handleInputChange("branch", value)}
-                  disabled={pending}
-                >
-                  <SelectTrigger className="h-10 text-sm">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CSE">CSE</SelectItem>
-                    <SelectItem value="EE">EE</SelectItem>
-                    <SelectItem value="ME">ME</SelectItem>
-                    <SelectItem value="CE">CE</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <Separator className="my-4" />
-
-            {/* College Information */}
-            <div className="space-y-3 sm:space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="collegeName" className="flex items-center gap-2 text-sm">
-                  <Building className="w-3 h-3 sm:w-4 sm:h-4" />
-                  College Name *
-                </Label>
-                <Input
-                  id="collegeName"
-                  type="text"
-                  value={formData.collegeName}
-                  onChange={(e) => handleInputChange("collegeName", e.target.value)}
-                  placeholder="Enter your college name"
-                  required
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="collegeAddress" className="flex items-center gap-2 text-sm">
-                  <Building className="w-3 h-3 sm:w-4 sm:h-4" />
-                  College Address *
-                </Label>
-                <Textarea
-                  id="collegeAddress"
-                  value={formData.collegeAddress}
-                  onChange={(e) => handleInputChange("collegeAddress", e.target.value)}
-                  placeholder="Enter your college address"
-                  required
-                  disabled={pending}
-                  rows={3}
-                  className="text-sm resize-none"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Address Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
-              Address Information
-            </CardTitle>
-            <CardDescription className="text-sm">
-              Your residential address details
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 sm:space-y-4">
-              {/* Full Address */}
-              <div className="space-y-2">
-                <Label htmlFor="address" className="text-sm">Address</Label>
-                <Input
-                  id="address"
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange("address", e.target.value)}
-                  placeholder="Street address"
-                  disabled={pending}
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {/* Post Office */}
-                <div className="space-y-2">
-                  <Label htmlFor="postOffice" className="text-sm">Post Office</Label>
-                  <Input
-                    id="postOffice"
-                    type="text"
-                    value={formData.postOffice}
-                    onChange={(e) => handleInputChange("postOffice", e.target.value)}
-                    placeholder="Post office"
-                    disabled={pending}
-                    className="h-10 text-sm"
-                  />
-                </div>
-
-                {/* Police Station */}
-                <div className="space-y-2">
-                  <Label htmlFor="policeStation" className="text-sm">Police Station</Label>
-                  <Input
-                    id="policeStation"
-                    type="text"
-                    value={formData.policeStation}
-                    onChange={(e) => handleInputChange("policeStation", e.target.value)}
-                    placeholder="Police station"
-                    disabled={pending}
-                    className="h-10 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                {/* Block */}
-                <div className="space-y-2">
-                  <Label htmlFor="block" className="text-sm">Block</Label>
-                  <Input
-                    id="block"
-                    type="text"
-                    value={formData.block}
-                    onChange={(e) => handleInputChange("block", e.target.value)}
-                    placeholder="Block"
-                    disabled={pending}
-                    className="h-10 text-sm"
-                  />
-                </div>
-
-                {/* PIN Code */}
-                <div className="space-y-2">
-                  <Label htmlFor="pinCode" className="text-sm">PIN Code</Label>
-                  <Input
-                    id="pinCode"
-                    type="text"
-                    value={formData.pinCode}
-                    onChange={(e) => handleInputChange("pinCode", e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="PIN code"
-                    disabled={pending}
-                    maxLength={6}
-                    className="h-10 text-sm"
-                  />
-                </div>
-
-                {/* State */}
-                <div className="space-y-2">
-                  <Label htmlFor="state" className="text-sm">State *</Label>
-                  <Select
-                    value={formData.state}
-                    onValueChange={handleStateChange}
-                    disabled={pending}
-                  >
-                    <SelectTrigger className="h-10 text-sm">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statesDistrictsData.states.map((stateItem) => (
-                        <SelectItem key={stateItem.state} value={stateItem.state}>
-                          {stateItem.state}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* District */}
-                <div className="space-y-2">
-                  <Label htmlFor="district" className="text-sm">District *</Label>
-                  <Select
-                    value={formData.district}
-                    onValueChange={(value) => handleInputChange("district", value)}
-                    disabled={!selectedState || pending}
-                  >
-                    <SelectTrigger className="h-10 text-sm">
-                      <SelectValue placeholder="Select district" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableDistricts.map((district) => (
-                        <SelectItem key={district} value={district}>
-                          {district}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Submit Button */}
-        <div className="flex justify-end pt-4">
-          <Button 
-            type="submit" 
-            disabled={pending} 
-            className="w-full sm:w-auto min-w-40 h-10 text-sm cursor-pointer"
+        {/* Name split */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <FormField
+            id="firstName"
+            label="First name"
+            maxLength={FIELD_LIMITS.firstName}
+            value={formData.firstName}
           >
-            {pending ? (
-              <>
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mr-2" />
-                Updating Profile...
-              </>
-            ) : (
-              <>
-                <Save className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                Update Profile
-              </>
-            )}
-          </Button>
+            <Input
+              id="firstName"
+              value={formData.firstName}
+              onChange={(e) => set("firstName", e.target.value)}
+              placeholder="First"
+              maxLength={FIELD_LIMITS.firstName}
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField
+            id="middleName"
+            label="Middle name"
+            maxLength={FIELD_LIMITS.middleName}
+            value={formData.middleName}
+          >
+            <Input
+              id="middleName"
+              value={formData.middleName}
+              onChange={(e) => set("middleName", e.target.value)}
+              placeholder="Middle"
+              maxLength={FIELD_LIMITS.middleName}
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField
+            id="lastName"
+            label="Last name"
+            maxLength={FIELD_LIMITS.lastName}
+            value={formData.lastName}
+          >
+            <Input
+              id="lastName"
+              value={formData.lastName}
+              onChange={(e) => set("lastName", e.target.value)}
+              placeholder="Last"
+              maxLength={FIELD_LIMITS.lastName}
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
         </div>
-      </form>
-    </div>
-  );
+
+        {/* Contact */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormField id="email" label="Email address" required>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => set("email", e.target.value)}
+              placeholder="you@example.com"
+              required
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField id="mobileNumber" label="Mobile number" required>
+            <Input
+              id="mobileNumber"
+              type="tel"
+              value={formData.mobileNumber}
+              onChange={(e) => set("mobileNumber", e.target.value)}
+              placeholder="+91 9876543210"
+              required
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField id="whatsappNumber" label="WhatsApp number">
+            <Input
+              id="whatsappNumber"
+              type="tel"
+              value={formData.whatsappNumber}
+              onChange={(e) => set("whatsappNumber", e.target.value)}
+              placeholder="+91 9876543210"
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField id="aadhaarNumber" label="Aadhaar number" required>
+            <Input
+              id="aadhaarNumber"
+              type="text"
+              value={formData.aadhaarNumber}
+              onChange={(e) =>
+                set("aadhaarNumber", e.target.value.replace(/\D/g, "").slice(0, 12))
+              }
+              placeholder="123456789012"
+              required
+              disabled={pending}
+              maxLength={12}
+              className="h-9"
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* ── Academic ── */}
+      <SubHeading>Academic Information</SubHeading>
+
+      <div className="space-y-4 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <FormField id="admissionYear" label="Admission year">
+            <Select
+              value={formData.admissionYear}
+              onValueChange={(v) => set("admissionYear", v)}
+              disabled={pending}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {admissionYears.map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+          <FormField id="registration" label="Registration no.">
+            <Input
+              id="registration"
+              value={formData.registration}
+              onChange={(e) => set("registration", e.target.value)}
+              placeholder="Reg number"
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField id="rollNumber" label="Roll number">
+            <Input
+              id="rollNumber"
+              value={formData.rollNumber}
+              onChange={(e) => set("rollNumber", e.target.value)}
+              placeholder="Roll no."
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+        </div>
+
+        <FormField id="branch" label="Branch">
+          <Select
+            value={formData.branch}
+            onValueChange={(v) => set("branch", v)}
+            disabled={pending}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Select branch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="CSE">CSE</SelectItem>
+              <SelectItem value="EE">EE</SelectItem>
+              <SelectItem value="ME">ME</SelectItem>
+              <SelectItem value="CE">CE</SelectItem>
+              <SelectItem value="ECE">ECE</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormField>
+
+        <FormField id="collegeName" label="College" required>
+          <Select
+            value={selectedCollege}
+            onValueChange={handleCollegeChange}
+            disabled={pending}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Select college" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="GOVERNMENT COLLEGE OF ENGINEERING KALAHANDI, BHAWANIPATNA">
+                GCEK, Bhawanipatna
+              </SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          {selectedCollege === "Other" && (
+            <Input
+              placeholder="Enter college name"
+              value={formData.collegeName}
+              onChange={(e) => set("collegeName", e.target.value)}
+              disabled={pending}
+              className="mt-2 h-9"
+            />
+          )}
+        </FormField>
+
+        <FormField id="collegeAddress" label="College address" required>
+          <Textarea
+            id="collegeAddress"
+            value={formData.collegeAddress}
+            onChange={(e) => set("collegeAddress", e.target.value)}
+            placeholder="College address"
+            disabled={
+              pending ||
+              selectedCollege ===
+                "GOVERNMENT COLLEGE OF ENGINEERING KALAHANDI, BHAWANIPATNA"
+            }
+            rows={2}
+            className="text-sm resize-none"
+          />
+        </FormField>
+      </div>
+
+      {/* ── Address ── */}
+      <SubHeading>Address Information</SubHeading>
+
+      <div className="space-y-4 pt-2">
+        <FormField id="address" label="Address">
+          <Input
+            id="address"
+            value={formData.address}
+            onChange={(e) => set("address", e.target.value)}
+            placeholder="Street / locality"
+            disabled={pending}
+            className="h-9"
+          />
+        </FormField>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormField id="postOffice" label="Post office">
+            <Input
+              id="postOffice"
+              value={formData.postOffice}
+              onChange={(e) => set("postOffice", e.target.value)}
+              placeholder="Post office"
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField id="policeStation" label="Police station">
+            <Input
+              id="policeStation"
+              value={formData.policeStation}
+              onChange={(e) => set("policeStation", e.target.value)}
+              placeholder="Police station"
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <FormField id="block" label="Block">
+            <Input
+              id="block"
+              value={formData.block}
+              onChange={(e) => set("block", e.target.value)}
+              placeholder="Block"
+              disabled={pending}
+              className="h-9"
+            />
+          </FormField>
+          <FormField id="pinCode" label="Pin code">
+            <Input
+              id="pinCode"
+              value={formData.pinCode}
+              onChange={(e) =>
+                set("pinCode", e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              placeholder="Pin code"
+              disabled={pending}
+              maxLength={6}
+              className="h-9"
+            />
+          </FormField>
+          <FormField id="state" label="State" required>
+            <Select
+              value={formData.state}
+              onValueChange={handleStateChange}
+              disabled={pending}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="State" />
+              </SelectTrigger>
+              <SelectContent>
+                {statesDistrictsData.states.map((s) => (
+                  <SelectItem key={s.state} value={s.state}>
+                    {s.state}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+        </div>
+
+        <FormField id="district" label="District" required>
+          <Select
+            value={formData.district}
+            onValueChange={(v) => set("district", v)}
+            disabled={!selectedState || pending}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Select district" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableDistricts.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {d}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
+      </div>
+
+      {/* Save Button */}
+      <div className="pt-2">
+        <Button
+          type="submit"
+          disabled={pending}
+          className="bg-foreground text-background hover:bg-foreground/90 h-9 px-5 text-sm font-medium rounded-full cursor-pointer"
+        >
+          {pending ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
+              Saving...
+            </>
+          ) : (
+            "Save changes"
+          )}
+        </Button>
+      </div>
+    </form>
+
+    {/* Email OTP Verification Dialog */}
+    <VerifyEmailDialog
+      isOpen={isVerifyDialogOpen}
+      onClose={handleEmailVerificationCancel}
+      pendingEmail={pendingVerifyEmail || ""}
+      onSuccess={handleEmailVerificationSuccess}
+    />
+  </>
+);
 }

@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useTransition, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Camera, Trash2, Loader2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { updateProfileImage, removeProfileImage } from "../actions";
-import { RenderEmptyState } from "@/components/file-uploader/RenderState";
-import Image from "next/image";
+import { ProfileCropDialog } from "@/components/image-cropper/profile-crop-dialog";
 
 interface ProfileImageUploadProps {
   currentImageKey?: string | null;
@@ -18,232 +16,171 @@ interface ProfileImageUploadProps {
 export function ProfileImageUpload({ currentImageKey, userName }: ProfileImageUploadProps) {
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
-  const [isDragActive, setIsDragActive] = useState(false);
+  const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
+  const [isCropOpen, setIsCropOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getImageUrl = (imageKey: string | null | undefined) => {
     if (!imageKey) return undefined;
-    // Construct S3 URL based on your bucket configuration
     const bucketName = process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES;
-    let url;
-    if (bucketName) {
-      // Use the correct S3 URL format - codebreakers.t3.storage.dev
-      url = `https://codebreakers.t3.storage.dev/${imageKey}`;
-    } else {
-      // Fallback for local development or if S3 isn't configured
-      url = `/uploads/profiles/${imageKey}`;
-    }
-    return url;
+    if (bucketName) return `https://codebreakers.t3.storage.dev/${imageKey}`;
+    return `/uploads/profiles/${imageKey}`;
   };
 
-  const handleFileUpload = async (file: File) => {
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+
+  const handleSelectFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
       toast.error("Please select a valid image file");
       return;
     }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB");
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Image must be smaller than 20 MB");
       return;
     }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setRawImageSrc(reader.result as string);
+      setIsCropOpen(true);
+    };
+    reader.onerror = () => toast.error("Failed to read the file");
+    reader.readAsDataURL(file);
+  };
 
+  const handleCropSave = async (croppedFile: File, sizeKB: number) => {
     setUploading(true);
-
     try {
-      // Create FormData for file upload
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'profile');
+      formData.append("file", croppedFile);
+      formData.append("type", "profile");
 
-      // Upload file to S3
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const result = await res.json();
 
-      const uploadResult = await uploadResponse.json();
-
-      if (uploadResult.success) {
-        // Update user profile with new image key
+      if (result.success) {
         startTransition(async () => {
-          const result = await updateProfileImage(uploadResult.key);
-          
-          if (result.status === "success") {
-            toast.success("Profile image updated successfully");
+          const r = await updateProfileImage(result.key);
+          if (r.status === "success") {
+            toast.success(`Avatar updated (${sizeKB} KB)`);
           } else {
-            toast.error(result.message);
+            toast.error(r.message);
           }
         });
       } else {
-        toast.error(uploadResult.message || "Failed to upload image");
+        toast.error(result.message || "Upload failed");
       }
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("Failed to upload image. Please try again.");
+    } catch {
+      toast.error("Upload failed. Please try again.");
     } finally {
       setUploading(false);
+      setRawImageSrc(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    await handleFileUpload(file);
-    // Reset the input
-    event.target.value = '';
-  };
-
-  const handleRemoveImage = () => {
+  const handleRemove = () => {
     startTransition(async () => {
-      const result = await removeProfileImage();
-      
-      if (result.status === "success") {
-        toast.success("Profile image removed successfully");
-      } else {
-        toast.error(result.message);
-      }
+      const r = await removeProfileImage();
+      if (r.status === "success") toast.success("Avatar removed");
+      else toast.error(r.message);
     });
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragActive(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragActive(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragActive(false);
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      await handleFileUpload(files[0]);
-    }
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
   };
 
   const isLoading = pending || uploading;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Camera className="w-5 h-5" />
-          Profile Picture
-        </CardTitle>
-        <CardDescription>
-          Upload a profile picture to personalize your account
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Profile Image Display using RenderState */}
-        <div 
-          className={`relative h-64 w-full border-2 border-dashed rounded-lg transition-colors ${
-            isDragActive 
-              ? 'border-primary bg-primary/5' 
-              : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-          } ${isLoading ? 'pointer-events-none opacity-50' : ''}`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          {currentImageKey ? (
-            <div className="relative group w-full h-full flex items-center justify-center">
-              <Image
-                src={getImageUrl(currentImageKey) || '/assets/logo.png'}
-                alt={`${userName} profile picture`}
-                fill
-                className="object-cover rounded-lg"
-                priority
-                onError={(e) => {
-                  console.error('Failed to load profile image');
-                }}
+    <>
+      {/* Avatar block — matches reference: centered circle + text button + trash */}
+      <div className="flex flex-col items-start gap-3">
+        {/* Large circle avatar */}
+        <div className="relative group">
+          <Avatar className="w-20 h-20 border border-border">
+            {currentImageKey ? (
+              <AvatarImage
+                src={getImageUrl(currentImageKey)}
+                alt={userName}
+                className="object-cover"
               />
-              <Button 
-                type="button"
-                variant="destructive" 
-                size="icon"
-                className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleRemoveImage();
-                }}
-                disabled={pending}
-              >
-                {pending ? (
-                  <Loader2 className="animate-spin size-4" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
-              </Button>
-            </div>
-          ) : (
-            <div className="relative h-full">
-              <RenderEmptyState isDragActive={isDragActive} />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleInputChange}
-                disabled={isLoading}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
+            ) : (
+              <AvatarFallback className="text-xl font-semibold bg-muted text-muted-foreground">
+                {getInitials(userName)}
+              </AvatarFallback>
+            )}
+          </Avatar>
+
+          {/* Loading overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70">
+              <Loader2 className="w-5 h-5 animate-spin text-foreground" />
             </div>
           )}
         </div>
 
-        {/* Alternative Avatar Display for small preview */}
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-center">
-            <p className="text-sm font-medium mb-2">Current Profile Picture</p>
-            <Avatar className="w-20 h-20 mx-auto">
-              {currentImageKey ? (
-                <AvatarImage 
-                  src={getImageUrl(currentImageKey)} 
-                  alt={userName}
-                  className="object-cover"
-                />
+        {/* Action row: "Change avatar" text + trash icon */}
+        <div className="flex items-center gap-3">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleSelectFile(file);
+            }}
+            disabled={isLoading}
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            className="text-sm text-foreground hover:underline underline-offset-2 font-medium disabled:opacity-50 transition-opacity"
+          >
+            Change avatar
+          </button>
+
+          {currentImageKey && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleRemove}
+              disabled={isLoading}
+              title="Remove avatar"
+            >
+              {pending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <AvatarFallback className="text-lg font-semibold">
-                  {getInitials(userName)}
-                </AvatarFallback>
+                <Trash2 className="w-3.5 h-3.5" />
               )}
-            </Avatar>
-          </div>
-
-          {/* Upload Status */}
-          {uploading && (
-            <div className="text-center">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Uploading image...</p>
-            </div>
+            </Button>
           )}
-
-          {/* Upload Guidelines */}
-          <div className="text-center space-y-1">
-            <p className="text-sm text-muted-foreground">
-              Drag & drop an image above or click to select
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Recommended size: 400x400 pixels • Max: 5MB • Formats: JPG, PNG, WEBP
-            </p>
-          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <p className="text-xs text-muted-foreground">
+          JPG, PNG or WEBP. Will be cropped to a circle and compressed to under 100 KB.
+        </p>
+      </div>
+
+      {/* Crop modal */}
+      <ProfileCropDialog
+        isOpen={isCropOpen}
+        onClose={() => {
+          setIsCropOpen(false);
+          setRawImageSrc(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }}
+        imageSrc={rawImageSrc}
+        onCropSave={handleCropSave}
+      />
+    </>
   );
 }

@@ -109,6 +109,7 @@ export default function OverallLeaderboard({ data }: OverallLeaderboardProps) {
             <TableRow>
               <TableHead className="w-20">Rank</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Batch</TableHead>
               <TableHead>Registration</TableHead>
               <TableHead className="text-center">Attendance</TableHead>
               <TableHead className="text-center">Tasks</TableHead>
@@ -129,6 +130,15 @@ export default function OverallLeaderboard({ data }: OverallLeaderboardProps) {
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">{entry.userName}</TableCell>
+                  <TableCell>
+                    {entry.batch ? (
+                      <Badge variant="outline" className="text-[10px] font-mono bg-primary/5 text-primary border-primary/20">
+                        {entry.batch.code}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {entry.registration || (
                       <span className="text-muted-foreground text-sm">-</span>

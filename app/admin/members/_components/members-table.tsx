@@ -39,6 +39,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
@@ -47,14 +54,24 @@ import {
   Eye, 
   Ban, 
   Trash2,
-  CheckCircle,
-  XCircle,
-  Loader2,
   Plus,
   User,
   QrCode,
+  Layers,
+  CheckCircle,
+  XCircle,
+  Loader2,
 } from "lucide-react";
-import { MemberData, toggleMemberBan, deleteMember, deleteMembers, getMemberBySlugId } from "../actions";
+import {
+  MemberData,
+  toggleMemberBan,
+  deleteMember,
+  deleteMembers,
+  getMemberBySlugId,
+  assignMemberBatch,
+  bulkAssignMembersBatch,
+} from "../actions";
+import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import Link from "next/link";
 import { toast } from "sonner";
 import AddMemberSidebar from "@/app/admin/members/_components/add-member-sidebar";
@@ -80,11 +97,20 @@ export default function MembersTable({ members }: MembersTableProps) {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [showAddMemberSidebar, setShowAddMemberSidebar] = useState(false);
   const [viewMode, setViewMode] = useState<"all" | "pending">("all");
+  const [batchFilter, setBatchFilter] = useState<string>("all");
+  const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [showAssignBatchDialog, setShowAssignBatchDialog] = useState(false);
+  const [targetBatchId, setTargetBatchId] = useState<string>("none");
+  const [isAssigningBatch, setIsAssigningBatch] = useState(false);
   const [banReason, setBanReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [qrMember, setQrMember] = useState<MemberData | null>(null);
+
+  useEffect(() => {
+    getActiveBatchesList().then((list) => setBatchesList(list));
+  }, []);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -93,17 +119,25 @@ export default function MembersTable({ members }: MembersTableProps) {
   const pendingMembers = members.filter((member) => !member.profileComplete).length;
 
   const filteredMembers = useMemo(() => {
-    const modeFiltered =
+    let list =
       viewMode === "pending"
         ? members.filter((member) => !member.profileComplete)
         : members;
 
+    if (batchFilter !== "all") {
+      if (batchFilter === "unassigned") {
+        list = list.filter((m) => !m.batchId);
+      } else {
+        list = list.filter((m) => m.batchId === batchFilter);
+      }
+    }
+
     if (!searchQuery.trim()) {
-      return modeFiltered;
+      return list;
     }
 
     const lowercaseQuery = searchQuery.toLowerCase();
-    return modeFiltered.filter((member) => {
+    return list.filter((member) => {
       return (
         member.cbUserId?.toLowerCase().includes(lowercaseQuery) ||
         member.name.toLowerCase().includes(lowercaseQuery) ||
@@ -115,10 +149,12 @@ export default function MembersTable({ members }: MembersTableProps) {
         member.registration?.toLowerCase().includes(lowercaseQuery) ||
         member.rollNumber?.toLowerCase().includes(lowercaseQuery) ||
         member.branch?.toLowerCase().includes(lowercaseQuery) ||
+        member.batch?.name?.toLowerCase().includes(lowercaseQuery) ||
+        member.batch?.code?.toLowerCase().includes(lowercaseQuery) ||
         member.collegeName?.toLowerCase().includes(lowercaseQuery)
       );
     });
-  }, [members, searchQuery, viewMode]);
+  }, [members, searchQuery, viewMode, batchFilter]);
 
   const allVisibleSelected =
     filteredMembers.length > 0 &&
@@ -300,14 +336,30 @@ export default function MembersTable({ members }: MembersTableProps) {
           </CardTitle>
 
           <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-3 sm:items-center">
+            <Select value={batchFilter} onValueChange={setBatchFilter}>
+              <SelectTrigger className="w-full sm:w-44 text-xs h-9">
+                <Layers className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="All Batches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Batches</SelectItem>
+                <SelectItem value="unassigned">Unassigned Only</SelectItem>
+                {batchesList.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name} ({b.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Button
               type="button"
               variant={viewMode === "pending" ? "default" : "outline"}
               onClick={() => setViewMode(viewMode === "pending" ? "all" : "pending")}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto h-9 text-xs"
             >
-              Pending Members
-              <Badge variant="secondary" className="ml-2">
+              Pending
+              <Badge variant="secondary" className="ml-1.5 text-[10px]">
                 {pendingMembers}
               </Badge>
             </Button>
@@ -315,32 +367,47 @@ export default function MembersTable({ members }: MembersTableProps) {
             <Button
               type="button"
               onClick={() => setShowAddMemberSidebar(true)}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto h-9 text-xs"
             >
               <Plus className="h-4 w-4" />
-              Add New Member
+              Add Member
             </Button>
 
             {selectedMemberIds.size > 0 && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => setShowBulkDeleteDialog(true)}
-                className="w-full sm:w-auto"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Selected ({selectedMemberIds.size})
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setTargetBatchId("none");
+                    setShowAssignBatchDialog(true);
+                  }}
+                  className="w-full sm:w-auto h-9 text-xs gap-1.5"
+                >
+                  <Layers className="h-3.5 w-3.5 text-primary" />
+                  Set Batch ({selectedMemberIds.size})
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowBulkDeleteDialog(true)}
+                  className="w-full sm:w-auto h-9 text-xs gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete ({selectedMemberIds.size})
+                </Button>
+              </>
             )}
 
-            <div className="relative w-full sm:w-auto sm:min-w-75">
+            <div className="relative w-full sm:w-auto sm:min-w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search members..."
+                placeholder="Search members, batch, roll..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-xs h-9"
               />
             </div>
           </div>
@@ -358,28 +425,28 @@ export default function MembersTable({ members }: MembersTableProps) {
                     aria-label="Select all members"
                   />
                 </TableHead>
-                <TableHead className="w-16">S.No.</TableHead>
-                <TableHead className="min-w-37.5">Name</TableHead>
+                <TableHead className="w-14">#</TableHead>
+                <TableHead className="min-w-36">Name</TableHead>
                 <TableHead className="min-w-28">User ID</TableHead>
+                <TableHead className="min-w-28">Batch</TableHead>
                 <TableHead className="min-w-20">Role</TableHead>
-                <TableHead className="min-w-50">Email</TableHead>
-                <TableHead className="min-w-30">WhatsApp</TableHead>
-                <TableHead className="min-w-25">Branch</TableHead>
-                <TableHead className="min-w-30">Mobile</TableHead>
-                <TableHead className="min-w-25">Status</TableHead>
-                <TableHead className="text-right min-w-25">Actions</TableHead>
+                <TableHead className="min-w-44">Email</TableHead>
+                <TableHead className="min-w-24">Branch</TableHead>
+                <TableHead className="min-w-28">Mobile</TableHead>
+                <TableHead className="min-w-24">Status</TableHead>
+                <TableHead className="text-right min-w-24">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredMembers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                    {searchQuery ? "No members found matching your search." : "No members registered yet."}
+                  <TableCell colSpan={11} className="text-center py-12 text-muted-foreground text-xs">
+                    {searchQuery ? "No members found matching your search." : "No members found matching filters."}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredMembers.map((member, index) => (
-                  <TableRow key={member.id}>
+                  <TableRow key={member.id} className="hover:bg-muted/40">
                     <TableCell>
                       <Checkbox
                         checked={selectedMemberIds.has(member.id)}
@@ -387,53 +454,59 @@ export default function MembersTable({ members }: MembersTableProps) {
                         aria-label={`Select ${member.name}`}
                       />
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-xs font-mono text-muted-foreground">
                       {index + 1}
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium text-xs">
                       <Link 
                         href={`/admin/members/${member.cbUserId || member.registration || member.username || member.id}`}
-                        className="flex items-center gap-2 hover:underline cursor-pointer"
+                        className="flex items-center gap-1.5 hover:underline cursor-pointer"
                       >
-                        {member.name}
+                        <span>{member.name}</span>
                         {member.emailVerified && (
-                          <CheckCircle className="h-3 w-3 text-green-600" />
+                          <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />
                         )}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm font-mono font-medium">
+                    <TableCell className="text-xs font-mono font-medium">
                       {member.cbUserId || <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell>
-                      {member.role === "admin" ? (
-                        <Badge className="bg-purple-600 hover:bg-purple-700 text-white border-none">Admin</Badge>
+                      {member.batch ? (
+                        <Badge variant="outline" className="font-mono text-[11px] bg-primary/5 text-primary border-primary/20">
+                          {member.batch.code}
+                        </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-muted-foreground">Member</Badge>
+                        <span className="text-muted-foreground text-[11px] italic">Unassigned</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm">{member.email}</TableCell>
-                    <TableCell className="text-sm">
-                      {member.whatsappNumber || <span className="text-muted-foreground">-</span>}
+                    <TableCell>
+                      {member.role === "admin" ? (
+                        <Badge className="bg-purple-600 hover:bg-purple-700 text-white border-none text-[10px]">Admin</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground text-[10px]">Member</Badge>
+                      )}
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="text-xs font-mono">{member.email}</TableCell>
+                    <TableCell className="text-xs">
                       {member.branch || <span className="text-muted-foreground">-</span>}
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="text-xs font-mono">
                       {member.mobileNumber || <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell>
                       {member.banned ? (
-                        <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                        <Badge variant="destructive" className="flex items-center gap-1 w-fit text-[10px]">
                           <XCircle className="h-3 w-3" />
                           Banned
                         </Badge>
                       ) : !member.profileComplete ? (
-                        <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                        <Badge variant="secondary" className="flex items-center gap-1 w-fit text-[10px]">
                           Pending
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                          <CheckCircle className="h-3 w-3 text-green-600" />
+                        <Badge variant="outline" className="flex items-center gap-1 w-fit text-[10px] text-emerald-600 border-emerald-200">
+                          <CheckCircle className="h-3 w-3 text-emerald-600" />
                           Active
                         </Badge>
                       )}
@@ -441,19 +514,31 @@ export default function MembersTable({ members }: MembersTableProps) {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="text-xs w-44">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="cursor-pointer"
                             onClick={() => openMemberSidebar(member)}
                           >
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
+                            <Eye className="mr-2 h-3.5 w-3.5" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setSelectedMember(member);
+                              setSelectedMemberIds(new Set([member.id]));
+                              setTargetBatchId(member.batchId || "none");
+                              setShowAssignBatchDialog(true);
+                            }}
+                          >
+                            <Layers className="mr-2 h-3.5 w-3.5 text-primary" />
+                            Assign Batch
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="cursor-pointer"
@@ -462,7 +547,7 @@ export default function MembersTable({ members }: MembersTableProps) {
                               setShowQrDialog(true);
                             }}
                           >
-                            <QrCode className="mr-2 h-4 w-4" />
+                            <QrCode className="mr-2 h-3.5 w-3.5" />
                             View QR
                           </DropdownMenuItem>
                           <DropdownMenuItem 
@@ -472,19 +557,19 @@ export default function MembersTable({ members }: MembersTableProps) {
                               setShowBanDialog(true);
                             }}
                           >
-                            <Ban className="mr-2 h-4 w-4" />
+                            <Ban className="mr-2 h-3.5 w-3.5" />
                             {member.banned ? "Unban" : "Ban"} Member
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            className="cursor-pointer text-destructive"
+                            className="cursor-pointer text-destructive focus:text-destructive"
                             onClick={() => {
                               setSelectedMemberIds(new Set());
                               setSelectedMember(member);
                               setShowDeleteDialog(true);
                             }}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
+                            <Trash2 className="mr-2 h-3.5 w-3.5" />
                             Delete Member
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -680,6 +765,77 @@ export default function MembersTable({ members }: MembersTableProps) {
                 </>
               ) : (
                 "Delete Permanently"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Assign Batch Dialog */}
+      <AlertDialog open={showAssignBatchDialog} onOpenChange={setShowAssignBatchDialog}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-primary" />
+              Assign Batch
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Assign {selectedMemberIds.size} selected student(s) to a cohort batch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-3 space-y-3">
+            <Label className="text-xs font-medium">Select Target Batch</Label>
+            <Select value={targetBatchId} onValueChange={setTargetBatchId} disabled={isAssigningBatch}>
+              <SelectTrigger className="w-full text-xs">
+                <SelectValue placeholder="Select batch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Batch (Remove / Unassigned)</SelectItem>
+                {batchesList.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name} ({b.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isAssigningBatch} onClick={() => setShowAssignBatchDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                setIsAssigningBatch(true);
+                try {
+                  const ids = Array.from(selectedMemberIds);
+                  const bId = targetBatchId === "none" ? null : targetBatchId;
+                  const res = await bulkAssignMembersBatch(ids, bId);
+                  if (res.status === "success") {
+                    toast.success(res.message);
+                    setShowAssignBatchDialog(false);
+                    setSelectedMemberIds(new Set());
+                    setSelectedMember(null);
+                    router.refresh();
+                  } else {
+                    toast.error(res.message);
+                  }
+                } catch {
+                  toast.error("Failed to assign batch.");
+                } finally {
+                  setIsAssigningBatch(false);
+                }
+              }}
+              disabled={isAssigningBatch}
+              className="bg-primary text-primary-foreground font-medium"
+            >
+              {isAssigningBatch ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Save Batch Assignment"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
