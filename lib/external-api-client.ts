@@ -35,14 +35,12 @@ import type {
   PublishedProject,
   ProjectReview,
   ResourceFolder,
-  SupportTicket,
   AllDataSummary,
   ExternalAPIConfig,
   UserQueryParams,
   AnnouncementQueryParams,
   QuizQueryParams,
   ReviewQueryParams,
-  SupportQueryParams,
   BaseQueryParams,
 } from './external-api-types';
 
@@ -324,38 +322,6 @@ export class ExternalAPIClient {
      */
     withItems: async (limit = 100): Promise<APIResponse<ResourceFolder[]>> => {
       return this.fetch<ResourceFolder[]>('resources', { includeRelations: true, limit });
-    },
-  };
-
-  // ==================== Support Ticket Methods ====================
-
-  public support = {
-    /**
-     * Fetch support tickets with optional filtering
-     */
-    list: async (params?: Omit<SupportQueryParams, 'resource'>): Promise<APIResponse<SupportTicket[]>> => {
-      return this.fetch<SupportTicket[]>('support', params);
-    },
-
-    /**
-     * Fetch open tickets
-     */
-    open: async (limit = 100): Promise<APIResponse<SupportTicket[]>> => {
-      return this.fetch<SupportTicket[]>('support', { status: 'OPEN', limit });
-    },
-
-    /**
-     * Fetch tickets by priority
-     */
-    byPriority: async (priority: string, limit = 100): Promise<APIResponse<SupportTicket[]>> => {
-      return this.fetch<SupportTicket[]>('support', { priority, limit });
-    },
-
-    /**
-     * Fetch tickets with responses
-     */
-    withResponses: async (limit = 100): Promise<APIResponse<SupportTicket[]>> => {
-      return this.fetch<SupportTicket[]>('support', { includeRelations: true, limit });
     },
   };
 

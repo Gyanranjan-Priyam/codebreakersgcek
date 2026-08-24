@@ -9,13 +9,12 @@ export interface DashboardStats {
   pendingTasks: number;
   activeQuizzes: number;
   upcomingEvents: number;
-  openTickets: number;
   totalAnnouncements: number;
 }
 
 export interface RecentActivity {
   id: string;
-  type: 'announcement' | 'task' | 'event' | 'quiz' | 'ticket';
+  type: 'announcement' | 'task' | 'event' | 'quiz';
   title: string;
   description: string;
   date: Date;
@@ -49,8 +48,6 @@ export async function getUserDashboardData() {
       pendingTasksCount,
       activeQuizzesCount,
       upcomingEventsCount,
-      openTicketsCount,
-      recentTickets
     ] = await Promise.all([
       // 1. Announcements
       prisma.announcement.findMany({
@@ -133,19 +130,6 @@ export async function getUserDashboardData() {
           eventDate: { gte: new Date() }
         }
       }),
-      // 10. Open Tickets Count
-      prisma.supportTicket.count({
-        where: {
-          userId,
-          status: { in: ['OPEN', 'IN_PROGRESS'] }
-        }
-      }),
-      // 11. Recent Tickets
-      prisma.supportTicket.findMany({
-        where: { userId },
-        orderBy: { updatedAt: 'desc' },
-        take: 3
-      })
     ]);
 
     // Calculate Total Points
@@ -190,14 +174,6 @@ export async function getUserDashboardData() {
         date: q.updatedAt,
         points: q.pointsEarned
       })),
-      ...recentTickets.map(t => ({
-        id: `ticket-${t.id}`,
-        type: 'ticket' as const,
-        title: `Support Ticket: ${t.subject}`,
-        description: `Status: ${t.status}`,
-        date: t.updatedAt,
-        status: t.status
-      }))
     ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 10);
@@ -207,7 +183,6 @@ export async function getUserDashboardData() {
       pendingTasks: pendingTasksCount,
       activeQuizzes: activeQuizzesCount,
       upcomingEvents: upcomingEventsCount,
-      openTickets: openTicketsCount,
       totalAnnouncements: announcements.length // Just for this batch, or could fetch total count if needed
     };
 

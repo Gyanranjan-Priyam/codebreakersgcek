@@ -52,7 +52,6 @@ export type Resource =
   | 'projects'
   | 'reviews'
   | 'resources'
-  | 'support'
   | 'all';
 
 // ==================== User Types ====================
@@ -325,47 +324,6 @@ export interface ResourceItem {
   createdAt: string;
 }
 
-// ==================== Support Ticket Types ====================
-
-export type SupportTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
-export type SupportTicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-
-export interface SupportTicket {
-  id: string;
-  ticketNumber: string;
-  userId: string;
-  name: string;
-  email: string;
-  mobileNumber: string | null;
-  whatsappNumber: string | null;
-  subject: string;
-  message: string;
-  status: SupportTicketStatus;
-  priority: SupportTicketPriority;
-  createdAt: string;
-  updatedAt: string;
-  resolvedAt: string | null;
-  attachments?: SupportAttachment[];
-  responses?: SupportResponse[];
-}
-
-export interface SupportAttachment {
-  id: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  createdAt: string;
-}
-
-export interface SupportResponse {
-  id: string;
-  userId: string | null;
-  adminId: string | null;
-  message: string;
-  isInternal: boolean;
-  createdAt: string;
-}
-
 // ==================== All Resource Summary ====================
 
 export interface AllDataSummary {
@@ -379,7 +337,6 @@ export interface AllDataSummary {
     totalPublishedProjects: number;
     totalProjectReviews: number;
     totalResourceFolders: number;
-    totalSupportTickets: number;
   };
   systemSettings: SystemSetting[];
   message: string;
@@ -436,19 +393,12 @@ export interface ReviewQueryParams extends BaseQueryParams {
   reviewType?: ReviewType;
 }
 
-export interface SupportQueryParams extends BaseQueryParams {
-  resource: 'support';
-  status?: SupportTicketStatus;
-  priority?: SupportTicketPriority;
-}
-
 export type QueryParams =
   | BaseQueryParams
   | UserQueryParams
   | AnnouncementQueryParams
   | QuizQueryParams
-  | ReviewQueryParams
-  | SupportQueryParams;
+  | ReviewQueryParams;
 
 // ==================== API Client Configuration ====================
 

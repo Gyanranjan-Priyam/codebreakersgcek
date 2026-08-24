@@ -8,7 +8,6 @@ interface DataCleanupOptions {
   participants: boolean;
   users: boolean;
   payments: boolean;
-  supportTickets: boolean;
   s3Files: boolean;
 }
 
@@ -25,22 +24,11 @@ export async function POST(request: NextRequest) {
     }
 
     const options: DataCleanupOptions = await request.json();
-    let deletedItems: string[] = [];
-    let s3FilesToDelete: string[] = [];
+    const deletedItems: string[] = [];
+    const s3FilesToDelete: string[] = [];
 
     // Pre-collect S3 file keys before transaction to reduce transaction time
     if (options.s3Files) {
-      if (options.supportTickets) {
-        const supportAttachments = await prisma.supportAttachment.findMany({
-          select: { fileKey: true }
-        });
-        const supportResponseAttachments = await prisma.supportResponseAttachment.findMany({
-          select: { fileKey: true }
-        });
-        s3FilesToDelete.push(...supportAttachments.map(a => a.fileKey));
-        s3FilesToDelete.push(...supportResponseAttachments.map(a => a.fileKey));
-      }
-
       if (options.users) {
         const userProfiles = await prisma.user.findMany({
           where: { 
@@ -77,17 +65,7 @@ export async function POST(request: NextRequest) {
         deletedItems.push("Attendance records");
       }
 
-      // 2. Clean up support tickets if selected
-      if (options.supportTickets) {
-        // Delete in correct order respecting foreign key constraints
-        await tx.supportResponseAttachment.deleteMany({});
-        await tx.supportResponse.deleteMany({});
-        await tx.supportAttachment.deleteMany({});
-        await tx.supportTicket.deleteMany({});
-        deletedItems.push("Support tickets");
-      }
-
-      // 3. Clean up non-admin users if selected (do this last)
+      // 2. Clean up non-admin users if selected (do this last)
       if (options.users) {
         // Delete non-admin users (this will cascade delete related data due to foreign keys)
         const deletedUsers = await tx.user.deleteMany({

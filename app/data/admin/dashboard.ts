@@ -56,22 +56,6 @@ export async function getDashboardStats() {
             prisma.quizAttempt.count({ where: { completedAt: { not: null } } }),
         ]);
 
-        // Get support tickets stats
-        const [totalTickets, openTickets, resolvedTickets] = await Promise.all([
-            prisma.supportTicket.count(),
-            prisma.supportTicket.count({ 
-                where: { 
-                    status: { in: ['OPEN', 'IN_PROGRESS'] }
-                } 
-            }),
-            prisma.supportTicket.count({ 
-                where: { 
-                    status: 'RESOLVED',
-                    resolvedAt: { gte: monthStart, lte: monthEnd }
-                } 
-            }),
-        ]);
-
         // Get events and attendance stats
         const [totalEvents, upcomingEvents, totalAttendance] = await Promise.all([
             prisma.eventPoint.count(),
@@ -138,20 +122,6 @@ export async function getDashboardStats() {
             }
         });
 
-        const recentTickets = await prisma.supportTicket.findMany({
-            orderBy: { createdAt: 'desc' },
-            take: 5,
-            select: {
-                id: true,
-                ticketNumber: true,
-                subject: true,
-                status: true,
-                priority: true,
-                createdAt: true,
-                name: true,
-            }
-        });
-
         return {
             // User stats
             totalUsers,
@@ -168,11 +138,6 @@ export async function getDashboardStats() {
             activeQuizzes,
             totalQuizAttempts,
             
-            // Support
-            totalTickets,
-            openTickets,
-            resolvedTickets,
-            
             // Events & Attendance
             totalEvents,
             upcomingEvents,
@@ -188,7 +153,6 @@ export async function getDashboardStats() {
             
             // Recent activities
             recentUsers,
-            recentTickets,
         };
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);

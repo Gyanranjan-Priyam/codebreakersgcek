@@ -68,9 +68,6 @@ model User {
   banExpires      DateTime?
   sessions        Session[]
   accounts        Account[]
-  supportTickets  SupportTicket[]
-  supportResponses SupportResponse[]
-  adminResponses  SupportResponse[] @relation("AdminResponses")
   publishedProjects PublishedProject[]
   projectReviews  ProjectReview[]
   resourceFolders ResourceFolder[]  @relation("ResourceFolderCreator")
@@ -138,88 +135,6 @@ model SystemSettings {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@map("system_settings")
-}
-
-enum SupportTicketStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-}
-
-enum SupportTicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-model SupportTicket {
-  id          String                @id @default(cuid())
-  ticketNumber String               @unique
-  userId      String
-  name        String
-  email       String
-  mobileNumber String?
-  whatsappNumber String?
-  subject     String
-  message     String
-  status      SupportTicketStatus  @default(OPEN)
-  priority    SupportTicketPriority @default(MEDIUM)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  resolvedAt  DateTime?
-  
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attachments SupportAttachment[]
-  responses   SupportResponse[]
-
-  @@map("support_ticket")
-}
-
-model SupportAttachment {
-  id        String   @id @default(cuid())
-  ticketId  String
-  fileName  String
-  fileKey   String   // S3 key for the uploaded file
-  fileSize  Int
-  mimeType  String
-  createdAt DateTime @default(now())
-  
-  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@map("support_attachment")
-}
-
-model SupportResponse {
-  id         String   @id @default(cuid())
-  ticketId   String
-  userId     String?  // null if admin response
-  adminId    String?  // null if user response
-  message    String
-  isInternal Boolean  @default(false) // Internal notes not visible to users
-  createdAt  DateTime @default(now())
-  
-  ticket      SupportTicket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  user        User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  admin       User?                     @relation("AdminResponses", fields: [adminId], references: [id], onDelete: SetNull)
-  attachments SupportResponseAttachment[]
-
-  @@map("support_response")
-}
-
-model SupportResponseAttachment {
-  id         String   @id @default(cuid())
-  responseId String
-  fileName   String
-  fileSize   Int
-  mimeType   String
-  fileKey    String   // S3 key for the file
-  createdAt  DateTime @default(now())
-
-  response   SupportResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
-
-  @@map("support_response_attachment")
 }
 
 enum AnnouncementCategory {

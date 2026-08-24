@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Activity, Clock, Bell, CheckSquare, Calendar, BrainCircuit, LifeBuoy } from "lucide-react";
+import { Activity, Clock, Bell, CheckSquare, Calendar, BrainCircuit } from "lucide-react";
 import { format } from "date-fns";
 import { RecentActivity } from "../actions";
 
@@ -18,7 +18,6 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
       case 'task': return <CheckSquare className="w-4 h-4" />;
       case 'event': return <Calendar className="w-4 h-4" />;
       case 'quiz': return <BrainCircuit className="w-4 h-4" />;
-      case 'ticket': return <LifeBuoy className="w-4 h-4" />;
       default: return <Activity className="w-4 h-4" />;
     }
   };
@@ -29,7 +28,6 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
       case 'task': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'event': return 'bg-green-100 text-green-800 border-green-200';
       case 'quiz': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'ticket': return 'bg-orange-100 text-orange-800 border-orange-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Bell, Trophy, CheckSquare, BrainCircuit, Calendar, LifeBuoy, ArrowRight, Info } from "lucide-react";
+import { Bell, Trophy, CheckSquare, BrainCircuit, Calendar, ArrowRight, Info } from "lucide-react";
 import { DashboardStats } from "../actions";
 import Link from "next/link";
 
@@ -93,24 +93,6 @@ export function DashboardStatsCards({ stats }: DashboardStatsCardsProps) {
             "Review past events for insights"
           ]
         };
-      case "Open Tickets":
-        return {
-          title: "Support Tickets",
-          description: `You have ${stats.openTickets} open support ticket${stats.openTickets !== 1 ? 's' : ''}.`,
-          details: stats.openTickets > 0
-            ? "These tickets are currently being processed by our support team. You will receive updates as responses are added to your tickets."
-            : "You have no open support tickets. If you need assistance, feel free to create a new support ticket anytime.",
-          actionLabel: stats.openTickets > 0 ? "View My Tickets" : "Contact Support",
-          actionHref: "/dashboard/contact-support",
-          tips: stats.openTickets > 0 ? [
-            "Check your tickets regularly for updates",
-            "Respond promptly to admin queries",
-            "Add more details if requested"
-          ] : [
-            "Create a ticket if you need help",
-            "Include detailed information in your request"
-          ]
-        };
       default:
         return {
           title: title,
@@ -156,19 +138,11 @@ export function DashboardStatsCards({ stats }: DashboardStatsCardsProps) {
       color: "text-green-600",
       bgColor: "bg-green-50 dark:bg-green-950/20",
     },
-    {
-      title: "Open Tickets",
-      value: stats.openTickets,
-      icon: LifeBuoy,
-      description: "Support tickets in progress",
-      color: "text-orange-600",
-      bgColor: "bg-orange-50 dark:bg-orange-950/20",
-    },
   ];
 
   return (
     <>
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card, index) => (
           <Card 
             key={index} 

@@ -10,7 +10,7 @@ import {
    Users,
    Megaphone,
    BrainCircuit,
-   LifeBuoy,
+   QrCode,
    Trophy,
    Settings,
    TrendingUp,
@@ -87,11 +87,11 @@ export default function AdminPage() {
          color: "bg-purple-500"
       },
       {
-         title: "Support Tickets",
-         description: "Handle member support requests",
-         href: "/admin/support-messages",
-         icon: LifeBuoy,
-         color: "bg-orange-500"
+         title: "Attendance",
+         description: "Track and mark attendance",
+         href: "/admin/attendance",
+         icon: QrCode,
+         color: "bg-emerald-500"
       },
       {
          title: "Points Management",

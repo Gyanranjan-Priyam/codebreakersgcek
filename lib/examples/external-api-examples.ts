@@ -135,35 +135,7 @@ async function fetchRecentAnnouncements() {
   }
 }
 
-// ==================== Example 5: Fetch Support Tickets ====================
 
-async function fetchOpenTickets() {
-  try {
-    const response = await client.support.open(50);
-
-    console.log(`Open tickets: ${response.data.length}`);
-
-    // Group by priority
-    const byPriority = response.data.reduce((acc, ticket) => {
-      if (!acc[ticket.priority]) {
-        acc[ticket.priority] = [];
-      }
-      acc[ticket.priority].push(ticket);
-      return acc;
-    }, {} as Record<string, typeof response.data>);
-
-    for (const [priority, tickets] of Object.entries(byPriority)) {
-      console.log(`\n${priority} Priority: ${tickets.length} tickets`);
-      tickets.forEach((ticket) => {
-        console.log(`  - ${ticket.ticketNumber}: ${ticket.subject}`);
-      });
-    }
-
-    return response.data;
-  } catch (error) {
-    handleAPIError(error);
-  }
-}
 
 // ==================== Example 6: Pagination ====================
 
@@ -217,7 +189,6 @@ async function fetchDatabaseSummary() {
     console.log(`Published Projects: ${summary.totalPublishedProjects}`);
     console.log(`Project Reviews: ${summary.totalProjectReviews}`);
     console.log(`Resource Folders: ${summary.totalResourceFolders}`);
-    console.log(`Support Tickets: ${summary.totalSupportTickets}`);
 
     console.log('\n=== System Settings ===');
     systemSettings.forEach((setting) => {
@@ -311,19 +282,16 @@ async function fetchDashboardData() {
     const [
       summaryRes,
       recentAnnouncementsRes,
-      openTicketsRes,
       activeQuizzesRes,
     ] = await Promise.all([
       client.all(),
       client.announcements.list({ limit: 5 }),
-      client.support.open(10),
       client.quizzes.active(5),
     ]);
 
     const dashboardData = {
       summary: summaryRes.data.summary,
       recentAnnouncements: recentAnnouncementsRes.data,
-      openTickets: openTicketsRes.data,
       activeQuizzes: activeQuizzesRes.data,
       lastUpdated: new Date().toISOString(),
     };
@@ -367,7 +335,6 @@ export {
   fetchActiveQuizzes,
   fetchQuizWithResults,
   fetchRecentAnnouncements,
-  fetchOpenTickets,
   fetchAllUsers,
   fetchDatabaseSummary,
   exportUsersToCSV,

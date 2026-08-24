@@ -22,7 +22,6 @@ interface DataCleanupOptions {
   participants: boolean;
   users: boolean;
   payments: boolean;
-  supportTickets: boolean;
   s3Files: boolean;
 }
 
@@ -33,7 +32,6 @@ export function DataCleanup() {
     participants: false,
     users: false,
     payments: false,
-    supportTickets: false,
     s3Files: false,
   });
 
@@ -74,7 +72,6 @@ export function DataCleanup() {
           participants: false,
           users: false,
           payments: false,
-          supportTickets: false,
           s3Files: false,
         });
         // Optionally refresh the page or update UI
@@ -155,17 +152,6 @@ export function DataCleanup() {
                 />
                 <label htmlFor="payments" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Payment Records & Receipts
-                </label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="supportTickets"
-                  checked={cleanupOptions.supportTickets}
-                  onCheckedChange={(checked) => handleOptionChange("supportTickets", checked as boolean)}
-                />
-                <label htmlFor="supportTickets" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Support Tickets & Messages
                 </label>
               </div>
 

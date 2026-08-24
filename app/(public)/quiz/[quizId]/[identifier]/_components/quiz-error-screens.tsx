@@ -48,9 +48,6 @@ export function BannedUserScreen({ user }: BannedUserScreenProps) {
           >
             Return to Dashboard
           </CloseWindowButton>
-          <Button asChild className="w-full">
-            <Link href="/dashboard/contact-support">Contact Support</Link>
-          </Button>
         </div>
       </div>
     </div>
@@ -107,9 +104,6 @@ export function QuizBlockedScreen({ quizBlock }: QuizBlockedScreenProps) {
           >
             Back to Quizzes
           </CloseWindowButton>
-          <Button asChild className="w-full">
-            <Link href="/dashboard/contact-support">Contact Support</Link>
-          </Button>
         </div>
       </div>
     </div>

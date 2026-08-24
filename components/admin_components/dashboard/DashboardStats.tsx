@@ -10,7 +10,6 @@ import {
     UserPlus,
     Megaphone,
     BrainCircuit,
-    LifeBuoy,
     Calendar,
     CheckSquare,
     Trophy,
@@ -40,11 +39,6 @@ interface DashboardStatsProps {
         activeQuizzes: number;
         totalQuizAttempts: number;
         
-        // Support
-        totalTickets: number;
-        openTickets: number;
-        resolvedTickets: number;
-        
         // Events
         totalEvents: number;
         upcomingEvents: number;
@@ -65,15 +59,6 @@ interface DashboardStatsProps {
             createdAt: Date;
             emailVerified: boolean;
             role?: string | null;
-        }>;
-        recentTickets: Array<{
-            id: string;
-            ticketNumber: string;
-            subject: string;
-            status: string;
-            priority: string;
-            createdAt: Date;
-            name: string;
         }>;
     };
 }
@@ -108,13 +93,13 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
             href: "/admin/quizzes",
         },
         {
-            title: "Open Tickets",
-            value: stats.openTickets,
-            description: `${stats.resolvedTickets} resolved this month`,
-            icon: LifeBuoy,
+            title: "Total Tasks",
+            value: stats.totalTasks,
+            description: `${stats.pendingTasks} active tasks`,
+            icon: CheckSquare,
             color: "text-orange-600",
             bgColor: "bg-orange-50 dark:bg-orange-950/20",
-            href: "/admin/support-messages",
+            href: "/admin/tasks",
         },
         {
             title: "Total Points",
@@ -166,26 +151,6 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
             color: "text-red-600",
         },
     ];
-
-    const getPriorityColor = (priority: string) => {
-        switch (priority) {
-            case 'URGENT': return 'bg-red-500';
-            case 'HIGH': return 'bg-orange-500';
-            case 'MEDIUM': return 'bg-yellow-500';
-            case 'LOW': return 'bg-green-500';
-            default: return 'bg-gray-500';
-        }
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'OPEN': return 'text-blue-600';
-            case 'IN_PROGRESS': return 'text-orange-600';
-            case 'RESOLVED': return 'text-green-600';
-            case 'CLOSED': return 'text-gray-600';
-            default: return 'text-gray-600';
-        }
-    };
 
     return (
         <div className="space-y-6">
@@ -245,7 +210,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
             </Card>
 
             {/* Recent Activities */}
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div>
                 {/* Recent Users */}
                 <Card>
                     <CardHeader>
@@ -286,55 +251,6 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
                         <Link href="/admin/members">
                             <p className="text-sm text-primary hover:underline text-center">
                                 View all members →
-                            </p>
-                        </Link>
-                    </CardContent>
-                </Card>
-
-                {/* Recent Support Tickets */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                            <LifeBuoy className="h-5 w-5 text-orange-600" />
-                            Recent Tickets
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            {stats.recentTickets.length > 0 ? (
-                                stats.recentTickets.map((ticket) => (
-                                    <Link key={ticket.id} href={`/admin/support-messages/${ticket.ticketNumber}`}>
-                                        <div className="p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
-                                            <div className="flex items-start justify-between gap-2 mb-2">
-                                                <p className="font-medium text-sm truncate flex-1">
-                                                    {ticket.subject}
-                                                </p>
-                                                <div className={`h-2 w-2 rounded-full ${getPriorityColor(ticket.priority)} shrink-0 mt-1.5`} />
-                                            </div>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <p className="text-xs text-muted-foreground truncate">
-                                                    {ticket.name}
-                                                </p>
-                                                <Badge variant="outline" className={`text-xs ${getStatusColor(ticket.status)}`}>
-                                                    {ticket.status.replace('_', ' ')}
-                                                </Badge>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {format(new Date(ticket.createdAt), "MMM dd, HH:mm")}
-                                            </p>
-                                        </div>
-                                    </Link>
-                                ))
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">
-                                    No recent tickets
-                                </p>
-                            )}
-                        </div>
-                        <Separator className="my-3" />
-                        <Link href="/admin/support-messages">
-                            <p className="text-sm text-primary hover:underline text-center">
-                                View all tickets →
                             </p>
                         </Link>
                     </CardContent>

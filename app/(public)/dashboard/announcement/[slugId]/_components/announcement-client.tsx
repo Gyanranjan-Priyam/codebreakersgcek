@@ -364,12 +364,6 @@ export function AnnouncementClient({ announcement }: { announcement: Announcemen
                   />
                 </DialogContent>
               </Dialog>
-              <Link 
-               href={"/dashboard/contact-support"}
-               className={buttonVariants({ variant: "outline", className: "w-full text-center text-xs sm:text-sm" })}>
-                  <span className="hidden sm:inline">Report Issue</span>
-                  <span className="sm:hidden">Report</span>
-              </Link>
             </CardContent>
           </Card>
         </div>

@@ -155,13 +155,6 @@ export async function GET(request: NextRequest) {
         totalCount = await prisma.resource.count();
         break;
 
-      case "support":
-        data = await fetchSupportTickets(searchParams, limit, offset, includeRelations);
-        totalCount = await prisma.supportTicket.count({
-          where: buildSupportFilter(searchParams)
-        });
-        break;
-
       case "all":
         data = await fetchAllData(limit, offset, includeRelations);
         totalCount = -1; // Not applicable for 'all'
@@ -175,7 +168,7 @@ export async function GET(request: NextRequest) {
             code: "INVALID_RESOURCE",
             availableResources: [
               "users", "announcements", "attendance", "tasks", "events",
-              "quizzes", "projects", "reviews", "resources", "support", "all"
+              "quizzes", "projects", "reviews", "resources", "all"
             ]
           },
           { status: 400 }
@@ -577,56 +570,6 @@ async function fetchResources(searchParams: URLSearchParams, limit: number, offs
   return folders;
 }
 
-async function fetchSupportTickets(searchParams: URLSearchParams, limit: number, offset: number, includeRelations: boolean) {
-  const where = buildSupportFilter(searchParams);
-
-  const tickets = await prisma.supportTicket.findMany({
-    where,
-    select: {
-      id: true,
-      ticketNumber: true,
-      userId: true,
-      name: true,
-      email: true,
-      mobileNumber: true,
-      whatsappNumber: true,
-      subject: true,
-      message: true,
-      status: true,
-      priority: true,
-      createdAt: true,
-      updatedAt: true,
-      resolvedAt: true,
-      ...(includeRelations && {
-        attachments: {
-          select: {
-            id: true,
-            fileName: true,
-            fileSize: true,
-            mimeType: true,
-            createdAt: true,
-          }
-        },
-        responses: {
-          select: {
-            id: true,
-            userId: true,
-            adminId: true,
-            message: true,
-            isInternal: true,
-            createdAt: true,
-          }
-        }
-      }),
-    },
-    take: limit,
-    skip: offset,
-    orderBy: { createdAt: 'desc' }
-  });
-
-  return tickets;
-}
-
 async function fetchAllData(limit: number, offset: number, includeRelations: boolean) {
   // For 'all', we'll fetch a summary of each resource with limited data
   const [
@@ -639,7 +582,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
     projects,
     reviews,
     resourceFolders,
-    supportTickets,
     systemSettings,
   ] = await Promise.all([
     prisma.user.count(),
@@ -651,7 +593,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
     prisma.publishedProject.count(),
     prisma.projectReview.count(),
     prisma.resourceFolder.count(),
-    prisma.supportTicket.count(),
     prisma.systemSettings.findMany({
       select: {
         key: true,
@@ -673,7 +614,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
       totalPublishedProjects: projects,
       totalProjectReviews: reviews,
       totalResourceFolders: resourceFolders,
-      totalSupportTickets: supportTickets,
     },
     systemSettings,
     message: "To fetch detailed data, use specific resource endpoints like ?resource=users or ?resource=quizzes"
@@ -729,18 +669,6 @@ function buildReviewFilter(searchParams: URLSearchParams) {
 
   if (status) where.status = status;
   if (reviewType) where.reviewType = reviewType;
-
-  return where;
-}
-
-function buildSupportFilter(searchParams: URLSearchParams) {
-  const where: any = {};
-
-  const status = searchParams.get("status");
-  const priority = searchParams.get("priority");
-
-  if (status) where.status = status;
-  if (priority) where.priority = priority;
 
   return where;
 }

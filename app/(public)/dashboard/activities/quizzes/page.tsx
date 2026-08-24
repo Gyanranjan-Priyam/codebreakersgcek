@@ -374,19 +374,13 @@ export default function QuizzesPage() {
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogFooter>
             <Button
               variant="outline"
               onClick={() => setShowBlockedDialog(false)}
               className="w-full sm:w-auto"
             >
               Close
-            </Button>
-            <Button
-              onClick={() => router.push('/dashboard/contact-support')}
-              className="w-full sm:w-auto"
-            >
-              Contact Support
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

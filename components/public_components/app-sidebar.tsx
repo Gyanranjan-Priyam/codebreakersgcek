@@ -4,7 +4,6 @@ import * as React from "react";
 import {
   Calendar,
   LayoutDashboard,
-  HelpCircle,
   Settings,
   Users,
   Trophy,
@@ -122,11 +121,6 @@ const data = {
       title: "Settings",
       url: "/dashboard/settings",
       icon: Settings,
-    },
-    {
-      title: "Contact Support",
-      url: "/dashboard/contact-support",
-      icon: HelpCircle,
     },
   ],
 };
