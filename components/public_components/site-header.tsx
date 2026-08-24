@@ -5,10 +5,11 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { BackButton } from "@/components/ui/back-button"
 import { usePathname } from "next/navigation"
 import { useMemo } from "react"
-import { Bell } from "lucide-react";
+import { Bell, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNotification } from "./notification-context";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 import { ThemeSelectorDropdown } from "@/components/ui/theme-selector-dropdown";
 
@@ -54,6 +55,10 @@ export function SiteHeader() {
         return "Team Management";
       } else if (segments.includes("settings")) {
         return "Profile Settings";
+      } else if (segments.includes("transactions")) {
+        return "Transaction History";
+      } else if (segments.includes("resume-builder")) {
+        return "ATS Resume Builder";
       }
       return "Dashboard";
     } else if (segments.includes("events")) {
@@ -78,6 +83,8 @@ export function SiteHeader() {
       "/dashboard/events",
       "/dashboard/teams",
       "/dashboard/settings",
+      "/dashboard/transactions",
+      "/dashboard/resume-builder",
     ];
     
     return !mainPages.includes(pathname);
@@ -104,6 +111,21 @@ export function SiteHeader() {
       </div>
       <div className="mr-6 flex items-center gap-2">
         <ThemeSelectorDropdown />
+        
+        {/* Transactions Navbar Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          asChild
+          aria-label="Transaction History"
+          className="cursor-pointer relative"
+          title="Transaction History"
+        >
+          <Link href="/dashboard/transactions">
+            <ReceiptText size={18} />
+          </Link>
+        </Button>
+
         <div className="relative">
           <Button 
             variant="ghost" 

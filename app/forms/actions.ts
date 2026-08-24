@@ -2,6 +2,8 @@
 
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import type { FormDefinition } from "@/lib/form-types";
 import { sendFormSubmissionEmail } from "@/lib/mailer";
 
@@ -93,6 +95,10 @@ export async function submitFormResponse(input: {
       };
     }
 
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    }).catch(() => null);
+
     const response = await prisma.formResponse.create({
       data: {
         id: randomUUID(),
@@ -100,6 +106,7 @@ export async function submitFormResponse(input: {
         answers: input.answers as unknown as import("@prisma/client").Prisma.InputJsonValue,
         transactionId: input.transactionId?.trim() || null,
         paymentStatus: hasPaymentField(formDef) ? "pending" : "submitted",
+        submittedById: session?.user?.id || null,
       },
     });
 

@@ -75,6 +75,7 @@ model User {
   createdForms    Form[]            @relation("FormCreator")
   formResponsesSubmitted FormResponse[] @relation("FormResponseSubmitter")
   formResponsesVerified FormResponse[] @relation("FormResponseVerifier")
+  resumes         Resume[]
 
   @@unique([email])
   @@map("user")
@@ -587,5 +588,23 @@ model SmtpUsageTracker {
   updatedAt   DateTime @updatedAt
 
   @@map("smtp_usage_tracker")
+}
+
+model Resume {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String   @default("Untitled Resume")
+  mode         String   @default("visual") // "latex" | "visual"
+  templateId   String   @default("jakes-resume")
+  latexContent String   @db.Text
+  visualData   Json
+  targetRole   String?
+  atsScore     Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([userId])
+  @@map("resume")
 }
 

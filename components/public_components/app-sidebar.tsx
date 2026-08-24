@@ -7,12 +7,10 @@ import {
   Settings,
   Users,
   Trophy,
-  Code,
   FolderGit,
-  Activity,
   ListChecks,
-  Brain,
-  QrCode,
+  ReceiptText,
+  FileText,
 } from "lucide-react";
 
 import { NavMain } from "@/components/public_components/nav-main";
@@ -48,29 +46,18 @@ const data = {
       url: "/dashboard",
       icon: LayoutDashboard,
     },
+
     {
-      title: "Activities",
-      url: "#",
-      icon: Activity,
-      isCollapsible: true,
-      items: [
-        {
-          title: "Attendance",
-          url: "/dashboard/attendance",
-          icon: QrCode,
-        },
-        {
-          title: "Quizzes",
-          url: "/dashboard/activities/quizzes",
-          icon: Calendar,
-        },
-        {
-          title: "Tasks",
-          url: "/dashboard/activities/tasks",
-          icon: ListChecks,
-        },
-      ],
+      title: "Quizzes",
+      url: "/dashboard/activities/quizzes",
+      icon: Calendar,
     },
+    {
+      title: "Tasks",
+      url: "/dashboard/activities/tasks",
+      icon: ListChecks,
+    },
+
     {
       title: "Achievements",
       url: "/dashboard/achievements",
@@ -82,17 +69,14 @@ const data = {
       icon: Users,
     },
     {
-      title: "Play Ground (Beta)",
-      url: "/dashboard/playground",
-      icon: Code,
-      isCollapsible: true,
-      items: [
-        {
-          title: "Brainstack",
-          url: "/dashboard/playground/brainstack",
-          icon: Brain,
-        },
-      ],
+      title: "Resume Builder",
+      url: "/dashboard/resume-builder",
+      icon: FileText,
+    },
+    {
+      title: "Transactions",
+      url: "/dashboard/transactions",
+      icon: ReceiptText,
     },
     {
       title: "Projects",
@@ -162,7 +146,9 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                       className="inline-block mr-2 mb-1 shrink-0"
                       priority
                     />
-                    <span className="group-data-[collapsible=icon]:hidden">CodeBreakers</span>
+                    <span className="group-data-[collapsible=icon]:hidden">
+                      CodeBreakers
+                    </span>
                   </span>
                 </div>
               </Link>

@@ -4,7 +4,6 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import LenisProvider from "@/components/providers/lenis-provider";
 import { Analytics } from "@vercel/analytics/next";
-import { ConvexClientProvider } from "@/components/providers/convex-provider";
 import CapacitorProvider from "@/components/providers/capacitor-provider";
 import { MobileRedirect } from "@/components/mobile-redirect";
 
@@ -190,11 +189,9 @@ export default function RootLayout({
       >
         <CapacitorProvider>
           <MobileRedirect />
-          <ConvexClientProvider>
-            <LenisProvider>
-              {children}
-            </LenisProvider>
-          </ConvexClientProvider>
+          <LenisProvider>
+            {children}
+          </LenisProvider>
         </CapacitorProvider>
         <Toaster position="top-center" richColors closeButton />
         <Analytics />

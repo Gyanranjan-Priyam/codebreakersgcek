@@ -21,7 +21,7 @@ import {
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/admin_components/rich-text-editor/Editor";
 import { MultipleUploader } from "@/components/file-uploader/MultipleUploader";
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 
 interface AnnouncementEditFormProps {
   announcement: any;

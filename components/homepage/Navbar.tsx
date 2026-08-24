@@ -4,7 +4,7 @@ import Image from "next/image";
 import Logo from "../../public/assets/logo.png";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, XIcon, LogOut, LayoutDashboard, User } from "lucide-react";
+import { Menu, XIcon, LogOut, LayoutDashboard, User, ReceiptText } from "lucide-react";
 import { navItems } from "./_components/constant/navItems";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -127,6 +127,13 @@ const Navbar = ({ user }: NavbarProps) => {
                   <span>Dashboard</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem 
+                  onClick={() => router.push("/dashboard/transactions")}
+                  className="cursor-pointer text-slate-300 focus:text-white focus:bg-slate-800"
+                >
+                  <ReceiptText className="mr-2 h-4 w-4" />
+                  <span>Transactions</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
                   onClick={handleSignOut}
                   className="cursor-pointer text-red-400 focus:text-red-300 focus:bg-slate-800"
                 >
@@ -186,6 +193,13 @@ const Navbar = ({ user }: NavbarProps) => {
                   >
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
+                  </button>
+                  <button
+                    onClick={() => router.push("/dashboard/transactions")}
+                    className="flex items-center px-4 py-2 text-base font-medium text-slate-300 hover:bg-gray-800 rounded w-full text-left"
+                  >
+                    <ReceiptText className="mr-2 h-4 w-4" />
+                    Transactions
                   </button>
                   <button
                     onClick={handleSignOut}
