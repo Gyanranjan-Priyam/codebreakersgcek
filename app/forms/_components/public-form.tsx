@@ -378,7 +378,9 @@ function getBannerGradient(form: PublishedFormResponse): string {
     return "linear-gradient(135deg, #2dd4bf 0%, #a7f3d0 50%, #bfdbfe 100%)";
   }
   const tpl = BANNER_TEMPLATES.find((t) => t.id === templateId);
-  return tpl ? tpl.cssGradient : "linear-gradient(135deg, #2dd4bf 0%, #a7f3d0 50%, #bfdbfe 100%)";
+  return tpl
+    ? tpl.cssGradient
+    : "linear-gradient(135deg, #2dd4bf 0%, #a7f3d0 50%, #bfdbfe 100%)";
 }
 
 const tiptapExtensions = [
@@ -438,7 +440,10 @@ function autoFormatDescriptionText(text: string): string {
       const header = parts[1].trim();
       const rest = parts.slice(2).join("").trim();
 
-      const rawSentences = rest.split(/(?<=\.)\s+|\r?\n/).map((s) => s.trim()).filter(Boolean);
+      const rawSentences = rest
+        .split(/(?<=\.)\s+|\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       let bulletItems: string[] = [];
       let outro = "";
 
@@ -453,7 +458,8 @@ function autoFormatDescriptionText(text: string): string {
 
       let html = "";
       if (intro) html += `<p>${intro}</p>`;
-      if (header) html += `<p style="margin-top: 12px; margin-bottom: 6px;"><strong>${header}</strong></p>`;
+      if (header)
+        html += `<p style="margin-top: 12px; margin-bottom: 6px;"><strong>${header}</strong></p>`;
       if (bulletItems.length > 0) {
         html += `<ul class="my-bullet-list">`;
         for (const item of bulletItems) {
@@ -461,7 +467,8 @@ function autoFormatDescriptionText(text: string): string {
         }
         html += `</ul>`;
       }
-      if (outro) html += `<p style="margin-top: 12px;"><strong>${outro}</strong></p>`;
+      if (outro)
+        html += `<p style="margin-top: 12px;"><strong>${outro}</strong></p>`;
 
       return html;
     }
@@ -480,8 +487,14 @@ function plainTextToHtml(text: string): string {
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) {
-      if (inBulletList) { html += "</ul>"; inBulletList = false; }
-      if (inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      if (inBulletList) {
+        html += "</ul>";
+        inBulletList = false;
+      }
+      if (inOrderedList) {
+        html += "</ol>";
+        inOrderedList = false;
+      }
       continue;
     }
 
@@ -489,16 +502,34 @@ function plainTextToHtml(text: string): string {
     const orderedMatch = line.match(/^\d+[\.\)]\s+(.*)/);
 
     if (bulletMatch) {
-      if (inOrderedList) { html += "</ol>"; inOrderedList = false; }
-      if (!inBulletList) { html += "<ul class=\"my-bullet-list\">"; inBulletList = true; }
+      if (inOrderedList) {
+        html += "</ol>";
+        inOrderedList = false;
+      }
+      if (!inBulletList) {
+        html += '<ul class="my-bullet-list">';
+        inBulletList = true;
+      }
       html += `<li class="my-list-item"><p>${bulletMatch[1]}</p></li>`;
     } else if (orderedMatch) {
-      if (inBulletList) { html += "</ul>"; inBulletList = false; }
-      if (!inOrderedList) { html += "<ol class=\"my-ordered-list\">"; inOrderedList = true; }
+      if (inBulletList) {
+        html += "</ul>";
+        inBulletList = false;
+      }
+      if (!inOrderedList) {
+        html += '<ol class="my-ordered-list">';
+        inOrderedList = true;
+      }
       html += `<li class="my-list-item"><p>${orderedMatch[1]}</p></li>`;
     } else {
-      if (inBulletList) { html += "</ul>"; inBulletList = false; }
-      if (!inOrderedList) { html += "</ol>"; inOrderedList = false; }
+      if (inBulletList) {
+        html += "</ul>";
+        inBulletList = false;
+      }
+      if (!inOrderedList) {
+        html += "</ol>";
+        inOrderedList = false;
+      }
       html += `<p>${line}</p>`;
     }
   }
@@ -551,7 +582,9 @@ export default function PublicForm({ form }: PublicFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [transactionId, setTransactionId] = useState("");
-  const [answers, setAnswers] = useState<Record<string, string | string[] | Record<string, string>>>({});
+  const [answers, setAnswers] = useState<
+    Record<string, string | string[] | Record<string, string>>
+  >({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
@@ -565,8 +598,11 @@ export default function PublicForm({ form }: PublicFormProps) {
         if (parsed.name) setName(parsed.name);
         if (parsed.email) setEmail(parsed.email);
         if (parsed.transactionId) setTransactionId(parsed.transactionId);
-        if (parsed.answers && typeof parsed.answers === "object") setAnswers(parsed.answers);
-        toast.info("Restored your saved form responses from last session.", { duration: 4000 });
+        if (parsed.answers && typeof parsed.answers === "object")
+          setAnswers(parsed.answers);
+        toast.info("Restored your saved form responses from last session.", {
+          duration: 4000,
+        });
       }
     } catch {
       // ignore storage error
@@ -580,7 +616,7 @@ export default function PublicForm({ form }: PublicFormProps) {
       const draftKey = `public_form_draft_${form.formId}`;
       localStorage.setItem(
         draftKey,
-        JSON.stringify({ name, email, transactionId, answers })
+        JSON.stringify({ name, email, transactionId, answers }),
       );
     } catch {
       // ignore storage error
@@ -589,17 +625,20 @@ export default function PublicForm({ form }: PublicFormProps) {
 
   const allFields = useMemo(
     () => form.definition.sections.flatMap((s) => s.fields),
-    [form]
+    [form],
   );
   const paymentField = useMemo(
     () => allFields.find((f) => f.type === "payment") || null,
-    [allFields]
+    [allFields],
   );
 
   const firstName = name.split(" ")[0] || "there";
 
   /* ─── Answer Helpers ─── */
-  const updateAnswer = (id: string, val: string | string[] | Record<string, string>) => {
+  const updateAnswer = (
+    id: string,
+    val: string | string[] | Record<string, string>,
+  ) => {
     setAnswers((c) => ({ ...c, [id]: val }));
     setTouched((c) => ({ ...c, [id]: true }));
   };
@@ -608,7 +647,7 @@ export default function PublicForm({ form }: PublicFormProps) {
     const cur = (answers[id] as string[] | undefined) || [];
     updateAnswer(
       id,
-      cur.includes(opt) ? cur.filter((v) => v !== opt) : [...cur, opt]
+      cur.includes(opt) ? cur.filter((v) => v !== opt) : [...cur, opt],
     );
   };
 
@@ -622,13 +661,16 @@ export default function PublicForm({ form }: PublicFormProps) {
   const openUpi = () => {
     if (!paymentField?.upiId) return;
     const payee = paymentField.payeeName || form.title;
-    const amountParam = paymentField.paymentAmount !== undefined ? `&am=${paymentField.paymentAmount}` : "";
+    const amountParam =
+      paymentField.paymentAmount !== undefined
+        ? `&am=${paymentField.paymentAmount}`
+        : "";
     const upiUrl = `upi://pay?pa=${encodeURIComponent(
-      paymentField.upiId
+      paymentField.upiId,
     )}&pn=${encodeURIComponent(payee)}${amountParam}&cu=INR`;
     copyToClipboard(paymentField.upiId, "UPI ID");
     const isMobile = /Android|iPhone|iPad|iPod/i.test(
-      typeof navigator !== "undefined" ? navigator.userAgent : ""
+      typeof navigator !== "undefined" ? navigator.userAgent : "",
     );
     if (isMobile) {
       toast.success("Opening UPI payment app...");
@@ -636,7 +678,7 @@ export default function PublicForm({ form }: PublicFormProps) {
     } else {
       toast.info(
         `UPI ID (${paymentField.upiId}) copied! Scan the QR code with GPay/PhonePe or open your app to pay ₹${paymentField.paymentAmount ?? 0}.`,
-        { duration: 5000 }
+        { duration: 5000 },
       );
       try {
         window.location.href = upiUrl;
@@ -650,7 +692,8 @@ export default function PublicForm({ form }: PublicFormProps) {
   const isFieldValid = (field: FormFieldDefinition): boolean => {
     if (field.type === "multi_input") {
       if (!field.required) return true;
-      const valObj = (answers[field.id] as Record<string, string> | undefined) || {};
+      const valObj =
+        (answers[field.id] as Record<string, string> | undefined) || {};
       const subQuestions = field.subQuestions || [];
       for (const sub of subQuestions) {
         if (sub.required && !valObj[sub.id]?.trim()) return false;
@@ -668,7 +711,11 @@ export default function PublicForm({ form }: PublicFormProps) {
   const validateAll = (): boolean => {
     let valid = true;
     if (form.definition.settings.collectName && !name.trim()) valid = false;
-    if (form.definition.settings.collectEmail && (!email.trim() || !email.includes("@"))) valid = false;
+    if (
+      form.definition.settings.collectEmail &&
+      (!email.trim() || !email.includes("@"))
+    )
+      valid = false;
     for (const field of allFields) {
       if (!isFieldValid(field)) valid = false;
     }
@@ -719,8 +766,11 @@ export default function PublicForm({ form }: PublicFormProps) {
   };
 
   const bannerGradient = getBannerGradient(form);
-  const bannerImage = form.definition.bannerKey ? getImageUrl(form.definition.bannerKey) : null;
-  const hasAnyRequired = allFields.some((f) => f.required) ||
+  const bannerImage = form.definition.bannerKey
+    ? getImageUrl(form.definition.bannerKey)
+    : null;
+  const hasAnyRequired =
+    allFields.some((f) => f.required) ||
     form.definition.settings.collectName ||
     form.definition.settings.collectEmail;
 
@@ -740,7 +790,12 @@ export default function PublicForm({ form }: PublicFormProps) {
             }}
           >
             {bannerImage && (
-              <Image src={bannerImage} alt="" fill style={{ objectFit: "cover" }} />
+              <Image
+                src={bannerImage}
+                alt=""
+                fill
+                style={{ objectFit: "cover" }}
+              />
             )}
           </div>
           <div className="mf-container">
@@ -801,39 +856,43 @@ export default function PublicForm({ form }: PublicFormProps) {
                   `Confirmation sent to ${email || "your email"}. See you at Codebreakers.`}
               </p>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setSuccess(false);
-                  setAnswers({});
-                  setName("");
-                  setEmail("");
-                  setTransactionId("");
-                  setTouched({});
-                  setSubmitAttempted(false);
-                }}
+              <div
                 style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "#0078D4",
-                  fontSize: 14,
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                  fontWeight: 500,
+                  marginTop: 40,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
                 }}
               >
-                Submit another response
-              </button>
-
-              <div style={{ marginTop: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: "50%", background: "#FFF",
-                  border: "1px solid #e8e8e8", display: "flex", alignItems: "center",
-                  justifyContent: "center",
-                }}>
-                  <Image src="/assets/logo.png" alt="Codebreakers" width={36} height={36} style={{ objectFit: "contain" }} />
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    background: "#FFF",
+                    border: "1px solid #e8e8e8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Image
+                    src="/assets/logo.png"
+                    alt="Codebreakers"
+                    width={36}
+                    height={36}
+                    style={{ objectFit: "contain" }}
+                  />
                 </div>
-                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 600, color: "#1C1B1F" }}>
+                <span
+                  style={{
+                    fontFamily: "'Sora', sans-serif",
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: "#1C1B1F",
+                  }}
+                >
                   Codebreakers
                 </span>
               </div>
@@ -860,7 +919,8 @@ export default function PublicForm({ form }: PublicFormProps) {
           <p className="mf-question-label">
             {qNumber}. {field.label}
           </p>
-          {field.description && renderRichText(field.description, "mf-question-desc")}
+          {field.description &&
+            renderRichText(field.description, "mf-question-desc")}
           <button
             type="button"
             className="mf-submit-btn"
@@ -872,7 +932,8 @@ export default function PublicForm({ form }: PublicFormProps) {
                 : (window.location.href = field.buttonUrl);
             }}
           >
-            {field.buttonLabel || "Open link"} <ExternalLink className="h-4 w-4" />
+            {field.buttonLabel || "Open link"}{" "}
+            <ExternalLink className="h-4 w-4" />
           </button>
         </div>
       );
@@ -886,39 +947,98 @@ export default function PublicForm({ form }: PublicFormProps) {
             {qNumber}. {field.label}
             <span className="mf-asterisk">*</span>
           </p>
-          {field.description && renderRichText(field.description, "mf-question-desc")}
+          {field.description &&
+            renderRichText(field.description, "mf-question-desc")}
 
           <div className="mf-payment-card">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em" }}>Amount Due</span>
-              <span className="mf-payment-amount">₹{field.paymentAmount ?? 0}</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 16,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#888",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Amount Due
+              </span>
+              <span className="mf-payment-amount">
+                ₹{field.paymentAmount ?? 0}
+              </span>
             </div>
             {field.upiId && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-                <div style={{
-                  width: 180, height: 180, background: "#fff", borderRadius: 8,
-                  border: "1px solid #e8e8e8", padding: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 16,
+                }}
+              >
+                <div
+                  style={{
+                    width: 180,
+                    height: 180,
+                    background: "#fff",
+                    borderRadius: 8,
+                    border: "1px solid #e8e8e8",
+                    padding: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(
                       `upi://pay?pa=${field.upiId}&pn=${encodeURIComponent(
-                        field.payeeName || form.title
-                      )}${field.paymentAmount !== undefined ? `&am=${field.paymentAmount}` : ""}&cu=INR`
+                        field.payeeName || form.title,
+                      )}${field.paymentAmount !== undefined ? `&am=${field.paymentAmount}` : ""}&cu=INR`,
                     )}`}
                     alt="UPI QR Code"
-                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                    }}
                   />
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                  }}
+                >
                   <span style={{ fontSize: 13, color: "#888" }}>UPI:</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>{field.upiId}</span>
+                  <span
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {field.upiId}
+                  </span>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(field.upiId!, "UPI ID")}
                     style={{
-                      background: "transparent", border: "none", cursor: "pointer",
-                      padding: 4, color: "#888",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 4,
+                      color: "#888",
                     }}
                     title="Copy UPI ID"
                   >
@@ -928,9 +1048,17 @@ export default function PublicForm({ form }: PublicFormProps) {
                     type="button"
                     onClick={openUpi}
                     style={{
-                      background: "#0078D4", color: "#fff", border: "none", borderRadius: 4,
-                      padding: "6px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      display: "inline-flex", alignItems: "center", gap: 6,
+                      background: "#0078D4",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 4,
+                      padding: "6px 16px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
                     }}
                   >
                     <CreditCard className="h-4 w-4" /> Pay Now
@@ -940,8 +1068,19 @@ export default function PublicForm({ form }: PublicFormProps) {
             )}
           </div>
 
-          <label style={{ fontSize: 12, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>
-            {field.transactionIdLabel || "Transaction ID"} <span style={{ color: "#D13438" }}>*</span>
+          <label
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#888",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              display: "block",
+              marginBottom: 4,
+            }}
+          >
+            {field.transactionIdLabel || "Transaction ID"}{" "}
+            <span style={{ color: "#D13438" }}>*</span>
           </label>
           <input
             className={`mf-input${payErr ? " mf-input-error" : ""}`}
@@ -961,25 +1100,51 @@ export default function PublicForm({ form }: PublicFormProps) {
           {qNumber}. {field.label}
           {field.required && <span className="mf-asterisk">*</span>}
         </p>
-        {field.description && renderRichText(field.description, "mf-question-desc")}
+        {field.description &&
+          renderRichText(field.description, "mf-question-desc")}
 
         {field.imageKey && (
-          <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 8, overflow: "hidden", marginBottom: 16, border: "1px solid #e8e8e8" }}>
-            <Image src={getImageUrl(field.imageKey)} alt="" fill style={{ objectFit: "cover" }} />
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              aspectRatio: "16/9",
+              borderRadius: 8,
+              overflow: "hidden",
+              marginBottom: 16,
+              border: "1px solid #e8e8e8",
+            }}
+          >
+            <Image
+              src={getImageUrl(field.imageKey)}
+              alt=""
+              fill
+              style={{ objectFit: "cover" }}
+            />
           </div>
         )}
 
         {/* Short Text / Email / Number */}
-        {(field.type === "short_text" || field.type === "email" || field.type === "number") && (
+        {(field.type === "short_text" ||
+          field.type === "email" ||
+          field.type === "number") && (
           <div>
             <input
               className={`mf-input${fieldError ? " mf-input-error" : ""}`}
-              type={field.type === "email" ? "email" : field.type === "number" ? "number" : "text"}
+              type={
+                field.type === "email"
+                  ? "email"
+                  : field.type === "number"
+                    ? "number"
+                    : "text"
+              }
               value={(answers[field.id] as string) || ""}
               onChange={(e) => updateAnswer(field.id, e.target.value)}
               placeholder={field.placeholder || "Enter your answer"}
             />
-            {fieldError && <p className="mf-error-msg">This field is required</p>}
+            {fieldError && (
+              <p className="mf-error-msg">This field is required</p>
+            )}
           </div>
         )}
 
@@ -993,7 +1158,9 @@ export default function PublicForm({ form }: PublicFormProps) {
               onChange={(e) => updateAnswer(field.id, e.target.value)}
               placeholder={field.placeholder || "Enter your answer"}
             />
-            {fieldError && <p className="mf-error-msg">This field is required</p>}
+            {fieldError && (
+              <p className="mf-error-msg">This field is required</p>
+            )}
           </div>
         )}
 
@@ -1001,27 +1168,46 @@ export default function PublicForm({ form }: PublicFormProps) {
         {field.type === "multi_input" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {(field.subQuestions || []).map((sub, idx) => {
-              const currentValObj = (answers[field.id] as Record<string, string> | undefined) || {};
+              const currentValObj =
+                (answers[field.id] as Record<string, string> | undefined) || {};
               const subVal = currentValObj[sub.id] || "";
               const isSubRequired = Boolean(field.required && sub.required);
-              const subErr = (submitAttempted || touched[field.id]) && isSubRequired && !subVal.trim();
+              const subErr =
+                (submitAttempted || touched[field.id]) &&
+                isSubRequired &&
+                !subVal.trim();
               return (
                 <div key={sub.id || idx}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "#1C1B1F", display: "block", marginBottom: 4 }}>
+                  <label
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#1C1B1F",
+                      display: "block",
+                      marginBottom: 4,
+                    }}
+                  >
                     {sub.label || `Sub-question ${idx + 1}`}
-                    {isSubRequired && <span style={{ color: "#D13438", marginLeft: 2 }}>*</span>}
+                    {isSubRequired && (
+                      <span style={{ color: "#D13438", marginLeft: 2 }}>*</span>
+                    )}
                   </label>
                   <input
                     className={`mf-input${subErr ? " mf-input-error" : ""}`}
                     type="text"
                     value={subVal}
                     onChange={(e) => {
-                      const updated = { ...currentValObj, [sub.id]: e.target.value };
+                      const updated = {
+                        ...currentValObj,
+                        [sub.id]: e.target.value,
+                      };
                       updateAnswer(field.id, updated);
                     }}
                     placeholder={sub.placeholder || "Enter your answer"}
                   />
-                  {subErr && <p className="mf-error-msg">This field is required</p>}
+                  {subErr && (
+                    <p className="mf-error-msg">This field is required</p>
+                  )}
                 </div>
               );
             })}
@@ -1034,7 +1220,7 @@ export default function PublicForm({ form }: PublicFormProps) {
             <div className="mf-scale-grid">
               {Array.from(
                 { length: (field.scaleMax ?? 5) - (field.scaleMin ?? 1) + 1 },
-                (_, idx) => (field.scaleMin ?? 1) + idx
+                (_, idx) => (field.scaleMin ?? 1) + idx,
               ).map((num) => {
                 const selected = answers[field.id] === String(num);
                 return (
@@ -1050,12 +1236,22 @@ export default function PublicForm({ form }: PublicFormProps) {
               })}
             </div>
             {(field.scaleMinLabel || field.scaleMaxLabel) && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888", marginTop: 6 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 12,
+                  color: "#888",
+                  marginTop: 6,
+                }}
+              >
                 <span>{field.scaleMinLabel || ""}</span>
                 <span>{field.scaleMaxLabel || ""}</span>
               </div>
             )}
-            {fieldError && <p className="mf-error-msg">This field is required</p>}
+            {fieldError && (
+              <p className="mf-error-msg">This field is required</p>
+            )}
           </div>
         )}
 
@@ -1073,13 +1269,18 @@ export default function PublicForm({ form }: PublicFormProps) {
                     key={opt}
                     className={`mf-option-card ${selected ? "selected" : ""}`}
                   >
-                    <RadioGroupItem value={opt} className="h-4 w-4 border-2 border-[#D2D0CA] text-[#0078D4]" />
+                    <RadioGroupItem
+                      value={opt}
+                      className="h-4 w-4 border-2 border-[#D2D0CA] text-[#0078D4]"
+                    />
                     <span className="mf-option-label">{opt}</span>
                   </label>
                 );
               })}
             </RadioGroup>
-            {fieldError && <p className="mf-error-msg">This field is required</p>}
+            {fieldError && (
+              <p className="mf-error-msg">This field is required</p>
+            )}
           </div>
         )}
 
@@ -1096,7 +1297,10 @@ export default function PublicForm({ form }: PublicFormProps) {
                   onClick={() => toggleCheckbox(field.id, opt)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleCheckbox(field.id, opt); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                      toggleCheckbox(field.id, opt);
+                  }}
                 >
                   <Checkbox
                     checked={selected}
@@ -1107,7 +1311,9 @@ export default function PublicForm({ form }: PublicFormProps) {
                 </div>
               );
             })}
-            {fieldError && <p className="mf-error-msg">This field is required</p>}
+            {fieldError && (
+              <p className="mf-error-msg">This field is required</p>
+            )}
           </div>
         )}
 
@@ -1118,18 +1324,26 @@ export default function PublicForm({ form }: PublicFormProps) {
               value={(answers[field.id] as string) || ""}
               onValueChange={(val) => updateAnswer(field.id, val)}
             >
-              <SelectTrigger className={`w-full h-11 bg-white border-[1.5px] ${fieldError ? "border-[#D13438]" : "border-[#D2D0CA]"} rounded text-sm text-[#1C1B1F] focus:border-[#0078D4]`}>
+              <SelectTrigger
+                className={`w-full h-11 bg-white border-[1.5px] ${fieldError ? "border-[#D13438]" : "border-[#D2D0CA]"} rounded text-sm text-[#1C1B1F] focus:border-[#0078D4]`}
+              >
                 <SelectValue placeholder="Choose an option..." />
               </SelectTrigger>
               <SelectContent className="rounded border border-[#D2D0CA] shadow-lg">
                 {(field.options || []).map((opt) => (
-                  <SelectItem key={opt} value={opt} className="text-sm py-2 cursor-pointer">
+                  <SelectItem
+                    key={opt}
+                    value={opt}
+                    className="text-sm py-2 cursor-pointer"
+                  >
                     {opt}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {fieldError && <p className="mf-error-msg">This field is required</p>}
+            {fieldError && (
+              <p className="mf-error-msg">This field is required</p>
+            )}
           </div>
         )}
 
@@ -1143,7 +1357,9 @@ export default function PublicForm({ form }: PublicFormProps) {
                   className={`mf-input text-left flex items-center justify-between cursor-pointer${fieldError ? " mf-input-error" : ""}`}
                   style={{ maxWidth: 260 }}
                 >
-                  <span style={{ color: answers[field.id] ? "#1C1B1F" : "#B4B2AC" }}>
+                  <span
+                    style={{ color: answers[field.id] ? "#1C1B1F" : "#B4B2AC" }}
+                  >
                     {answers[field.id]
                       ? format(new Date(answers[field.id] as string), "PPP")
                       : "Pick a date..."}
@@ -1151,7 +1367,10 @@ export default function PublicForm({ form }: PublicFormProps) {
                   <CalendarIcon className="h-4 w-4" style={{ color: "#888" }} />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 rounded-lg shadow-lg" align="start">
+              <PopoverContent
+                className="w-auto p-0 rounded-lg shadow-lg"
+                align="start"
+              >
                 <Calendar
                   mode="single"
                   selected={
@@ -1160,13 +1379,16 @@ export default function PublicForm({ form }: PublicFormProps) {
                       : undefined
                   }
                   onSelect={(day) => {
-                    if (day) updateAnswer(field.id, day.toISOString().split("T")[0]);
+                    if (day)
+                      updateAnswer(field.id, day.toISOString().split("T")[0]);
                   }}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
-            {fieldError && <p className="mf-error-msg">This field is required</p>}
+            {fieldError && (
+              <p className="mf-error-msg">This field is required</p>
+            )}
           </div>
         )}
       </div>
@@ -1186,7 +1408,13 @@ export default function PublicForm({ form }: PublicFormProps) {
           }}
         >
           {bannerImage && (
-            <Image src={bannerImage} alt="" fill style={{ objectFit: "cover" }} priority />
+            <Image
+              src={bannerImage}
+              alt=""
+              fill
+              style={{ objectFit: "cover" }}
+              priority
+            />
           )}
         </div>
 
@@ -1194,12 +1422,11 @@ export default function PublicForm({ form }: PublicFormProps) {
         <div className="mf-container">
           <div className="mf-card mf-fade-in">
             {/* Form Title */}
-            {form.title && (
-              <h1 className="mf-title">{form.title}</h1>
-            )}
+            {form.title && <h1 className="mf-title">{form.title}</h1>}
 
             {/* Form Description */}
-            {form.description && renderRichText(form.description, "mf-description")}
+            {form.description &&
+              renderRichText(form.description, "mf-description")}
 
             {!form.acceptingResponses ? (
               /* ─── Closed State ─── */
@@ -1240,7 +1467,9 @@ export default function PublicForm({ form }: PublicFormProps) {
                     margin: "0 auto",
                   }}
                 >
-                  The form owner has closed this form for new submissions. If you believe this is a mistake, please contact the form creator.
+                  The form owner has closed this form for new submissions. If
+                  you believe this is a mistake, please contact the form
+                  creator.
                 </p>
               </div>
             ) : (
@@ -1248,7 +1477,9 @@ export default function PublicForm({ form }: PublicFormProps) {
               <>
                 {/* Disclaimer text */}
                 <p className="mf-disclaimer">
-                  When you submit this form, it will not automatically collect your details like name and email address unless you provide it yourself.
+                  When you submit this form, it will not automatically collect
+                  your details like name and email address unless you provide it
+                  yourself.
                 </p>
 
                 {/* Required notice */}
@@ -1259,46 +1490,65 @@ export default function PublicForm({ form }: PublicFormProps) {
                 )}
 
                 {/* ─── Name Field ─── */}
-                {form.definition.settings.collectName && (() => {
-                  questionNum++;
-                  const nameErr = (submitAttempted || touched["__name"]) && !name.trim();
-                  return (
-                    <div className="mf-question mf-fade-in">
-                      <p className="mf-question-label">
-                        {questionNum}. NAME <span className="mf-asterisk">*</span>
-                      </p>
-                      <input
-                        className={`mf-input${nameErr ? " mf-input-error" : ""}`}
-                        type="text"
-                        value={name}
-                        onChange={(e) => { setName(e.target.value); setTouched((c) => ({ ...c, __name: true })); }}
-                        placeholder="Enter your answer"
-                      />
-                      {nameErr && <p className="mf-error-msg">This field is required</p>}
-                    </div>
-                  );
-                })()}
+                {form.definition.settings.collectName &&
+                  (() => {
+                    questionNum++;
+                    const nameErr =
+                      (submitAttempted || touched["__name"]) && !name.trim();
+                    return (
+                      <div className="mf-question mf-fade-in">
+                        <p className="mf-question-label">
+                          {questionNum}. NAME{" "}
+                          <span className="mf-asterisk">*</span>
+                        </p>
+                        <input
+                          className={`mf-input${nameErr ? " mf-input-error" : ""}`}
+                          type="text"
+                          value={name}
+                          onChange={(e) => {
+                            setName(e.target.value);
+                            setTouched((c) => ({ ...c, __name: true }));
+                          }}
+                          placeholder="Enter your answer"
+                        />
+                        {nameErr && (
+                          <p className="mf-error-msg">This field is required</p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 {/* ─── Email Field ─── */}
-                {form.definition.settings.collectEmail && (() => {
-                  questionNum++;
-                  const emailErr = (submitAttempted || touched["__email"]) && (!email.trim() || !email.includes("@"));
-                  return (
-                    <div className="mf-question mf-fade-in">
-                      <p className="mf-question-label">
-                        {questionNum}. Email <span className="mf-asterisk">*</span>
-                      </p>
-                      <input
-                        className={`mf-input${emailErr ? " mf-input-error" : ""}`}
-                        type="email"
-                        value={email}
-                        onChange={(e) => { setEmail(e.target.value); setTouched((c) => ({ ...c, __email: true })); }}
-                        placeholder="Enter your answer"
-                      />
-                      {emailErr && <p className="mf-error-msg">Please enter a valid email address</p>}
-                    </div>
-                  );
-                })()}
+                {form.definition.settings.collectEmail &&
+                  (() => {
+                    questionNum++;
+                    const emailErr =
+                      (submitAttempted || touched["__email"]) &&
+                      (!email.trim() || !email.includes("@"));
+                    return (
+                      <div className="mf-question mf-fade-in">
+                        <p className="mf-question-label">
+                          {questionNum}. Email{" "}
+                          <span className="mf-asterisk">*</span>
+                        </p>
+                        <input
+                          className={`mf-input${emailErr ? " mf-input-error" : ""}`}
+                          type="email"
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            setTouched((c) => ({ ...c, __email: true }));
+                          }}
+                          placeholder="Enter your answer"
+                        />
+                        {emailErr && (
+                          <p className="mf-error-msg">
+                            Please enter a valid email address
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 {/* ─── Section Fields ─── */}
                 {form.definition.sections.map((section) => (
@@ -1319,9 +1569,13 @@ export default function PublicForm({ form }: PublicFormProps) {
                     onClick={handleSubmit}
                   >
                     {isSubmitting ? (
-                      <><Loader2 className="animate-spin h-4 w-4" /> Submitting…</>
+                      <>
+                        <Loader2 className="animate-spin h-4 w-4" /> Submitting…
+                      </>
                     ) : (
-                      <>{form.definition.settings.submitButtonLabel || "Submit"}</>
+                      <>
+                        {form.definition.settings.submitButtonLabel || "Submit"}
+                      </>
                     )}
                   </button>
                 </div>
