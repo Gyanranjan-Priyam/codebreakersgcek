@@ -61,6 +61,21 @@ export async function getPublishedFormByFormId(formId: string) {
   }
 }
 
+function extractEmailFromAnswers(answers: Record<string, unknown>): string | null {
+  if (typeof answers.email === "string" && answers.email.trim()) {
+    return answers.email.trim().toLowerCase();
+  }
+  for (const [k, v] of Object.entries(answers)) {
+    if (typeof v === "string") {
+      const val = v.trim().toLowerCase();
+      if (val.includes("@") && val.includes(".") && (k.toLowerCase().includes("email") || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val))) {
+        return val;
+      }
+    }
+  }
+  return null;
+}
+
 export async function submitFormResponse(input: {
   formId: string;
   answers: Record<string, unknown>;
@@ -98,6 +113,67 @@ export async function submitFormResponse(input: {
     const session = await auth.api.getSession({
       headers: await headers(),
     }).catch(() => null);
+
+    const submitterEmail = extractEmailFromAnswers(input.answers) || session?.user?.email?.toLowerCase() || null;
+    const submitterUserId = session?.user?.id || null;
+    const submitterTxId = input.transactionId?.trim().toLowerCase() || null;
+
+    // Duplicate Check: Each form cannot have duplicate email, user ID, or transaction ID
+    const existingResponses = await prisma.formResponse.findMany({
+      where: { formId: form.id },
+      select: {
+        id: true,
+        answers: true,
+        transactionId: true,
+        submittedById: true,
+        createdAt: true,
+        paymentStatus: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    let duplicateFound: (typeof existingResponses)[0] | null = null;
+
+    for (const prev of existingResponses) {
+      // 1. Check matching user ID
+      if (submitterUserId && prev.submittedById === submitterUserId) {
+        duplicateFound = prev;
+        break;
+      }
+
+      // 2. Check matching email
+      if (submitterEmail) {
+        const prevAnswers = (prev.answers || {}) as Record<string, unknown>;
+        const prevEmail = extractEmailFromAnswers(prevAnswers);
+        if (prevEmail && prevEmail === submitterEmail) {
+          duplicateFound = prev;
+          break;
+        }
+      }
+
+      // 3. Check matching transaction ID if payment
+      if (submitterTxId && prev.transactionId && prev.transactionId.trim().toLowerCase() === submitterTxId) {
+        duplicateFound = prev;
+        break;
+      }
+    }
+
+    if (duplicateFound) {
+      const shortRef = `CB-INV-${duplicateFound.id.slice(0, 8).toUpperCase()}`;
+      return {
+        status: "duplicate" as const,
+        isDuplicate: true,
+        previousResponseId: duplicateFound.id,
+        referenceNumber: shortRef,
+        message: `You have already submitted a response for "${form.title || "this form"}". Duplicate submissions are not allowed.`,
+        data: {
+          id: duplicateFound.id,
+          referenceNumber: shortRef,
+          submittedAt: duplicateFound.createdAt.toISOString(),
+          paymentStatus: duplicateFound.paymentStatus,
+        },
+      };
+    }
 
     const response = await prisma.formResponse.create({
       data: {

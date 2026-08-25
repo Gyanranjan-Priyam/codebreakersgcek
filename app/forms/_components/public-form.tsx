@@ -580,6 +580,12 @@ function renderRichText(value: string | null | undefined, className?: string) {
 export default function PublicForm({ form }: PublicFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    previousResponseId: string;
+    referenceNumber: string;
+    message: string;
+    submittedAt?: string;
+  } | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [transactionId, setTransactionId] = useState("");
@@ -753,7 +759,16 @@ export default function PublicForm({ form }: PublicFormProps) {
       },
       transactionId,
     });
-    if (result.status === "success") {
+
+    if (result.status === "duplicate" || (result as any).isDuplicate) {
+      setDuplicateInfo({
+        previousResponseId: (result as any).previousResponseId || (result as any).data?.id || "",
+        referenceNumber: (result as any).referenceNumber || (result as any).data?.referenceNumber || "",
+        message: result.message || "A submission with this email has already been recorded.",
+        submittedAt: (result as any).data?.submittedAt,
+      });
+      toast.warning(result.message);
+    } else if (result.status === "success") {
       setSuccess(true);
       try {
         localStorage.removeItem(`public_form_draft_${form.formId}`);
@@ -777,6 +792,197 @@ export default function PublicForm({ form }: PublicFormProps) {
 
   /* ─── Build numbered questions ─── */
   let questionNum = 0;
+
+  /* ═══ RENDER: DUPLICATE / ALREADY SUBMITTED ═══ */
+  if (duplicateInfo) {
+    return (
+      <>
+        <style dangerouslySetInnerHTML={{ __html: FORM_CSS }} />
+        <div className="mf-page" style={{ background: "#F3F2F1" }}>
+          <div
+            className="mf-banner"
+            style={{
+              background: bannerImage ? undefined : bannerGradient,
+            }}
+          >
+            {bannerImage && (
+              <Image
+                src={bannerImage}
+                alt=""
+                fill
+                style={{ objectFit: "cover" }}
+              />
+            )}
+          </div>
+          <div className="mf-container">
+            <div className="mf-success-card mf-fade-in" style={{ borderColor: "#E0A800" }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "#FFF8E1",
+                  border: "2px solid #F59E0B",
+                  color: "#D97706",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 20px",
+                }}
+              >
+                <Ban style={{ width: 28, height: 28, strokeWidth: 2.5 }} />
+              </div>
+
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#D97706",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  marginBottom: 8,
+                }}
+              >
+                Already Submitted
+              </p>
+
+              <h1
+                style={{
+                  fontFamily: "'Sora', sans-serif",
+                  fontSize: "clamp(22px, 3.5vw, 30px)",
+                  fontWeight: 700,
+                  color: "#1C1B1F",
+                  marginBottom: 12,
+                }}
+              >
+                Response Already Recorded
+              </h1>
+
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 14,
+                  color: "#555",
+                  lineHeight: 1.6,
+                  maxWidth: 480,
+                  margin: "0 auto 24px",
+                }}
+              >
+                {duplicateInfo.message}
+              </p>
+
+              {/* Previous Response Details Box */}
+              <div
+                style={{
+                  background: "#F9F9F8",
+                  border: "1px solid #E5E5E5",
+                  borderRadius: 12,
+                  padding: "16px 20px",
+                  maxWidth: 440,
+                  margin: "0 auto 28px",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Form</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1C1B1F" }}>{form.title}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Previous Response ID</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: "#1C1B1F" }}>
+                    {duplicateInfo.referenceNumber || `#${duplicateInfo.previousResponseId.slice(0, 8).toUpperCase()}`}
+                  </span>
+                </div>
+                {duplicateInfo.submittedAt && (
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Submitted On</span>
+                    <span style={{ fontSize: 12, color: "#444" }}>
+                      {new Date(duplicateInfo.submittedAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 12,
+                }}
+              >
+                
+                <button
+                  type="button"
+                  onClick={() => setDuplicateInfo(null)}
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid #D1D5DB",
+                    color: "#374151",
+                    padding: "10px 18px",
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Dismiss / Review Answers
+                </button>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 40,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    background: "#FFF",
+                    border: "1px solid #e8e8e8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Image
+                    src="/assets/logo.png"
+                    alt="Codebreakers"
+                    width={36}
+                    height={36}
+                    style={{ objectFit: "contain" }}
+                  />
+                </div>
+                <span
+                  style={{
+                    fontFamily: "'Sora', sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#1C1B1F",
+                  }}
+                >
+                  Codebreakers
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   /* ═══ RENDER: SUCCESS ═══ */
   if (success) {
@@ -868,11 +1074,8 @@ export default function PublicForm({ form }: PublicFormProps) {
               >
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background: "#FFF",
-                    border: "1px solid #e8e8e8",
+                    width: 46,
+                    height: 46,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -889,21 +1092,21 @@ export default function PublicForm({ form }: PublicFormProps) {
                 <span
                   style={{
                     fontFamily: "'Sora', sans-serif",
-                    fontSize: 18,
+                    fontSize: 25,
                     fontWeight: 600,
                     color: "#1C1B1F",
                   }}
                 >
-                  Codebreakers
+                  CodeBreakers
                 </span>
               </div>
             </div>
           </div>
 
           <div className="mf-footer">
-            <a href="/privacy">Privacy Policy</a>
+            <a href="https://codebreakersgcek.tech/privacy">Privacy Policy</a>
             <span style={{ margin: "0 8px", color: "#ccc" }}>·</span>
-            Powered by <strong>Codebreakers</strong>
+            Powered by <strong>CodeBreakers</strong>
           </div>
         </div>
       </>

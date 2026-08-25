@@ -88,7 +88,7 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
         >
           {/* Verified Watermark Stamp */}
           <div className="absolute top-8 right-8 sm:top-12 sm:right-12 opacity-10 pointer-events-none select-none rotate-[-12deg]">
-            <div className="border-4 border-[#16A34A] text-[#16A34A] rounded-xl px-4 py-2 text-3xl font-black uppercase tracking-widest flex items-center gap-2">
+            <div className="border-4 border-[#16A34A] text-[#16A34A] rounded-xl px-4 py-2 text-2xl sm:text-3xl font-black uppercase tracking-widest flex items-center gap-2">
               <ShieldCheck className="h-8 w-8" />
               VERIFIED
             </div>
@@ -98,9 +98,9 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
           <header className="flex flex-col gap-8 pb-8 border-b border-[#E7E5DE]">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-black/10 shrink-0 bg-white p-1">
+                <div className="relative h-12 w-12 rounded-xl overflow-hidden shrink-0 p-1">
                   <Image
-                    src="https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png"
+                    src="/assets/logo.png"
                     alt="CodeBreakers Logo"
                     fill
                     className="object-contain"
@@ -231,7 +231,7 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
                 <p>
                   Status:{" "}
                   <span className="text-[#16A34A] font-semibold">
-                    Payment Verified &amp; Certificate Issued
+                    Payment Verified
                   </span>
                 </p>
               </div>
@@ -256,11 +256,10 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
           {/* Footer */}
           <footer className="pt-8 border-t border-[#E7E5DE] text-[11px] text-[#78716C] flex flex-col sm:flex-row justify-between gap-4">
             <div>
-              <p>codebreakersgcekalahandi@gmail.com</p>
+              <p>cse.codebreaker@gcekbpatna.ac.in</p>
               <p>CodeBreakers • GCEK Bhawanipatna</p>
             </div>
             <div className="sm:text-right">
-              <p>Prepared for prompt processing.</p>
               <p className="font-semibold text-[#0C0A09]">
                 Issued by CodeBreakers Team
               </p>

@@ -550,19 +550,17 @@ export function UserTransactionsClient({
                         Details &amp; Msgs
                       </Button>
 
-                      <Button
-                        variant={tx.paymentStatus === "verified" ? "default" : "secondary"}
-                        size="sm"
-                        onClick={() => router.push(`/dashboard/tranasction/reciept/${tx.id}`)}
-                        className={`text-xs h-9 gap-1.5 flex-1 sm:flex-none rounded-xl cursor-pointer ${
-                          tx.paymentStatus === "verified"
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : ""
-                        }`}
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        View Receipt
-                      </Button>
+                      {tx.paymentStatus === "verified" && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => router.push(`/dashboard/tranasction/reciept/${tx.id}`)}
+                          className="text-xs h-9 gap-1.5 flex-1 sm:flex-none rounded-xl cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          View Receipt
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -579,7 +577,7 @@ export function UserTransactionsClient({
       >
         <SheetContent
           side="right"
-          className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full bg-card border-l border-border/80 shadow-2xl"
+          className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full bg-card border-l border-border/80 shadow-2xl overflow-hidden"
         >
           {selectedTransaction && (
             <>
@@ -600,8 +598,13 @@ export function UserTransactionsClient({
                 </SheetHeader>
               </div>
 
-              {/* Drawer Body with Independent Scrolling */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
+              {/* Drawer Body with Smooth Independent Scrolling and Hidden Scrollbar */}
+              <div
+                data-lenis-prevent
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 space-y-6 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                onWheel={(event) => event.stopPropagation()}
+                onTouchMoveCapture={(event) => event.stopPropagation()}
+              >
                 {/* Key Summary Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60">
@@ -711,32 +714,26 @@ export function UserTransactionsClient({
                 </Button>
 
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const tx = selectedTransaction;
-                      setSelectedTransaction(null);
-                      setReceiptModalItem(tx);
-                    }}
-                    className="gap-1.5 rounded-xl text-xs cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    Print Layout
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const txId = selectedTransaction.id;
-                      setSelectedTransaction(null);
-                      router.push(`/dashboard/tranasction/reciept/${txId}`);
-                    }}
-                    className="gap-1.5 rounded-xl text-xs bg-primary text-primary-foreground cursor-pointer shadow-xs"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Open Receipt Page
-                  </Button>
+                  {selectedTransaction.paymentStatus === "verified" ? (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const txId = selectedTransaction.id;
+                        setSelectedTransaction(null);
+                        router.push(`/dashboard/tranasction/reciept/${txId}`);
+                      }}
+                      className="gap-1.5 rounded-xl text-xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Open Receipt Page
+                    </Button>
+                  ) : (
+                    <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-lg border">
+                      {selectedTransaction.paymentStatus === "rejected"
+                        ? "Transaction Rejected"
+                        : "Receipt available once approved"}
+                    </span>
+                  )}
                 </div>
               </div>
             </>
@@ -808,9 +805,9 @@ export function UserTransactionsClient({
                 <header className="flex flex-col gap-8 pb-8 border-b border-[#E7E5DE]">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-black/10 shrink-0 bg-white p-1">
+                      <div className="relative h-12 w-12 rounded-xl overflow-hidden shrink-0p-1">
                         <Image
-                          src="https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png"
+                          src="/assets/logo.png"
                           alt="CodeBreakers Logo"
                           fill
                           className="object-contain"

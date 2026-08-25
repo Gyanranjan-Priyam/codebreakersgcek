@@ -1190,7 +1190,7 @@ export const generateWelcomeEmailHTML = ({
   firstName = "there",
   companyName = "CodeBreakers",
   getStartedUrl = "https://app.codebreakersgcek.tech/login",
-  supportEmail = "codebreakersgcekalahandi@gmail.com",
+  supportEmail = "cse.codebreaker@gcekbpatna.ac.in",
   companyAddress = "GCEK, Bhawanipatna, Odisha",
 }: {
   firstName?: string;
@@ -1557,11 +1557,10 @@ export const generateInvoiceDesignHTML = ({
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
                   <td align="left" valign="top">
-                    <p style="margin: 0;">codebreakersgcekalahandi@gmail.com</p>
+                    <p style="margin: 0;">cse.codebreaker@gcekbpatna.ac.in</p>
                     <p style="margin: 0;">CodeBreakers • GCEK Bhawanipatna</p>
                   </td>
                   <td align="right" valign="top">
-                    <p style="margin: 0;">Prepared for prompt processing.</p>
                     <p style="margin: 0;">Issued by CodeBreakers Team</p>
                   </td>
                 </tr>
@@ -1656,7 +1655,8 @@ const generateQuizResultHTML = ({
 }) => {
   const percentage = score;
   const passed = isPassed !== undefined ? isPassed : percentage >= 50;
-  const label = statusLabel || (passed ? "QUALIFIED / PASSED" : "FAILED / NOT QUALIFIED");
+  const label =
+    statusLabel || (passed ? "QUALIFIED / PASSED" : "FAILED / NOT QUALIFIED");
 
   return `<!DOCTYPE html>
 <html lang="en">

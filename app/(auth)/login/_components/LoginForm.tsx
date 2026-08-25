@@ -224,7 +224,7 @@ export function LoginForm() {
               size="sm"
               className="w-full text-xs font-medium rounded-lg shadow-sm"
             >
-              <a href="mailto:codebreakersgcekalahandi@gmail.com?subject=Member%20Access%20Help%20Request">
+              <a href="mailto:cse.codebreaker@gcekbpatna.ac.in?subject=Member%20Access%20Help%20Request">
                 <Mail className="w-4 h-4 mr-1.5" />
                 If you are a member, contact with admin
               </a>

@@ -104,9 +104,9 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
           <header className="flex flex-col gap-8 pb-8 border-b border-[#E7E5DE]">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-black/10 shrink-0 bg-white p-1">
+                <div className="relative h-12 w-12 rounded-xl overflow-hidden shrink-0 p-1">
                   <Image
-                    src="https://res.cloudinary.com/dw47ib0sh/image/upload/v1764077429/mydzalimrmzbscn0bmue.png"
+                    src="/assets/logo.png"
                     alt="CodeBreakers Logo"
                     fill
                     className="object-contain"
@@ -237,7 +237,7 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
                 <p>
                   Status:{" "}
                   <span className="text-[#16A34A] font-semibold">
-                    Payment Verified & Certificate Issued
+                    Payment Verified
                   </span>
                 </p>
               </div>
@@ -262,11 +262,10 @@ export function ReceiptClientView({ receipt }: ReceiptClientViewProps) {
           {/* Footer */}
           <footer className="pt-8 border-t border-[#E7E5DE] text-[11px] text-[#78716C] flex flex-col sm:flex-row justify-between gap-4">
             <div>
-              <p>codebreakersgcekalahandi@gmail.com</p>
+              <p>cse.codebreaker@gcekbpatna.ac.in</p>
               <p>CodeBreakers • GCEK Bhawanipatna</p>
             </div>
             <div className="sm:text-right">
-              <p>Prepared for prompt processing.</p>
               <p className="font-semibold text-[#0C0A09]">
                 Issued by CodeBreakers Team
               </p>

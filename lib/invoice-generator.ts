@@ -191,7 +191,7 @@ export async function generateInvoicePDF(
   pdf.text(`Status: `, margin + 5, yPos);
   pdf.setFont("courier", "bold");
   pdf.setTextColor(22, 163, 74);
-  pdf.text("Payment Verified & Certificate Issued", margin + 25, yPos);
+  pdf.text("Payment Verified", margin + 25, yPos);
 
   // Right side Summary Table
   let sumY = yPos - 5;
@@ -229,12 +229,9 @@ export async function generateInvoicePDF(
   pdf.setFont("courier", "normal");
   pdf.setFontSize(8);
   pdf.setTextColor(120, 113, 108);
-  pdf.text("codebreakersgcekalahandi@gmail.com", margin + 5, footerY + 5);
+  pdf.text("cse.codebreaker@gcekbpatna.ac.in", margin + 5, footerY + 5);
   pdf.text("CodeBreakers • GCEK Bhawanipatna", margin + 5, footerY + 9);
 
-  pdf.text("Prepared for prompt processing.", rightX - 5, footerY + 5, {
-    align: "right",
-  });
   pdf.setFont("courier", "bold");
   pdf.setTextColor(12, 10, 9);
   pdf.text("Issued by CodeBreakers Team", rightX - 5, footerY + 9, {

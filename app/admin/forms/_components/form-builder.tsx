@@ -1099,9 +1099,9 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
   ];
 
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground flex flex-col -m-4 sm:-m-6">
+    <div className="min-h-full flex-1 bg-muted/30 text-foreground flex flex-col">
       {/* ═══ HEADER ═══ */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 shadow-xs">
         <div className="flex items-center h-14 px-3 sm:px-6 gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/70" onClick={() => router.push("/admin/forms")}>
