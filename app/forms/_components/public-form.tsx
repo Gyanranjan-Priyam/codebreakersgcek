@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
@@ -444,7 +445,7 @@ function autoFormatDescriptionText(text: string): string {
         .split(/(?<=\.)\s+|\r?\n/)
         .map((s) => s.trim())
         .filter(Boolean);
-      let bulletItems: string[] = [];
+      const bulletItems: string[] = [];
       let outro = "";
 
       for (const sentence of rawSentences) {

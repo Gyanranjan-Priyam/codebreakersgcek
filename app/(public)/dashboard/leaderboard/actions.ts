@@ -89,62 +89,48 @@ export async function getOverallLeaderboard(targetBatchId?: string | null) {
       },
     });
 
-    // Get attendance points
-    const attendanceData = await prisma.attendance.groupBy({
-      by: ['userId'],
-      _sum: {
-        points: true,
-      },
-      _count: {
-        _all: true,
-      },
-      where: {
-        status: 'present',
-        userId: { in: users.map(u => u.id) },
-      },
-    });
+    const userIds = users.map((u) => u.id);
 
-    // Get task points
-    const taskData = await prisma.taskSubmission.groupBy({
-      by: ['userId'],
-      _sum: {
-        pointsAwarded: true,
-      },
-      _count: {
-        _all: true,
-      },
-      where: {
-        status: 'approved',
-        userId: { in: users.map(u => u.id) },
-      },
-    });
-
-    // Get event points
-    const eventData = await prisma.eventParticipation.groupBy({
-      by: ['userId'],
-      _sum: {
-        pointsAwarded: true,
-      },
-      _count: {
-        _all: true,
-      },
-      where: {
-        status: 'approved',
-        userId: { in: users.map(u => u.id) },
-      },
-    });
-
-    // Get approved quiz points
-    const quizAttempts = await prisma.quizAttempt.findMany({
-      where: {
-        userId: { in: users.map(u => u.id) },
-      },
-      select: {
-        userId: true,
-        pointsEarned: true,
-        answersJson: true,
-      },
-    });
+    // Parallelize all aggregation queries concurrently
+    const [attendanceData, taskData, eventData, quizAttempts] = await Promise.all([
+      prisma.attendance.groupBy({
+        by: ["userId"],
+        _sum: { points: true },
+        _count: { _all: true },
+        where: {
+          status: "present",
+          userId: { in: userIds },
+        },
+      }),
+      prisma.taskSubmission.groupBy({
+        by: ["userId"],
+        _sum: { pointsAwarded: true },
+        _count: { _all: true },
+        where: {
+          status: "approved",
+          userId: { in: userIds },
+        },
+      }),
+      prisma.eventParticipation.groupBy({
+        by: ["userId"],
+        _sum: { pointsAwarded: true },
+        _count: { _all: true },
+        where: {
+          status: "approved",
+          userId: { in: userIds },
+        },
+      }),
+      prisma.quizAttempt.findMany({
+        where: {
+          userId: { in: userIds },
+        },
+        select: {
+          userId: true,
+          pointsEarned: true,
+          answersJson: true,
+        },
+      }),
+    ]);
 
     // Filter only approved attempts and group by user
     const quizData = quizAttempts.reduce((acc, attempt) => {
@@ -153,8 +139,8 @@ export async function getOverallLeaderboard(targetBatchId?: string | null) {
       if (attempt.answersJson) {
         try {
           const answersData = JSON.parse(attempt.answersJson);
-          isApproved = answersData.approvalStatus === 'approved';
-        } catch (e) {
+          isApproved = answersData.approvalStatus === "approved";
+        } catch {
           // Not approved if can't parse
         }
       }
@@ -176,13 +162,13 @@ export async function getOverallLeaderboard(targetBatchId?: string | null) {
     }, new Map());
 
     // Create maps for quick lookup
-    const attendanceMap = new Map(attendanceData.map(a => [a.userId, a]));
-    const taskMap = new Map(taskData.map(t => [t.userId, t]));
-    const eventMap = new Map(eventData.map(e => [e.userId, e]));
+    const attendanceMap = new Map(attendanceData.map((a) => [a.userId, a]));
+    const taskMap = new Map(taskData.map((t) => [t.userId, t]));
+    const eventMap = new Map(eventData.map((e) => [e.userId, e]));
 
     // Build leaderboard with all points
     const leaderboard: LeaderboardEntry[] = users
-      .map(user => {
+      .map((user) => {
         const attendance = attendanceMap.get(user.id);
         const tasks = taskMap.get(user.id);
         const events = eventMap.get(user.id);
@@ -274,117 +260,100 @@ export async function getMonthlyLeaderboard(
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // Get all eligible users
-    const users = await prisma.user.findMany({
-      where: {
-        profileComplete: true,
-        role: { not: "admin" },
-        ...(effectiveBatchId ? { batchId: effectiveBatchId } : {}),
-      },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        registration: true,
-        branch: true,
-        admissionYear: true,
-        batchId: true,
-        batch: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
+    // Parallelize user fetching and sessions fetching
+    const [users, sessions] = await Promise.all([
+      prisma.user.findMany({
+        where: {
+          profileComplete: true,
+          role: { not: "admin" },
+          ...(effectiveBatchId ? { batchId: effectiveBatchId } : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          registration: true,
+          branch: true,
+          admissionYear: true,
+          batchId: true,
+          batch: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
           },
         },
-      },
-    });
-
-    const userIds = users.map(u => u.id);
-
-    // Get attendance sessions in this month
-    const sessions = await prisma.attendanceSession.findMany({
-      where: {
-        date: {
-          gte: startDate,
-          lte: endDate,
+      }),
+      prisma.attendanceSession.findMany({
+        where: {
+          date: {
+            gte: startDate,
+            lte: endDate,
+          },
         },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    const sessionIds = sessions.map(s => s.id);
-
-    // Get attendance points for this month
-    const attendanceData = await prisma.attendance.groupBy({
-      by: ['userId'],
-      _sum: {
-        points: true,
-      },
-      _count: {
-        _all: true,
-      },
-      where: {
-        sessionId: { in: sessionIds },
-        status: 'present',
-        userId: { in: userIds },
-      },
-    });
-
-    // Get task submissions evaluated in this month
-    const taskData = await prisma.taskSubmission.groupBy({
-      by: ['userId'],
-      _sum: {
-        pointsAwarded: true,
-      },
-      _count: {
-        _all: true,
-      },
-      where: {
-        status: 'approved',
-        evaluatedAt: {
-          gte: startDate,
-          lte: endDate,
+        select: {
+          id: true,
         },
-        userId: { in: userIds },
-      },
-    });
+      }),
+    ]);
 
-    // Get event participations evaluated in this month
-    const eventData = await prisma.eventParticipation.groupBy({
-      by: ['userId'],
-      _sum: {
-        pointsAwarded: true,
-      },
-      _count: {
-        _all: true,
-      },
-      where: {
-        status: 'approved',
-        evaluatedAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-        userId: { in: userIds },
-      },
-    });
+    const userIds = users.map((u) => u.id);
+    const sessionIds = sessions.map((s) => s.id);
 
-    // Get approved quiz attempts completed in this month
-    const quizAttempts = await prisma.quizAttempt.findMany({
-      where: {
-        userId: { in: userIds },
-        completedAt: {
-          gte: startDate,
-          lte: endDate,
+    // Parallelize all monthly aggregation queries concurrently
+    const [attendanceData, taskData, eventData, quizAttempts] = await Promise.all([
+      prisma.attendance.groupBy({
+        by: ["userId"],
+        _sum: { points: true },
+        _count: { _all: true },
+        where: {
+          sessionId: { in: sessionIds },
+          status: "present",
+          userId: { in: userIds },
         },
-      },
-      select: {
-        userId: true,
-        pointsEarned: true,
-        answersJson: true,
-      },
-    });
+      }),
+      prisma.taskSubmission.groupBy({
+        by: ["userId"],
+        _sum: { pointsAwarded: true },
+        _count: { _all: true },
+        where: {
+          status: "approved",
+          evaluatedAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          userId: { in: userIds },
+        },
+      }),
+      prisma.eventParticipation.groupBy({
+        by: ["userId"],
+        _sum: { pointsAwarded: true },
+        _count: { _all: true },
+        where: {
+          status: "approved",
+          evaluatedAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          userId: { in: userIds },
+        },
+      }),
+      prisma.quizAttempt.findMany({
+        where: {
+          userId: { in: userIds },
+          completedAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        select: {
+          userId: true,
+          pointsEarned: true,
+          answersJson: true,
+        },
+      }),
+    ]);
 
     // Filter only approved attempts and group by user
     const quizData = quizAttempts.reduce((acc, attempt) => {

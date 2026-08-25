@@ -76,6 +76,7 @@ model User {
   formResponsesSubmitted FormResponse[] @relation("FormResponseSubmitter")
   formResponsesVerified FormResponse[] @relation("FormResponseVerifier")
   resumes         Resume[]
+  roadmapProgress UserRoadmapProgress[]
 
   @@unique([email])
   @@map("user")
@@ -136,74 +137,6 @@ model SystemSettings {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@map("system_settings")
-}
-
-enum AnnouncementCategory {
-  EMERGENCY
-  GENERAL
-  EVENT_UPDATE
-  WORKSHOP
-  LOGISTICS
-}
-
-enum AnnouncementPriority {
-  NORMAL
-  IMPORTANT
-  URGENT
-}
-
-enum AnnouncementAudience {
-  PUBLIC
-  PARTICIPANTS_ONLY
-  VOLUNTEERS_ONLY
-  ORGANIZERS_ONLY
-}
-
-enum RecurrenceType {
-  NONE
-  HOURLY
-  DAILY
-  WEEKLY
-}
-
-model Announcement {
-  id          String   @id @default(cuid())
-  slugId      String   @unique
-  title       String
-  description String   // Rich text content
-  category    AnnouncementCategory
-  priority    AnnouncementPriority @default(NORMAL)
-  
-  // Media & attachments
-  attachmentKeys String[] @default([]) // S3 keys for PDFs, documents
-  imageKeys      String[] @default([]) // S3 keys for images/posters
-  
-  // Visibility & control
-  audience           AnnouncementAudience @default(PUBLIC)
-  sendNotifications  Boolean             @default(false)
-  isPinned          Boolean             @default(false)
-  showInHomeBanner  Boolean             @default(false)
-  
-  // Scheduling
-  publishDate DateTime @default(now())
-  expiryDate  DateTime?
-  
-  // Recurring announcements
-  isRecurring     Boolean        @default(false)
-  recurrenceType  RecurrenceType @default(NONE)
-  recurrenceInterval Int?        // For custom intervals (e.g., every 2 hours)
-  lastRecurrenceRun DateTime?    // Track last time recurring announcement was processed
-  
-  // Metadata
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String   // Admin user ID who created this
-  
-  // Soft delete
-  isDeleted Boolean @default(false)
-  deletedAt DateTime?
-  
-  @@map("announcement")
 }
 
 model Batch {
@@ -607,4 +540,46 @@ model Resume {
   @@index([userId])
   @@map("resume")
 }
+
+model Roadmap {
+  id          String   @id @default(cuid())
+  slug        String   @unique // e.g. "frontend-developer", "backend-developer"
+  title       String
+  description String   @db.Text
+  category    String   // "web-dev", "systems", "cloud-devops", "ai-ml", "cybersecurity", "dsa"
+  badgeText   String?  @default("Core Track")
+  iconName    String?  @default("Compass")
+  nodesJson   String   @db.Text // JSON Array of nodes & positions
+  edgesJson   String   @db.Text // JSON Array of connections & styles
+  isPublished Boolean  @default(true)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+
+  userProgress UserRoadmapProgress[]
+
+  @@map("roadmap")
+}
+
+model UserRoadmapProgress {
+  id                String   @id @default(cuid())
+  userId            String
+  roadmapId         String
+  completedNodeIds  String[] @default([])
+  inProgressNodeIds String[] @default([])
+  percentage        Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roadmap Roadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roadmapId])
+  @@index([userId])
+  @@index([roadmapId])
+  @@map("user_roadmap_progress")
+}
+
+
 

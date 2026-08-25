@@ -27,7 +27,11 @@ import type { ResumeTemplate } from "@/lib/resume/types";
 interface TemplateSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectTemplate: (template: ResumeTemplate, mode: "latex" | "visual", title: string) => void;
+  onSelectTemplate: (
+    template: ResumeTemplate,
+    mode: "latex" | "visual",
+    title: string,
+  ) => void;
 }
 
 export function TemplateSelectorModal({
@@ -35,15 +39,19 @@ export function TemplateSelectorModal({
   onClose,
   onSelectTemplate,
 }: TemplateSelectorModalProps) {
-  const [selectedTemplate, setSelectedTemplate] = useState<ResumeTemplate>(RESUME_TEMPLATES[0]);
-  const [selectedMode, setSelectedMode] = useState<"latex" | "visual">("latex");
+  const [selectedTemplate, setSelectedTemplate] = useState<ResumeTemplate>(
+    RESUME_TEMPLATES[0],
+  );
+  const [selectedMode, setSelectedMode] = useState<"latex" | "visual">(
+    "visual",
+  );
   const [resumeTitle, setResumeTitle] = useState("My Software Engineer Resume");
 
   const handleConfirm = () => {
     onSelectTemplate(
       selectedTemplate,
       selectedMode,
-      resumeTitle || `${selectedTemplate.name} - Resume`
+      resumeTitle || `${selectedTemplate.name} - Resume`,
     );
   };
 
@@ -65,7 +73,8 @@ export function TemplateSelectorModal({
                   Choose an ATS Resume Template
                 </SheetTitle>
                 <SheetDescription className="text-xs sm:text-sm text-muted-foreground">
-                  Select an ATS layout and start with Overleaf LaTeX or Canva Visual builder.
+                  Select an ATS layout and start with Overleaf LaTeX or Canva
+                  Visual builder.
                 </SheetDescription>
               </div>
             </div>
@@ -100,27 +109,6 @@ export function TemplateSelectorModal({
             </Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div
-                onClick={() => setSelectedMode("latex")}
-                className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
-                  selectedMode === "latex"
-                    ? "border-primary bg-primary/10 shadow-xs"
-                    : "border-border/60 bg-card hover:border-primary/40"
-                }`}
-              >
-                <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5 shrink-0">
-                  <Code2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-foreground block">
-                    Overleaf LaTeX Mode
-                  </span>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                    Monaco editor with LaTeX syntax highlighting, instant AST live preview, and .tex source export.
-                  </p>
-                </div>
-              </div>
-
-              <div
                 onClick={() => setSelectedMode("visual")}
                 className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
                   selectedMode === "visual"
@@ -136,7 +124,30 @@ export function TemplateSelectorModal({
                     Canva Visual Mode
                   </span>
                   <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                    Section forms, drag-and-drop ordering, custom color palettes, and typography.
+                    Section forms, drag-and-drop ordering, custom color
+                    palettes, and typography.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSelectedMode("latex")}
+                className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
+                  selectedMode === "latex"
+                    ? "border-primary bg-primary/10 shadow-xs"
+                    : "border-border/60 bg-card hover:border-primary/40"
+                }`}
+              >
+                <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5 shrink-0">
+                  <Code2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-foreground block">
+                    Overleaf LaTeX Mode
+                  </span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                    Monaco editor with LaTeX syntax highlighting, instant AST
+                    live preview, and .tex source export.
                   </p>
                 </div>
               </div>
@@ -172,11 +183,12 @@ export function TemplateSelectorModal({
                     }`}
                   >
                     {/* Header Thumbnail Preview Accent */}
-                    <div
-                      className="h-20 rounded-lg bg-muted/60 p-3 flex flex-col justify-between border border-border/40"
-                    >
+                    <div className="h-20 rounded-lg bg-muted/60 p-3 flex flex-col justify-between border border-border/40">
                       <div className="flex items-center justify-between">
-                        <Badge variant="outline" className="text-[10px] font-semibold bg-background">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-semibold bg-background"
+                        >
                           {tmpl.badgeText}
                         </Badge>
                         {isSelected && (
@@ -193,7 +205,9 @@ export function TemplateSelectorModal({
                     </div>
 
                     <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-foreground">{tmpl.name}</h4>
+                      <h4 className="text-xs font-bold text-foreground">
+                        {tmpl.name}
+                      </h4>
                       <p className="text-[11px] text-muted-foreground line-clamp-2">
                         {tmpl.description}
                       </p>
@@ -207,7 +221,12 @@ export function TemplateSelectorModal({
 
         {/* ── Fixed Sticky Footer ── */}
         <div className="shrink-0 p-4 px-6 border-t border-border/60 bg-background flex items-center justify-between gap-3 z-10">
-          <Button variant="outline" size="sm" onClick={onClose} className="text-xs">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className="text-xs"
+          >
             Cancel
           </Button>
           <Button

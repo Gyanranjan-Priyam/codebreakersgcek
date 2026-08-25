@@ -2,13 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { getAttendanceSessionByNumber, getAllMembers, getSessionAttendance } from "../actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, Clock, User } from "lucide-react";
-import Link from "next/link";
+import { Calendar, Clock, User, Layers } from "lucide-react";
 import { format } from "date-fns";
 import MemberAttendanceList from "./_components/member-attendance-list";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 interface PageProps {
   params: Promise<{
@@ -31,6 +30,15 @@ export default async function SessionDetailPage({ params }: PageProps) {
   }
 
   const session = result.data;
+
+  // Get target batches details if restricted
+  const targetBatches =
+    session.targetBatchIds && session.targetBatchIds.length > 0
+      ? await prisma.batch.findMany({
+          where: { id: { in: session.targetBatchIds } },
+          select: { id: true, name: true, code: true },
+        })
+      : [];
 
   // Get current admin user
   const authSession = await auth.api.getSession({
@@ -58,13 +66,26 @@ export default async function SessionDetailPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       <div>
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Session #{session.sessionNumber}
           </h1>
           <Badge variant="secondary" className="text-base">
             {session.day}
           </Badge>
+          {targetBatches.length > 0 ? (
+            targetBatches.map((b) => (
+              <Badge key={b.id} variant="default" className="text-sm font-mono flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5" />
+                <span>Batch: {b.code}</span>
+              </Badge>
+            ))
+          ) : (
+            <Badge variant="outline" className="text-sm text-muted-foreground flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5" />
+              <span>All Batches (Global)</span>
+            </Badge>
+          )}
         </div>
         <p className="text-muted-foreground">
           View attendance session details and manage member attendance
@@ -85,6 +106,26 @@ export default async function SessionDetailPage({ params }: PageProps) {
               <div className="flex-1">
                 <p className="text-sm font-medium text-muted-foreground">Session Title</p>
                 <p className="text-lg font-semibold">{session.title}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-amber-500/10 p-2">
+                <Layers className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Target Batch</p>
+                {targetBatches.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {targetBatches.map((b) => (
+                      <Badge key={b.id} variant="default" className="font-mono">
+                        {b.name} ({b.code})
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-base font-semibold">All Batches (Open to all students)</p>
+                )}
               </div>
             </div>
 

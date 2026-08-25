@@ -1,5 +1,5 @@
 "use client";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Code2, Terminal, GitBranch } from "lucide-react";
 import { FlipWords } from "../ui/flip-words";

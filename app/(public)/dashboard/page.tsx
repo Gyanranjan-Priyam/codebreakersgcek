@@ -1,17 +1,23 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  LayoutDashboard, 
-  Calendar, 
+import { Progress } from "@/components/ui/progress";
+import {
+  Trophy,
   Settings,
-  Bell,
-  TrendingUp,
-  Sparkles,
-  CheckCircle2,
-  AlertCircle,
-  ArrowRight
+  CheckSquare,
+  BrainCircuit,
+  Compass,
+  FileText,
+  Receipt,
+  FolderGit,
+  ArrowUpRight,
+  ShieldCheck,
+  ChevronRight,
+  Activity,
+  Layers,
+  Code2,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -19,15 +25,13 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getUserDashboardData } from "./actions";
-import { DashboardStatsCards } from "./_components/dashboard-stats-cards";
-import { RecentActivities } from "./_components/recent-activities";
-import { AnnouncementBanner } from "./_components/announcement-banner";
-import { Progress } from "@/components/ui/progress";
+import { AnalyticsGraphCard } from "./_components/analytics-graph-card";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "Your CodeBreakers dashboard - View your stats, activities, and upcoming events",
+  title: "Student Dashboard | CodeBreakers",
+  description:
+    "Your CodeBreakers learning hub - Track your points, assignments, quizzes, and learning roadmaps",
 };
 
 export default async function UserDashboard() {
@@ -45,48 +49,35 @@ export default async function UserDashboard() {
 
   if (dashboardResult.status === "error") {
     return (
-      <div className="container mx-auto py-6">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Error</CardTitle>
-            <CardDescription>
-              {dashboardResult.message}
-            </CardDescription>
-          </CardHeader>
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <Card className="border-destructive/60 bg-card p-6">
+          <h2 className="text-base font-bold text-destructive font-mono">
+            Unable to load dashboard data
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            {dashboardResult.message}
+          </p>
         </Card>
       </div>
     );
   }
 
-  const { stats, recentActivities, bannerAnnouncements, user } = dashboardResult.data;
+  const { stats, recentActivities, roadmaps = [], user } = dashboardResult.data;
 
-  // Get profile image URL - prioritize profileImageKey from S3
-  const getProfileImageUrl = () => {
-    if (user.profileImageKey) {
-      return `https://codebreakers.t3.storage.dev/${user.profileImageKey}`;
-    }
-    return user.image || "";
-  };
-
-  const profileImageUrl = getProfileImageUrl();
+  const profileImageUrl = user.profileImageKey
+    ? `https://codebreakers.t3.storage.dev/${user.profileImageKey}`
+    : user.image || "";
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
 
-  const getCurrentGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
-
-  // Calculate real-time profile completion based on filled fields
+  // Calculate real-time profile completion based on essential fields
   const calculateProfileCompletion = () => {
     const fields = [
       user.name,
@@ -94,199 +85,431 @@ export default async function UserDashboard() {
       user.emailVerified,
       user.mobileNumber,
       user.whatsappNumber,
-      user.state,
-      user.district,
-      user.collegeName,
       user.username,
-      user.firstName,
-      user.lastName,
       user.registration,
-      user.rollNumber,
       user.branch,
       user.admissionYear,
-      user.address,
-      user.pinCode,
-      user.image,
     ];
-    
-    const filledFields = fields.filter(field => {
-      if (typeof field === 'boolean') return field === true;
-      return field !== null && field !== undefined && field !== '';
+
+    const filledFields = fields.filter((field) => {
+      if (typeof field === "boolean") return field === true;
+      return field !== null && field !== undefined && field !== "";
     }).length;
-    
+
     return Math.round((filledFields / fields.length) * 100);
   };
 
   const profileCompletion = calculateProfileCompletion();
-  
-  // Get completed profile items
-  const completedItems = [
-    { condition: user.emailVerified, label: 'Email Verified' },
-    { condition: user.name && user.email, label: 'Basic Info Added' },
-    { condition: user.mobileNumber || user.whatsappNumber, label: 'Contact Info Added' },
-    { condition: user.collegeName && user.branch, label: 'Academic Info Added' },
-    { condition: user.username, label: 'Username Set' },
-    { condition: user.githubUsername, label: 'GitHub Connected' },
-  ].filter(item => item.condition); 
+
+  // 4 Core Flat Metric Cards
+  const coreStats = [
+    {
+      title: "Total Points",
+      value: stats.totalPoints.toLocaleString(),
+      subtext: `${stats.attendancePoints || 0} Att • ${stats.taskPoints || 0} Task • ${stats.quizPoints || 0} Quiz`,
+      actionLabel: "Leaderboard",
+      actionHref: "/dashboard/leaderboard",
+      icon: Trophy,
+    },
+    {
+      title: "Active Quizzes",
+      value: stats.activeQuizzes,
+      subtext: stats.activeQuizzes > 0 ? "Ready to attempt" : "No active tests",
+      actionLabel: "Take Quiz",
+      actionHref: "/dashboard/activities/quizzes",
+      icon: BrainCircuit,
+    },
+    {
+      title: "Pending Tasks",
+      value: stats.pendingTasks,
+      subtext:
+        stats.pendingTasks > 0 ? "Awaiting submission" : "All tasks done",
+      actionLabel: "View Tasks",
+      actionHref: "/dashboard/activities/tasks",
+      icon: CheckSquare,
+    },
+    {
+      title: "Active Roadmaps",
+      value: roadmaps.length,
+      subtext:
+        roadmaps.length > 0 ? "Curriculum in progress" : "Explore tracks",
+      actionLabel: "Roadmaps",
+      actionHref: "/dashboard/roadmaps",
+      icon: Compass,
+    },
+  ];
+
+  // Quick Action Shortcut Hub
+  const userShortcuts = [
+    {
+      title: "Learning Roadmaps",
+      desc: "Interactive skill trees & concept paths",
+      href: "/dashboard/roadmaps",
+      icon: Compass,
+    },
+    {
+      title: "Cohort Leaderboard",
+      desc: "Check rankings & performance",
+      href: "/dashboard/leaderboard",
+      icon: Trophy,
+    },
+    {
+      title: "Resume Builder",
+      desc: "Create ATS-compliant developer resume",
+      href: "/dashboard/resume-builder",
+      icon: FileText,
+    },
+    {
+      title: "Projects & Code",
+      desc: "Manage submissions & showcase apps",
+      href: "/dashboard/projects/my-projects",
+      icon: FolderGit,
+    },
+    {
+      title: "Receipts & History",
+      desc: "Transactions & verified payment logs",
+      href: "/dashboard/transactions",
+      icon: Receipt,
+    },
+  ];
 
   return (
-    <div className="container mx-auto py-4 sm:py-6 space-y-6 sm:space-y-8 px-4 sm:px-6">
-      {/* Announcement Banner */}
-      {bannerAnnouncements && bannerAnnouncements.length > 0 && (
-        <AnnouncementBanner announcements={bannerAnnouncements} />
-      )}
+    <div className="p-4 sm:p-6 lg:p-8 max-w-8xl mx-auto w-full space-y-6">
+      {/* ── 1. Student Header HUD ── */}
+      <div className="p-5 rounded-xl border border-border/80 bg-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <Avatar className="w-14 h-14 rounded-lg border border-border/70 shrink-0">
+            <AvatarImage src={profileImageUrl} alt={user.name || "Student"} />
+            <AvatarFallback className="rounded-lg font-mono font-bold text-sm bg-muted">
+              {getInitials(user.name || "User")}
+            </AvatarFallback>
+          </Avatar>
 
-      {/* Welcome Header */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <Avatar className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-primary/10">
-              <AvatarImage src={profileImageUrl} alt={user.name || "User"} />
-              <AvatarFallback className="text-sm sm:text-lg font-semibold bg-primary/5 text-primary">
-                {getInitials(user.name || "User")}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                {getCurrentGreeting()}, {user.name?.split(' ')[0] || 'there'}!
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+                {user.name}
               </h1>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Here's what's happening with your activities today.
-              </p>
+              {user.emailVerified && (
+                <span title="Verified Account">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                </span>
+              )}
+              {user.batch && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-mono uppercase bg-muted/40 border-border/70"
+                >
+                  <Layers className="w-3 h-3 mr-1" />
+                  {user.batch.code}
+                </Badge>
+              )}
             </div>
-          </div>
-          <div className="flex items-center gap-2 sm:shrink-0">
-            <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm">
-              <Link href="/dashboard/settings">
-                <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Settings</span>
-                <span className="sm:hidden">Settings</span>
-              </Link>
-            </Button>
+
+            <p className="text-xs text-muted-foreground font-mono truncate">
+              {user.registration ? `Reg: ${user.registration}` : user.email}
+              {user.branch ? ` • ${user.branch}` : ""}
+              {user.admissionYear ? ` • Class of ${user.admissionYear}` : ""}
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="truncate">Today is {format(new Date(), "EEEE, MMMM do, yyyy")}</span>
-          </div>
-          <Separator orientation="vertical" className="hidden sm:block h-4" />
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="h-8 text-xs font-mono gap-1.5"
+          >
+            <Link href="/dashboard/settings" prefetch={true}>
+              <Settings className="w-3.5 h-3.5" />
+              Settings
+            </Link>
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            asChild
+            className="h-8 text-xs font-mono gap-1.5"
+          >
+            <Link href="/dashboard/activities/tasks" prefetch={true}>
+              <CheckSquare className="w-3.5 h-3.5" />
+              My Tasks
+            </Link>
+          </Button>
         </div>
       </div>
 
-      <Separator />
+      {/* ── 2. Flat Geometric 4-KPI Grid ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {coreStats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Card
+              key={stat.title}
+              className="p-4 border border-border/80 bg-card flex flex-col justify-between space-y-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-medium truncate">
+                  {stat.title}
+                </span>
+                <div className="p-1.5 rounded-md bg-muted/60 border border-border/40 shrink-0">
+                  <Icon className="w-3.5 h-3.5 text-foreground" />
+                </div>
+              </div>
 
-      {/* Dashboard Stats */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          <h2 className="text-xl font-semibold">Overview</h2>
-        </div>
-        <DashboardStatsCards stats={stats} />
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight font-mono">
+                  {stat.value}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">
+                  {stat.subtext}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-border/40 flex items-center justify-between">
+                <Link
+                  href={stat.actionHref}
+                  prefetch={true}
+                  className="text-[11px] font-mono text-foreground hover:underline inline-flex items-center gap-1"
+                >
+                  <span>{stat.actionLabel}</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
-        {/* Left Column - Main Content */}
-        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-          
-          {/* Action Items / Pending Tasks */}
-          {stats.pendingTasks > 0 && (
-            <Card className="border-l-4 border-l-blue-500">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
-                  Action Items
-                </CardTitle>
-                <CardDescription>
-                  You have {stats.pendingTasks} pending tasks that require your attention.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="secondary" size="sm" asChild>
-                  <Link href="/dashboard/activities/tasks" className="flex items-center">
-                    View Pending Tasks <ArrowRight className="ml-2 w-4 h-4" />
+      {/* ── 3. Main Work Area Split (2 Columns) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Analytics Velocity Graph, Roadmaps in Progress & Recent Activity Ledger */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* 📈 Learning Velocity & Points Sparkline Chart */}
+          <AnalyticsGraphCard stats={stats} recentActivities={recentActivities} />
+
+          {/* Active Roadmaps Track */}
+          {roadmaps.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Compass className="w-4 h-4 text-foreground" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground">
+                    Enrolled Roadmaps
+                  </h2>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className="h-6 text-[11px] font-mono text-muted-foreground hover:text-foreground"
+                >
+                  <Link href="/dashboard/roadmaps" prefetch={true}>
+                    View All
+                    <ChevronRight className="w-3 h-3 ml-0.5" />
                   </Link>
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {roadmaps.map((r) => {
+                  const percent = Math.round(r.percentage || 0);
+                  return (
+                    <Card
+                      key={r.id}
+                      className="p-4 border border-border/80 bg-card space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] font-mono uppercase"
+                        >
+                          {r.roadmap.category || "Track"}
+                        </Badge>
+                        <span className="text-xs font-mono font-bold">
+                          {percent}%
+                        </span>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-bold text-foreground truncate">
+                          {r.roadmap.title}
+                        </h3>
+                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                          {r.completedNodeIds.length} topics mastered
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Progress value={percent} className="h-1.5" />
+                        <div className="flex justify-end pt-1">
+                          <Link
+                            href={`/dashboard/roadmaps/${r.roadmap.slug}`}
+                            prefetch={true}
+                            className="text-[11px] font-mono font-medium hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>Continue Track</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
-          {/* Recent Activities */}
-          <RecentActivities activities={recentActivities} />
+          {/* Recent Activity Ledger */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-foreground" />
+                <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground">
+                  Recent Activity Ledger
+                </h2>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                {recentActivities.length} logs
+              </span>
+            </div>
 
+            <Card className="border border-border/80 bg-card overflow-hidden">
+              {recentActivities.length > 0 ? (
+                <div className="divide-y divide-border/40">
+                  {recentActivities.map((act) => (
+                    <div
+                      key={act.id}
+                      className="p-3.5 flex items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] font-mono uppercase h-4 px-1.5 py-0"
+                          >
+                            {act.type}
+                          </Badge>
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {act.title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground font-mono truncate">
+                          {act.description}
+                        </p>
+                      </div>
+
+                      <div className="text-right shrink-0 space-y-0.5">
+                        {act.points !== undefined && act.points > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] font-mono font-bold h-4 px-1.5 py-0"
+                          >
+                            +{act.points} pts
+                          </Badge>
+                        )}
+                        <p className="text-[10px] text-muted-foreground font-mono">
+                          {format(new Date(act.date), "MMM d, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-xs text-muted-foreground font-mono">
+                  No activity recorded yet. Start participating in tasks,
+                  quizzes, or attendance sessions!
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
 
-        {/* Right Column - Sidebar */}
-        <div className="space-y-6 sm:space-y-8">
-          
-          {/* Profile Summary */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base sm:text-lg">Profile Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Completion</span>
-                  <span className="font-medium">{profileCompletion}%</span>
-                </div>
-                <Progress value={profileCompletion} className="h-2" />
+        {/* Right Column: Academic Standing & Quick Action Hub */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* Student Academic Standing */}
+          <Card className="border border-border/80 bg-card p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
+              <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
+                Profile Standing
+              </h3>
+              <Badge variant="outline" className="text-[10px] font-mono">
+                {profileCompletion}% Complete
+              </Badge>
+            </div>
+
+            <div className="space-y-1.5">
+              <Progress value={profileCompletion} className="h-1.5" />
+              <p className="text-[11px] text-muted-foreground font-mono">
+                {profileCompletion >= 80
+                  ? "Profile verified and active"
+                  : "Complete remaining details in settings"}
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs font-mono">
+              <div className="flex items-center justify-between py-1 border-b border-border/30 text-muted-foreground">
+                <span>Branch</span>
+                <span className="text-foreground font-semibold">
+                  {user.branch || "General"}
+                </span>
               </div>
-              <div className="pt-2 space-y-2">
-                {completedItems.length > 0 ? (
-                  completedItems.slice(0, 4).map((item, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      <span>{item.label}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <AlertCircle className="w-4 h-4 text-orange-500" />
-                    <span>Complete your profile to get started</span>
-                  </div>
-                )}
+              <div className="flex items-center justify-between py-1 text-muted-foreground">
+                <span>Batch Cohort</span>
+                <span className="text-foreground font-semibold">
+                  {user.batch?.code || "Unassigned"}
+                </span>
               </div>
-              <Button variant="outline" className="w-full text-sm mt-2" asChild>
-                <Link href="/dashboard/settings">
-                  Complete Profile
-                </Link>
-              </Button>
-            </CardContent>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="w-full h-8 text-xs font-mono"
+            >
+              <Link href="/dashboard/settings" prefetch={true}>
+                Update Profile Info
+              </Link>
+            </Button>
           </Card>
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="ghost" className="w-full justify-start text-sm" asChild>
-                <Link href="/dashboard/events">
-                  <Calendar className="w-4 h-4 mr-2 text-primary" />
-                  Browse All Events
-                </Link>
-              </Button>
-              
-              <Button variant="ghost" className="w-full justify-start text-sm" asChild>
-                <Link href="/dashboard/activities/quizzes">
-                  <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
-                  Take a Quiz
-                </Link>
-              </Button>
+          {/* Quick Access Navigation Hub */}
+          <Card className="border border-border/80 bg-card p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground border-b border-border/40 pb-2">
+              Quick Shortcuts
+            </h3>
 
-              <Button variant="ghost" className="w-full justify-start text-sm" asChild>
-                <Link href="/dashboard/support">
-                  <Bell className="w-4 h-4 mr-2 text-orange-500" />
-                  Contact Support
-                </Link>
-              </Button>
-            </CardContent>
+            <div className="space-y-1.5">
+              {userShortcuts.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.title}
+                    href={item.href}
+                    prefetch={true}
+                    className="p-2.5 rounded-lg border border-transparent hover:border-border/60 hover:bg-muted/40 transition-colors flex items-center justify-between gap-3 group block"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1.5 rounded-md bg-muted/60 text-foreground shrink-0">
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                          {item.title}
+                        </h4>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </div>
+
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
           </Card>
         </div>
       </div>

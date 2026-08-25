@@ -30,6 +30,7 @@ export interface UserTransactionItem {
   verifiedAt: string | null;
   verifierName: string | null;
   notifications: TransactionNotification[];
+  formDefinition?: any;
 }
 
 export interface UserTransactionsSummary {
@@ -59,6 +60,17 @@ export interface UserTransactionsResponse {
   user: UserProfileInfo;
   transactions: UserTransactionItem[];
   summary: UserTransactionsSummary;
+}
+
+function isValidTransactionId(txId: string | null | undefined): boolean {
+  if (!txId || typeof txId !== "string") return false;
+  const trimmed = txId.trim();
+  if (trimmed.length < 3) return false;
+  const lower = trimmed.toLowerCase();
+  if (["null", "undefined", "n/a", "na", "none", "nil", "0", "0000", "dummy", "fake"].includes(lower)) {
+    return false;
+  }
+  return true;
 }
 
 function cleanDigits(val: string | null | undefined): string {
@@ -165,8 +177,13 @@ export async function getUserTransactionsData(): Promise<UserTransactionsRespons
     },
   });
 
-  // Filter responses that belong to this user
+  // Filter responses that belong to this user AND have a valid Transaction ID
   const userResponses = allFormResponses.filter((res) => {
+    // 0. Filter: Do not show forms in the Transaction section if they do not contain a valid Transaction ID
+    if (!isValidTransactionId(res.transactionId)) {
+      return false;
+    }
+
     // 1. Direct submitter linkage
     if (res.submittedById && res.submittedById === user.id) {
       return true;
@@ -300,6 +317,7 @@ export async function getUserTransactionsData(): Promise<UserTransactionsRespons
       verifiedAt: res.verifiedAt ? res.verifiedAt.toISOString() : null,
       verifierName: res.verifiedBy?.name || null,
       notifications,
+      formDefinition: res.form?.definition || null,
     };
   });
 

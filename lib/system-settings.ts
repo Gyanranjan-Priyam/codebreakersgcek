@@ -13,7 +13,8 @@ export async function isRegistrationEnabled(): Promise<boolean> {
         data: {
           key: "registration_enabled",
           value: "true",
-          description: "Controls whether user registration is enabled or disabled",
+          description:
+            "Controls whether user registration is enabled or disabled",
         },
       });
     }
@@ -26,7 +27,10 @@ export async function isRegistrationEnabled(): Promise<boolean> {
   }
 }
 
-export async function getSystemSetting(key: string, defaultValue?: string): Promise<string | null> {
+export async function getSystemSetting(
+  key: string,
+  defaultValue?: string,
+): Promise<string | null> {
   try {
     const setting = await prisma.systemSettings.findUnique({
       where: { key },

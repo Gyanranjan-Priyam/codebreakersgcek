@@ -134,7 +134,8 @@ export async function verifyEmailChangeOTP(newEmail: string, otp: string) {
     if (!record) {
       return {
         status: "error" as const,
-        message: "The verification code has expired or is invalid. Please request a new one.",
+        message:
+          "The verification code has expired or is invalid. Please request a new one.",
       };
     }
 
@@ -156,7 +157,8 @@ export async function verifyEmailChangeOTP(newEmail: string, otp: string) {
     if (existingUser) {
       return {
         status: "error" as const,
-        message: "This email address was claimed by another account. Please use a different email.",
+        message:
+          "This email address was claimed by another account. Please use a different email.",
       };
     }
 
@@ -186,7 +188,8 @@ export async function verifyEmailChangeOTP(newEmail: string, otp: string) {
 
     return {
       status: "success" as const,
-      message: "Email address updated successfully! You can now log in with your new email.",
+      message:
+        "Email address updated successfully! You can now log in with your new email.",
       newEmail: trimmedEmail,
     };
   } catch (error) {

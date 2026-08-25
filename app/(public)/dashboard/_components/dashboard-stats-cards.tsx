@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Bell, Trophy, CheckSquare, BrainCircuit, Calendar, ArrowRight, Info } from "lucide-react";
+import {  Trophy, CheckSquare, BrainCircuit, Calendar, ArrowRight, Info } from "lucide-react";
 import { DashboardStats } from "../actions";
 import Link from "next/link";
 

@@ -1,11 +1,14 @@
 /**
  * Example usage of the External Data API Client
- * 
+ *
  * This file demonstrates various ways to use the API client
  * for different use cases and scenarios.
  */
 
-import { createExternalAPIClient, ExternalAPIError } from '@/lib/external-api-client';
+import {
+  createExternalAPIClient,
+  ExternalAPIError,
+} from "@/lib/external-api-client";
 
 // Initialize the client
 const client = createExternalAPIClient({
@@ -18,7 +21,7 @@ const client = createExternalAPIClient({
 async function fetchCSEStudents() {
   try {
     const response = await client.users.list({
-      branch: 'CSE',
+      branch: "CSE",
       profileComplete: true,
       limit: 50,
     });
@@ -27,21 +30,26 @@ async function fetchCSEStudents() {
     console.log(`Fetched ${response.data.length} students`);
 
     response.data.forEach((user) => {
-      console.log(`${user.name} (${user.email}) - ${user.githubUsername || 'No GitHub'}`);
+      console.log(
+        `${user.name} (${user.email}) - ${user.githubUsername || "No GitHub"}`,
+      );
     });
 
     return response.data;
   } catch (error) {
     if (error instanceof ExternalAPIError) {
       if (error.isRateLimitError()) {
-        console.error('Rate limit exceeded. Retry after:', error.getRetryAfter());
+        console.error(
+          "Rate limit exceeded. Retry after:",
+          error.getRetryAfter(),
+        );
       } else if (error.isAuthError()) {
-        console.error('Authentication failed. Check your API key.');
+        console.error("Authentication failed. Check your API key.");
       } else {
-        console.error('API Error:', error.message);
+        console.error("API Error:", error.message);
       }
     } else {
-      console.error('Unexpected error:', error);
+      console.error("Unexpected error:", error);
     }
   }
 }
@@ -60,7 +68,7 @@ async function fetchActiveQuizzes() {
         Duration: ${quiz.duration} minutes
         Points per question: ${quiz.pointsPerQuestion}
         Sets: ${quiz.sets}
-        Start: ${quiz.startDateTime || 'Not scheduled'}
+        Start: ${quiz.startDateTime || "Not scheduled"}
       `);
     }
 
@@ -82,20 +90,20 @@ async function fetchQuizWithResults(includeResults = true) {
 
     for (const quiz of response.data) {
       console.log(`\nQuiz: ${quiz.title}`);
-      
+
       if (quiz.attempts) {
         console.log(`Total attempts: ${quiz.attempts.length}`);
-        
+
         // Calculate statistics
         const scores = quiz.attempts
-          .filter(a => a.completedAt)
-          .map(a => a.score);
-        
+          .filter((a) => a.completedAt)
+          .map((a) => a.score);
+
         if (scores.length > 0) {
           const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
           const maxScore = Math.max(...scores);
           const minScore = Math.min(...scores);
-          
+
           console.log(`Average Score: ${avgScore.toFixed(2)}`);
           console.log(`Highest Score: ${maxScore}`);
           console.log(`Lowest Score: ${minScore}`);
@@ -108,34 +116,6 @@ async function fetchQuizWithResults(includeResults = true) {
     handleAPIError(error);
   }
 }
-
-// ==================== Example 4: Fetch Announcements ====================
-
-async function fetchRecentAnnouncements() {
-  try {
-    const response = await client.announcements.list({
-      limit: 20,
-      offset: 0,
-    });
-
-    console.log(`Total announcements: ${response.metadata.totalCount}`);
-
-    response.data.forEach((announcement) => {
-      console.log(`
-        [${announcement.priority}] ${announcement.title}
-        Category: ${announcement.category}
-        Published: ${new Date(announcement.publishDate).toLocaleDateString()}
-        Pinned: ${announcement.isPinned ? 'Yes' : 'No'}
-      `);
-    });
-
-    return response.data;
-  } catch (error) {
-    handleAPIError(error);
-  }
-}
-
-
 
 // ==================== Example 6: Pagination ====================
 
@@ -153,7 +133,9 @@ async function fetchAllUsers() {
       });
 
       allUsers.push(...response.data);
-      console.log(`Fetched ${allUsers.length} / ${response.metadata.totalCount} users`);
+      console.log(
+        `Fetched ${allUsers.length} / ${response.metadata.totalCount} users`,
+      );
 
       if (!response.metadata.hasMore) {
         break;
@@ -179,9 +161,8 @@ async function fetchDatabaseSummary() {
     const response = await client.all();
     const { summary, systemSettings } = response.data;
 
-    console.log('\n=== Database Summary ===');
+    console.log("\n=== Database Summary ===");
     console.log(`Users: ${summary.totalUsers}`);
-    console.log(`Announcements: ${summary.totalAnnouncements}`);
     console.log(`Attendance Sessions: ${summary.totalAttendanceSessions}`);
     console.log(`Tasks: ${summary.totalTasks}`);
     console.log(`Events: ${summary.totalEvents}`);
@@ -190,7 +171,7 @@ async function fetchDatabaseSummary() {
     console.log(`Project Reviews: ${summary.totalProjectReviews}`);
     console.log(`Resource Folders: ${summary.totalResourceFolders}`);
 
-    console.log('\n=== System Settings ===');
+    console.log("\n=== System Settings ===");
     systemSettings.forEach((setting) => {
       console.log(`${setting.key}: ${setting.value}`);
     });
@@ -212,27 +193,27 @@ async function exportUsersToCSV(branch?: string) {
     });
 
     // Create CSV header
-    const headers = ['Name', 'Email', 'Branch', 'Admission Year', 'GitHub'];
-    const csvRows = [headers.join(',')];
+    const headers = ["Name", "Email", "Branch", "Admission Year", "GitHub"];
+    const csvRows = [headers.join(",")];
 
     // Add user data
     response.data.forEach((user) => {
       const row = [
         user.name,
         user.email,
-        user.branch || '',
-        user.admissionYear || '',
-        user.githubUsername || '',
+        user.branch || "",
+        user.admissionYear || "",
+        user.githubUsername || "",
       ];
-      csvRows.push(row.join(','));
+      csvRows.push(row.join(","));
     });
 
-    const csv = csvRows.join('\n');
-    
+    const csv = csvRows.join("\n");
+
     // In Node.js, you could write to file:
     // fs.writeFileSync('users.csv', csv);
-    
-    console.log('CSV generated:', csv.split('\n').length - 1, 'users');
+
+    console.log("CSV generated:", csv.split("\n").length - 1, "users");
     return csv;
   } catch (error) {
     handleAPIError(error);
@@ -250,7 +231,7 @@ async function generateTaskLeaderboard() {
 
     response.data.forEach((task) => {
       task.submissions?.forEach((submission) => {
-        if (submission.status === 'approved') {
+        if (submission.status === "approved") {
           const current = userPoints.get(submission.userId) || 0;
           userPoints.set(submission.userId, current + submission.pointsAwarded);
         }
@@ -263,7 +244,7 @@ async function generateTaskLeaderboard() {
       .sort((a, b) => b.points - a.points)
       .slice(0, 10); // Top 10
 
-    console.log('\n=== Task Completion Leaderboard (Top 10) ===');
+    console.log("\n=== Task Completion Leaderboard (Top 10) ===");
     leaderboard.forEach((entry, index) => {
       console.log(`${index + 1}. User ${entry.userId}: ${entry.points} points`);
     });
@@ -279,24 +260,19 @@ async function generateTaskLeaderboard() {
 async function fetchDashboardData() {
   try {
     // Fetch multiple resources in parallel
-    const [
-      summaryRes,
-      recentAnnouncementsRes,
-      activeQuizzesRes,
-    ] = await Promise.all([
-      client.all(),
-      client.announcements.list({ limit: 5 }),
-      client.quizzes.active(5),
-    ]);
+    const [summaryRes, activeQuizzesRes] =
+      await Promise.all([
+        client.all(),
+        client.quizzes.active(5),
+      ]);
 
     const dashboardData = {
       summary: summaryRes.data.summary,
-      recentAnnouncements: recentAnnouncementsRes.data,
       activeQuizzes: activeQuizzesRes.data,
       lastUpdated: new Date().toISOString(),
     };
 
-    console.log('Dashboard data fetched successfully');
+    console.log("Dashboard data fetched successfully");
     return dashboardData;
   } catch (error) {
     handleAPIError(error);
@@ -308,19 +284,19 @@ async function fetchDashboardData() {
 function handleAPIError(error: unknown) {
   if (error instanceof ExternalAPIError) {
     console.error(`API Error [${error.code}]:`, error.message);
-    
+
     if (error.isRateLimitError()) {
-      console.error('Rate limit exceeded. Please wait before retrying.');
-      console.error('Retry after:', error.getRetryAfter());
+      console.error("Rate limit exceeded. Please wait before retrying.");
+      console.error("Retry after:", error.getRetryAfter());
     } else if (error.isAuthError()) {
-      console.error('Authentication failed. Please check your API key.');
+      console.error("Authentication failed. Please check your API key.");
     }
-    
+
     if (error.details) {
-      console.error('Error details:', error.details);
+      console.error("Error details:", error.details);
     }
   } else {
-    console.error('Unexpected error:', error);
+    console.error("Unexpected error:", error);
   }
 }
 
@@ -334,7 +310,6 @@ export {
   fetchCSEStudents,
   fetchActiveQuizzes,
   fetchQuizWithResults,
-  fetchRecentAnnouncements,
   fetchAllUsers,
   fetchDatabaseSummary,
   exportUsersToCSV,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Edit, Eye, MoreVertical } from "lucide-react";
 import { format } from "date-fns";
 import { AttendanceSessionData, deleteAttendanceSession } from "../actions";
+import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import EditSessionDialog from "./edit-session-dialog";
@@ -44,8 +45,45 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
   const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<AttendanceSessionData | null>(null);
+  const [selectedSession, setSelectedSession] =
+    useState<AttendanceSessionData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [batchesList, setBatchesList] = useState<
+    { id: string; name: string; code: string }[]
+  >([]);
+
+  useEffect(() => {
+    getActiveBatchesList().then((list) => setBatchesList(list));
+  }, []);
+
+  const getBatchLabel = (targetBatchIds?: string[]) => {
+    if (!targetBatchIds || targetBatchIds.length === 0) {
+      return (
+        <Badge variant="outline" className="text-xs text-muted-foreground">
+          All Batches
+        </Badge>
+      );
+    }
+    const matchedBatches = batchesList.filter((b) =>
+      targetBatchIds.includes(b.id),
+    );
+    if (matchedBatches.length === 0) {
+      return (
+        <Badge variant="secondary" className="text-xs">
+          Batch Restricted
+        </Badge>
+      );
+    }
+    return (
+      <div className="flex flex-wrap gap-1">
+        {matchedBatches.map((b) => (
+          <Badge key={b.id} variant="default" className="text-xs font-mono">
+            {b.code}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
 
   const handleDelete = async () => {
     if (!selectedSession) return;
@@ -73,7 +111,8 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <p className="text-muted-foreground">
-          No attendance sessions found. Create your first session to get started.
+          No attendance sessions found. Create your first session to get
+          started.
         </p>
       </div>
     );
@@ -87,6 +126,7 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
             <TableRow>
               <TableHead>Session #</TableHead>
               <TableHead>Title</TableHead>
+              <TableHead>Target Batch</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Day</TableHead>
               <TableHead>Created</TableHead>
@@ -100,6 +140,7 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
                   <Badge variant="outline">#{session.sessionNumber}</Badge>
                 </TableCell>
                 <TableCell>{session.title}</TableCell>
+                <TableCell>{getBatchLabel(session.targetBatchIds)}</TableCell>
                 <TableCell>{format(new Date(session.date), "PPP")}</TableCell>
                 <TableCell>
                   <Badge variant="secondary">{session.day}</Badge>
@@ -119,7 +160,9 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => {
-                          router.push(`/admin/points/attendance/${session.sessionNumber}`);
+                          router.push(
+                            `/admin/points/attendance/${session.sessionNumber}`,
+                          );
                         }}
                       >
                         <Eye className="h-4 w-4 mr-2 text-blue-500" />
@@ -167,8 +210,9 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Session?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete session #{selectedSession?.sessionNumber} - {selectedSession?.title}.
-              This action cannot be undone.
+              This will permanently delete session #
+              {selectedSession?.sessionNumber} - {selectedSession?.title}. This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -27,11 +27,14 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  const overallResult = await getOverallLeaderboard(requestedBatch);
+  // Run overall and monthly leaderboard queries in parallel
+  const [overallResult, monthlyResult] = await Promise.all([
+    getOverallLeaderboard(requestedBatch),
+    getMonthlyLeaderboard(currentYear, currentMonth, requestedBatch),
+  ]);
+
   const overallData = overallResult.status === "success" ? overallResult.data : [];
   const studentBatch = overallResult.studentBatch;
-
-  const monthlyResult = await getMonthlyLeaderboard(currentYear, currentMonth, requestedBatch);
   const monthlyData = monthlyResult.status === "success" ? monthlyResult.data : [];
 
   return (

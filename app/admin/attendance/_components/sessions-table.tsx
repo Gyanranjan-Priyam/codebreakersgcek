@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { Eye, Trash2, MoreVertical, Loader2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { getActiveBatchesList } from "@/app/admin/batches/actions";
 
 interface AttendanceSession {
   id: string;
@@ -40,6 +41,7 @@ interface AttendanceSession {
   title: string;
   date: string;
   day: string;
+  targetBatchIds?: string[];
   _count: {
     attendances: number;
   };
@@ -58,8 +60,45 @@ export default function SessionsTable({
   onSelectSession,
   onSessionDeleted,
 }: SessionsTableProps) {
-  const [sessionToDelete, setSessionToDelete] = useState<AttendanceSession | null>(null);
+  const [sessionToDelete, setSessionToDelete] =
+    useState<AttendanceSession | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [batchesList, setBatchesList] = useState<
+    { id: string; name: string; code: string }[]
+  >([]);
+
+  useEffect(() => {
+    getActiveBatchesList().then((list) => setBatchesList(list));
+  }, []);
+
+  const getBatchLabel = (targetBatchIds?: string[]) => {
+    if (!targetBatchIds || targetBatchIds.length === 0) {
+      return (
+        <Badge variant="outline" className="text-xs text-muted-foreground">
+          All Batches
+        </Badge>
+      );
+    }
+    const matchedBatches = batchesList.filter((b) =>
+      targetBatchIds.includes(b.id),
+    );
+    if (matchedBatches.length === 0) {
+      return (
+        <Badge variant="secondary" className="text-xs">
+          Batch Restricted
+        </Badge>
+      );
+    }
+    return (
+      <div className="flex flex-wrap gap-1">
+        {matchedBatches.map((b) => (
+          <Badge key={b.id} variant="default" className="text-xs font-mono">
+            {b.code}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
 
   const handleDelete = async () => {
     if (!sessionToDelete) return;
@@ -70,13 +109,15 @@ export default function SessionsTable({
         `/api/admin/attendance/sessions?id=${sessionToDelete.id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        toast.success(`Session #${sessionToDelete.sessionNumber} deleted successfully`);
+        toast.success(
+          `Session #${sessionToDelete.sessionNumber} deleted successfully`,
+        );
         setSessionToDelete(null);
         onSessionDeleted?.();
       } else {
@@ -106,6 +147,7 @@ export default function SessionsTable({
             <TableRow>
               <TableHead className="w-[100px]">Session #</TableHead>
               <TableHead>Title</TableHead>
+              <TableHead>Target Batch</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Day</TableHead>
               <TableHead className="text-center">Present Count</TableHead>
@@ -128,11 +170,12 @@ export default function SessionsTable({
                     <button
                       type="button"
                       onClick={() => onSelectSession(session.id)}
-                      className="text-left font-semibold hover:text-primary transition-colors cursor-pointer"
+                      className="hover:underline text-left cursor-pointer font-medium"
                     >
                       {session.title}
                     </button>
                   </TableCell>
+                  <TableCell>{getBatchLabel(session.targetBatchIds)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {format(new Date(session.date), "MMM dd, yyyy")}
                   </TableCell>
@@ -162,7 +205,11 @@ export default function SessionsTable({
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                        >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -216,9 +263,11 @@ export default function SessionsTable({
             <AlertDialogDescription>
               Are you sure you want to delete{" "}
               <strong>
-                Session #{sessionToDelete?.sessionNumber}: {sessionToDelete?.title}
+                Session #{sessionToDelete?.sessionNumber}:{" "}
+                {sessionToDelete?.title}
               </strong>
-              ? This will also remove all attendance records associated with this session. This action cannot be undone.
+              ? This will also remove all attendance records associated with
+              this session. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

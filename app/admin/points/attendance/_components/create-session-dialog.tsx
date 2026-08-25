@@ -20,6 +20,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -35,7 +42,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { createAttendanceSession } from "../actions";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
-import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -54,11 +60,15 @@ interface CreateSessionDialogProps {
   userId: string;
 }
 
-export default function CreateSessionDialog({ userId }: CreateSessionDialogProps) {
+export default function CreateSessionDialog({
+  userId,
+}: CreateSessionDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [batchesList, setBatchesList] = useState<
+    { id: string; name: string; code: string }[]
+  >([]);
 
   useEffect(() => {
     getActiveBatchesList().then((list) => setBatchesList(list));
@@ -76,7 +86,15 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
   const selectedDate = form.watch("date");
 
   const getDayName = (date: Date) => {
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const days = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
     return days[date.getDay()];
   };
 
@@ -84,7 +102,7 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
     setIsSubmitting(true);
     try {
       const day = getDayName(data.date);
-      
+
       const result = await createAttendanceSession({
         sessionNumber: data.sessionNumber,
         title: data.title,
@@ -137,7 +155,9 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
                       type="number"
                       placeholder="Enter session number"
                       {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
+                      onChange={(e) =>
+                        field.onChange(parseInt(e.target.value, 10) || 1)
+                      }
                       value={field.value}
                       disabled={isSubmitting}
                     />
@@ -178,7 +198,7 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
                           variant={"outline"}
                           className={cn(
                             "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
+                            !field.value && "text-muted-foreground",
                           )}
                           disabled={isSubmitting}
                         >
@@ -196,16 +216,17 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
-                        disabled={(date) =>
-                          date < new Date("2023-01-01")
-                        }
+                        disabled={(date) => date < new Date("2023-01-01")}
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
                   {selectedDate && (
                     <p className="text-sm text-muted-foreground mt-1">
-                      Day: <span className="font-medium">{getDayName(selectedDate)}</span>
+                      Day:{" "}
+                      <span className="font-medium">
+                        {getDayName(selectedDate)}
+                      </span>
                     </p>
                   )}
                   <FormMessage />
@@ -216,49 +237,53 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
             <FormField
               control={form.control}
               name="targetBatchIds"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel className="text-xs">Target Batches (Optional)</FormLabel>
-                    <span className="text-[11px] text-muted-foreground">
-                      {(field.value?.length || 0) === 0 ? "All Batches" : `${field.value?.length} selected`}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 p-2 rounded-md border bg-muted/20">
-                    <Badge
-                      variant={(field.value?.length || 0) === 0 ? "default" : "outline"}
-                      className="cursor-pointer text-xs"
-                      onClick={() => field.onChange([])}
-                    >
-                      All Batches (Global)
-                    </Badge>
-                    {batchesList.map((batch) => {
-                      const isSelected = field.value?.includes(batch.id);
-                      return (
-                        <Badge
-                          key={batch.id}
-                          variant={isSelected ? "default" : "outline"}
-                          className="cursor-pointer text-xs font-mono"
-                          onClick={() => {
-                            const current = field.value || [];
-                            if (isSelected) {
-                              field.onChange(current.filter((id) => id !== batch.id));
-                            } else {
-                              field.onChange([...current, batch.id]);
-                            }
-                          }}
-                        >
-                          {batch.code}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    If selected, only students in the target batch(es) will appear on the attendance roster.
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const currentValue =
+                  field.value && field.value.length > 0
+                    ? field.value[0]
+                    : "all";
+                return (
+                  <FormItem>
+                    <FormLabel>Target Batch</FormLabel>
+                    <div className="relative">
+                      <Select
+                        value={currentValue}
+                        onValueChange={(val) => {
+                          if (val === "all") {
+                            field.onChange([]);
+                          } else {
+                            field.onChange([val]);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="pl-10">
+                            <SelectValue placeholder="Select Target Batch" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            All Batches (Global - All students)
+                          </SelectItem>
+                          {batchesList.map((batch) => (
+                            <SelectItem key={batch.id} value={batch.id}>
+                              {batch.name} ({batch.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Layers className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Select which batch this attendance session is for. Only
+                      students belonging to this batch will be listed for
+                      attendance.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <DialogFooter>
@@ -271,7 +296,9 @@ export default function CreateSessionDialog({ userId }: CreateSessionDialogProps
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Create Session
               </Button>
             </DialogFooter>

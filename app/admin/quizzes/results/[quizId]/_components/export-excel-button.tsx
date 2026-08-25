@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -5,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+
+import { calculateQuizRankings } from "@/lib/quiz-ranking";
 
 export interface RankedAttemptItem {
   id: string;
@@ -18,9 +21,12 @@ export interface RankedAttemptItem {
   status: string;
   tabSwitches: number;
   createdAt: string | Date;
+  completedAt?: string | Date | null;
   isPublished: boolean;
   isQualified?: boolean;
   resultStatus?: string;
+  rank?: number;
+  isTied?: boolean;
 }
 
 interface ExportExcelButtonProps {
@@ -50,33 +56,34 @@ export function ExportExcelButton({
 
     setIsExporting(true);
     try {
-      // 1. Sort top to bottom: Highest score first, tie-break with points, correct answers, and earlier submission
-      const sorted = [...attempts].sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        if (b.pointsEarned !== a.pointsEarned) return b.pointsEarned - a.pointsEarned;
-        if (b.correctAnswers !== a.correctAnswers) return b.correctAnswers - a.correctAnswers;
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      });
+      // 1. Sort and rank using standard criteria (Marks desc -> Submission time asc -> Identical tie)
+      const { sortedAttempts, rankedDetailsMap } = calculateQuizRankings(attempts as any);
 
-      // 2. Prepare tabular data with 1-based ranks
-      const worksheetData = sorted.map((att, idx) => ({
-        "Rank": idx + 1,
-        "Participant Name": att.participantName || "N/A",
-        "Email Address": att.participantEmail || "N/A",
-        "Quiz Set": `Set ${att.setLetter || "A"}`,
-        "Score (%)": `${att.score.toFixed(1)}%`,
-        "Correct Answers": att.correctAnswers,
-        "Total Questions": att.totalQuestions,
-        "Points Awarded": att.pointsEarned,
-        "Result Status": att.resultStatus || (att.score >= 50 ? "QUALIFIED" : "FAILED"),
-        "Exam State": att.status || "Completed",
-        "Tab Violations": att.tabSwitches || 0,
-        "Submitted At": new Date(att.createdAt).toLocaleString("en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }),
-        "Result Published": att.isPublished ? "Yes" : "No",
-      }));
+      // 2. Prepare tabular data with calculated ranks and exact submission timestamps
+      const worksheetData = sortedAttempts.map((att: any) => {
+        const details = rankedDetailsMap.get(att.id);
+        const rankDisplay = details?.isTied ? `#${details.rank} (Tied)` : `#${details?.rank ?? 1}`;
+        const subDate = details?.submissionDate || new Date(att.completedAt || att.createdAt);
+
+        return {
+          "Rank": rankDisplay,
+          "Participant Name": att.participantName || "N/A",
+          "Email Address": att.participantEmail || "N/A",
+          "Quiz Set": `Set ${att.setLetter || "A"}`,
+          "Score (%)": `${att.score.toFixed(1)}%`,
+          "Correct Answers": att.correctAnswers,
+          "Total Questions": att.totalQuestions,
+          "Points Awarded": att.pointsEarned,
+          "Result Status": att.resultStatus || (att.score >= 50 ? "QUALIFIED" : "FAILED"),
+          "Exam State": att.status || "Completed",
+          "Tab Violations": att.tabSwitches || 0,
+          "Submitted At": subDate.toLocaleString("en-US", {
+            dateStyle: "medium",
+            timeStyle: "medium",
+          }),
+          "Result Published": att.isPublished ? "Yes" : "No",
+        };
+      });
 
       // 3. Create Workbook & Sheet
       const worksheet = XLSX.utils.json_to_sheet(worksheetData);
@@ -105,7 +112,7 @@ export function ExportExcelButton({
       const safeTitle = (quizTitle || "Quiz").replace(/[^a-zA-Z0-9_-]/g, "_");
       XLSX.writeFile(workbook, `${safeTitle}_Ranked_Results.xlsx`);
 
-      toast.success(`Exported ${sorted.length} ranked results to Excel!`);
+      toast.success(`Exported ${sortedAttempts.length} ranked results to Excel!`);
     } catch (error) {
       console.error("Error exporting to Excel:", error);
       toast.error("Failed to export Excel file");

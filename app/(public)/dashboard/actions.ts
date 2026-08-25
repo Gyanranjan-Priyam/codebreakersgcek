@@ -9,12 +9,11 @@ export interface DashboardStats {
   pendingTasks: number;
   activeQuizzes: number;
   upcomingEvents: number;
-  totalAnnouncements: number;
 }
 
 export interface RecentActivity {
   id: string;
-  type: 'announcement' | 'task' | 'event' | 'quiz';
+  type: 'task' | 'event' | 'quiz';
   title: string;
   description: string;
   date: Date;
@@ -44,81 +43,46 @@ export async function getUserDashboardData() {
 
     // Parallel data fetching for performance
     const [
-      announcements,
-      bannerAnnouncements,
-      attendancePoints,
+      allAttendances,
       taskSubmissions,
       eventParticipations,
       quizAttempts,
       pendingTasksCount,
       activeQuizzesCount,
       upcomingEventsCount,
+      userRoadmapProgress,
     ] = await Promise.all([
-      // 1. Announcements
-      prisma.announcement.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        where: { isDeleted: false }
-      }),
-      // 2. Banner Announcements
-      prisma.announcement.findMany({
-        where: {
-          isDeleted: false,
-          showInHomeBanner: true,
-          publishDate: { lte: new Date() },
-          OR: [
-            { expiryDate: null },
-            { expiryDate: { gte: new Date() } }
-          ]
-        },
-        orderBy: [
-          { isPinned: 'desc' },
-          { priority: 'desc' },
-          { publishDate: 'desc' }
-        ],
-        take: 3,
-        select: {
-          id: true,
-          slugId: true,
-          title: true,
-          priority: true,
-          isPinned: true
-        }
-      }),
-      // 3. Attendance Points
-      prisma.attendance.aggregate({
+      // 1. Attendance Records
+      prisma.attendance.findMany({
         where: { userId, status: 'present' },
-        _sum: { points: true }
+        select: { points: true, markedAt: true },
       }),
-      // 4. Task Submissions (Points & Recent)
+      // 2. Task Submissions
       prisma.taskSubmission.findMany({
         where: { userId },
         include: { task: true },
         orderBy: { updatedAt: 'desc' },
-        take: 5
       }),
-      // 5. Event Participations (Points & Recent)
+      // 3. Event Participations
       prisma.eventParticipation.findMany({
         where: { userId },
         include: { event: true },
         orderBy: { updatedAt: 'desc' },
-        take: 5
       }),
-      // 6. Quiz Attempts (Points & Recent)
+      // 4. Quiz Attempts
       prisma.quizAttempt.findMany({
         where: { userId },
         include: { quiz: true },
         orderBy: { updatedAt: 'desc' },
-        take: 5
       }),
-      // 7. Pending Tasks Count
+      // 5. Pending Tasks Count
       prisma.task.count({
         where: {
           dueDate: { gte: new Date() },
           submissions: { none: { userId } }
         }
       }),
-      // 8. Active Quizzes Count (Internal only & Batch-scoped)
+      // 6. Active Quizzes Count (Internal only & Batch-scoped)
       prisma.quiz.count({
         where: {
           isActive: true,
@@ -140,30 +104,83 @@ export async function getUserDashboardData() {
           attempts: { none: { userId } }
         }
       }),
-      // 9. Upcoming Events Count
+      // 7. Upcoming Events Count
       prisma.eventPoint.count({
         where: {
           eventDate: { gte: new Date() }
         }
       }),
+      // 8. User Roadmaps Progress
+      prisma.userRoadmapProgress.findMany({
+        where: { userId },
+        include: {
+          roadmap: {
+            select: {
+              title: true,
+              slug: true,
+              category: true,
+              badgeText: true,
+            }
+          }
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 3
+      }),
     ]);
 
+    const aPts = allAttendances.reduce((acc, curr) => acc + (curr.points || 0), 0);
+    const tPts = taskSubmissions.reduce((acc, curr) => acc + (curr.pointsAwarded || 0), 0);
+    const ePts = eventParticipations.reduce((acc, curr) => acc + (curr.pointsAwarded || 0), 0);
+    const qPts = quizAttempts.reduce((acc, curr) => acc + (curr.pointsEarned || 0), 0);
+
     // Calculate Total Points
-    const totalPoints = 
-      (attendancePoints._sum.points || 0) +
-      taskSubmissions.reduce((acc, curr) => acc + (curr.pointsAwarded || 0), 0) +
-      eventParticipations.reduce((acc, curr) => acc + (curr.pointsAwarded || 0), 0) +
-      quizAttempts.reduce((acc, curr) => acc + (curr.pointsEarned || 0), 0);
+    const totalPoints = aPts + tPts + ePts + qPts;
+
+    // Calculate Monthly Progress Breakdown for the past 6 months
+    const now = new Date();
+    const monthlyProgress: Array<{
+      month: string;
+      total: number;
+      attendance: number;
+      tasks: number;
+      quizzes: number;
+      events: number;
+    }> = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
+      const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+      const monthName = d.toLocaleString("default", { month: "short" });
+
+      const att = allAttendances
+        .filter((a) => a.markedAt >= mStart && a.markedAt <= mEnd)
+        .reduce((sum, a) => sum + (a.points || 0), 0);
+
+      const tsk = taskSubmissions
+        .filter((t) => t.status === "approved" && t.updatedAt >= mStart && t.updatedAt <= mEnd)
+        .reduce((sum, t) => sum + (t.pointsAwarded || 0), 0);
+
+      const qz = quizAttempts
+        .filter((q) => q.updatedAt >= mStart && q.updatedAt <= mEnd)
+        .reduce((sum, q) => sum + (q.pointsEarned || 0), 0);
+
+      const evt = eventParticipations
+        .filter((e) => e.status === "approved" && e.updatedAt >= mStart && e.updatedAt <= mEnd)
+        .reduce((sum, e) => sum + (e.pointsAwarded || 0), 0);
+
+      monthlyProgress.push({
+        month: monthName,
+        total: att + tsk + qz + evt,
+        attendance: att,
+        tasks: tsk,
+        quizzes: qz,
+        events: evt,
+      });
+    }
 
     // Aggregate Recent Activities
     const activities: RecentActivity[] = [
-      ...announcements.map(a => ({
-        id: `ann-${a.id}`,
-        type: 'announcement' as const,
-        title: a.title,
-        description: '', // Removed description
-        date: a.createdAt,
-      })),
       ...taskSubmissions.map(t => ({
         id: `task-${t.id}`,
         type: 'task' as const,
@@ -194,12 +211,17 @@ export async function getUserDashboardData() {
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 10);
 
-    const stats: DashboardStats = {
+    const stats = {
       totalPoints,
+      attendancePoints: aPts,
+      taskPoints: tPts,
+      eventPoints: ePts,
+      quizPoints: qPts,
       pendingTasks: pendingTasksCount,
       activeQuizzes: activeQuizzesCount,
       upcomingEvents: upcomingEventsCount,
-      totalAnnouncements: announcements.length // Just for this batch, or could fetch total count if needed
+      activeRoadmapsCount: userRoadmapProgress.length,
+      monthlyProgress,
     };
 
     // Fetch complete user profile for profile completion calculation
@@ -228,6 +250,12 @@ export async function getUserDashboardData() {
         pinCode: true,
         githubUsername: true,
         profileComplete: true,
+        batch: {
+          select: {
+            name: true,
+            code: true,
+          }
+        }
       }
     });
 
@@ -236,7 +264,7 @@ export async function getUserDashboardData() {
       data: {
         stats,
         recentActivities: activities,
-        bannerAnnouncements,
+        roadmaps: userRoadmapProgress,
         user: userProfile || {
           name: session.user.name || "",
           email: session.user.email || "",
@@ -260,6 +288,7 @@ export async function getUserDashboardData() {
           pinCode: null,
           githubUsername: null,
           profileComplete: false,
+          batch: null,
         },
       },
     };

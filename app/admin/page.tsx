@@ -1,177 +1,105 @@
 import { Suspense } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { 
-   getDashboardStats
-} from "@/app/data/admin/dashboard";
+import { getDashboardStats } from "@/app/data/admin/dashboard";
 import { DashboardStats } from "@/components/admin_components/dashboard/DashboardStats";
 import { 
-   Users,
-   Megaphone,
-   BrainCircuit,
-   QrCode,
-   Trophy,
-   Settings,
-   TrendingUp,
-   LayoutDashboard
+    LayoutDashboard,
+    Plus,
+    Compass,
+    FileText,
+    QrCode,
+    BrainCircuit,
+    Sparkles,
+    Shield,
+    Terminal
 } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Admin Dashboard",
-  description: "CodeBreakers admin dashboard - Manage members, events, and activities",
+  title: "Admin Dashboard | CodeBreakers",
+  description: "CodeBreakers central administrative command center - Manage roadmaps, forms, members, attendance, and activities",
 };
 
-// Loading components
-function StatsLoading() {
-   return (
-      <div className="space-y-6">
-         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-               <Card key={i}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                     <Skeleton className="h-4 w-24" />
-                     <Skeleton className="h-10 w-10 rounded-lg" />
-                  </CardHeader>
-                  <CardContent>
-                     <Skeleton className="h-8 w-20 mb-2" />
-                     <Skeleton className="h-3 w-28" />
-                  </CardContent>
-               </Card>
-            ))}
-         </div>
-         <Card>
-            <CardHeader>
-               <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent>
-               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                     <Skeleton key={i} className="h-24 w-full" />
-                  ))}
-               </div>
-            </CardContent>
-         </Card>
+// Fast-action navigation buttons
+const primaryShortcuts = [
+  {
+    label: "New Roadmap",
+    icon: Compass,
+    href: "/admin/roadmaps",
+    variant: "default" as const,
+  },
+  {
+    label: "Build Form",
+    icon: FileText,
+    href: "/admin/forms/new",
+    variant: "outline" as const,
+  },
+  {
+    label: "QR Attendance",
+    icon: QrCode,
+    href: "/admin/attendance",
+    variant: "outline" as const,
+  },
+  {
+    label: "Create Quiz",
+    icon: BrainCircuit,
+    href: "/admin/quizzes/create",
+    variant: "outline" as const,
+  },
+];
+
+// Geometric Loading Fallback
+function AdminStatsLoading() {
+  return (
+    <div className="space-y-8 animate-pulse">
+      {/* KPI Matrix Skeleton */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="p-4 rounded-xl border border-border/60 bg-card space-y-3">
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-4 rounded" />
+            </div>
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        ))}
       </div>
-   );
+
+      {/* Pillars Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-3">
+            <Skeleton className="h-4 w-36" />
+            <div className="space-y-2.5">
+              <Skeleton className="h-20 w-full rounded-xl" />
+              <Skeleton className="h-20 w-full rounded-xl" />
+              <Skeleton className="h-20 w-full rounded-xl" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-// Data fetching components
+// Data fetching component
 async function DashboardStatsSection() {
-   const stats = await getDashboardStats();
-   return <DashboardStats stats={stats} />;
+  const stats = await getDashboardStats();
+  return <DashboardStats stats={stats} />;
 }
 
 export default function AdminPage() {
-   const quickActions = [
-      {
-         title: "Members",
-         description: "View and manage all members",
-         href: "/admin/members",
-         icon: Users,
-         color: "bg-blue-500"
-      },
-      {
-         title: "Announcements",
-         description: "Create and manage announcements",
-         href: "/admin/announcement",
-         icon: Megaphone,
-         color: "bg-pink-500"
-      },
-      {
-         title: "Quizzes",
-         description: "Manage quizzes and results",
-         href: "/admin/quizzes",
-         icon: BrainCircuit,
-         color: "bg-purple-500"
-      },
-      {
-         title: "Attendance",
-         description: "Track and mark attendance",
-         href: "/admin/attendance",
-         icon: QrCode,
-         color: "bg-emerald-500"
-      },
-      {
-         title: "Points Management",
-         description: "Track and award points",
-         href: "/admin/points",
-         icon: Trophy,
-         color: "bg-yellow-500"
-      },
-      {
-         title: "System Settings",
-         description: "Configure platform settings",
-         href: "/admin/settings",
-         icon: Settings,
-         color: "bg-gray-500"
-      }
-   ];
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 max-w-8xl mx-auto w-full space-y-8">
 
-   return (
-      <div className="space-y-8">
-         {/* Header */}
-         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-2">
-               <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                     <LayoutDashboard className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-                     <p className="text-sm text-muted-foreground">
-                        Welcome back! Here's your platform overview.
-                     </p>
-                  </div>
-               </div>
-            </div>
-         </div>
-
-         {/* Quick Actions */}
-         <div>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-               <TrendingUp className="w-5 h-5" />
-               Quick Actions
-            </h2>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-               {quickActions.map((action) => {
-                  const Icon = action.icon;
-                  return (
-                     <Card key={action.title} className="hover:shadow-md transition-all cursor-pointer border-l-4 border-l-transparent hover:border-l-primary">
-                        <Link href={action.href} className="block h-full">
-                           <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-                              <div className={`${action.color} p-2.5 rounded-lg mr-3 shrink-0`}>
-                                 <Icon className="w-5 h-5 text-white" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                 <CardTitle className="text-base font-semibold truncate">
-                                    {action.title}
-                                 </CardTitle>
-                              </div>
-                           </CardHeader>
-                           <CardContent>
-                              <CardDescription className="text-xs leading-relaxed">
-                                 {action.description}
-                              </CardDescription>
-                           </CardContent>
-                        </Link>
-                     </Card>
-                  );
-               })}
-            </div>
-         </div>
-
-         {/* Dashboard Stats */}
-         <div className="space-y-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-               <TrendingUp className="w-5 h-5" />
-               Platform Overview
-            </h2>
-            <Suspense fallback={<StatsLoading />}>
-               <DashboardStatsSection />
-            </Suspense>
-         </div>
-      </div>
-   );
+      {/* ── Main Dashboard Modular Analytics & Module Hub ── */}
+      <Suspense fallback={<AdminStatsLoading />}>
+        <DashboardStatsSection />
+      </Suspense>
+    </div>
+  );
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useRef, useMemo } from "react";
@@ -169,7 +170,7 @@ export function LatexEditor({ value, onChange, onResetToTemplate }: LatexEditorP
   };
 
   return (
-    <div className="flex flex-col h-full w-full min-w-0 max-w-full bg-slate-950 border border-border/60 rounded-xl overflow-hidden shadow-xs">
+    <div className="flex flex-col h-full w-full min-w-0 max-w-full border border-border/60 rounded-xl overflow-hidden shadow-xs">
       {/* ── Overleaf-Style Code Toolbar ── */}
       <div className="flex flex-wrap items-center justify-between gap-1.5 p-2 px-3 bg-muted/40 border-b border-border/60 text-xs shrink-0 w-full min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">

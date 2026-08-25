@@ -44,7 +44,6 @@ export type ErrorCode =
 
 export type Resource =
   | 'users'
-  | 'announcements'
   | 'attendance'
   | 'tasks'
   | 'events'
@@ -88,47 +87,6 @@ export interface User {
   updatedAt: string;
   publishedProjects?: PublishedProjectSummary[];
   projectReviews?: ProjectReviewSummary[];
-}
-
-// ==================== Announcement Types ====================
-
-export type AnnouncementCategory =
-  | 'EMERGENCY'
-  | 'GENERAL'
-  | 'EVENT_UPDATE'
-  | 'WORKSHOP'
-  | 'LOGISTICS';
-
-export type AnnouncementPriority = 'NORMAL' | 'IMPORTANT' | 'URGENT';
-
-export type AnnouncementAudience =
-  | 'PUBLIC'
-  | 'PARTICIPANTS_ONLY'
-  | 'VOLUNTEERS_ONLY'
-  | 'ORGANIZERS_ONLY';
-
-export type RecurrenceType = 'NONE' | 'HOURLY' | 'DAILY' | 'WEEKLY';
-
-export interface Announcement {
-  id: string;
-  slugId: string;
-  title: string;
-  description: string;
-  category: AnnouncementCategory;
-  priority: AnnouncementPriority;
-  attachmentKeys: string[];
-  imageKeys: string[];
-  audience: AnnouncementAudience;
-  sendNotifications: boolean;
-  isPinned: boolean;
-  showInHomeBanner: boolean;
-  publishDate: string;
-  expiryDate: string | null;
-  isRecurring: boolean;
-  recurrenceType: RecurrenceType;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
 }
 
 // ==================== Attendance Types ====================
@@ -329,7 +287,6 @@ export interface ResourceItem {
 export interface AllDataSummary {
   summary: {
     totalUsers: number;
-    totalAnnouncements: number;
     totalAttendanceSessions: number;
     totalTasks: number;
     totalEvents: number;
@@ -375,13 +332,6 @@ export interface UserQueryParams extends BaseQueryParams {
   role?: string;
 }
 
-export interface AnnouncementQueryParams extends BaseQueryParams {
-  resource: 'announcements';
-  category?: AnnouncementCategory;
-  audience?: AnnouncementAudience;
-  isPinned?: boolean;
-}
-
 export interface QuizQueryParams extends BaseQueryParams {
   resource: 'quizzes';
   isActive?: boolean;
@@ -396,7 +346,6 @@ export interface ReviewQueryParams extends BaseQueryParams {
 export type QueryParams =
   | BaseQueryParams
   | UserQueryParams
-  | AnnouncementQueryParams
   | QuizQueryParams
   | ReviewQueryParams;
 

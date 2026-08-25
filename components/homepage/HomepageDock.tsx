@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Dock, DockIcon } from "@/components/ui/dock";
-import { FaTrophy, FaBullhorn, FaNewspaper } from "react-icons/fa";
+import { FaTrophy, FaNewspaper } from "react-icons/fa";
 import { Trophy } from "lucide-react";
 
 export function HomepageDock() {
@@ -38,13 +38,6 @@ export function HomepageDock() {
           <DockIcon>
             <Link href="/leaderboard" className="flex items-center justify-center w-full h-full">
               <Trophy className="w-6 h-6" />
-            </Link>
-          </DockIcon>
-        </Dock>
-        <Dock direction="middle" iconSize={38} iconMagnification={64}>
-          <DockIcon>
-            <Link href="/announcement" className="flex items-center justify-center w-full h-full">
-              <FaBullhorn className="w-6 h-6" />
             </Link>
           </DockIcon>
         </Dock>
@@ -91,11 +84,6 @@ export function HomepageDockMobile() {
         <DockIcon>
           <Link href="/leaderboard" className="flex items-center justify-center w-full h-full">
             <FaTrophy className="w-5 h-5 text-yellow-500" />
-          </Link>
-        </DockIcon>
-        <DockIcon>
-          <Link href="/announcement" className="flex items-center justify-center w-full h-full">
-            <FaBullhorn className="w-5 h-5 text-blue-500" />
           </Link>
         </DockIcon>
         <DockIcon>

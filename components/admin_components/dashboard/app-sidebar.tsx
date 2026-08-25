@@ -12,6 +12,8 @@ import {
   ListChecks,
   QrCode,
   Receipt,
+  Compass,
+  Code2,
 } from "lucide-react";
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main";
@@ -82,6 +84,11 @@ const data = {
       icon: FileText,
     },
     {
+      title: "Roadmaps",
+      url: "/admin/roadmaps",
+      icon: Compass,
+    },
+    {
       title: "Transactions",
       url: "/admin/transactions",
       icon: Receipt,
@@ -116,22 +123,25 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
+              size="lg"
               asChild
               tooltip="CodeBreakers"
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
+              className="data-[slot=sidebar-menu-button]:p-1.5 hover:bg-sidebar-accent transition-colors"
             >
-              <Link href="/">
-                <div className="flex items-center">
-                  <span className="text-[1.1rem] font-bold inline-flex items-center hover:text-amber-400">
-                    <Image
-                      src="/assets/logo.png"
-                      alt="CodeBreakers Logo"
-                      width={32}
-                      height={32}
-                      className="inline-block mr-2 mb-1 shrink-0"
-                      priority
-                    />
-                    <span className="group-data-[collapsible=icon]:hidden">CodeBreakers</span>
+              <Link href="/admin" className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
+                  <Image
+                    src="/assets/logo.png"
+                    alt="CodeBreakers Logo"
+                    width={28}
+                    height={28}
+                    className="size-7 object-contain shrink-0"
+                    priority
+                  />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-bold text-lg leading-none tracking-tight">
+                    CodeBreakers
                   </span>
                 </div>
               </Link>

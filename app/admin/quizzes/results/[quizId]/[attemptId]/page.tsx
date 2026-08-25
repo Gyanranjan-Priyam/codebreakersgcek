@@ -9,6 +9,7 @@ import Link from "next/link";
 import { PublishResultButton } from "../_components/publish-result-button";
 import { ExportResultPdfButton } from "../_components/export-result-pdf-button";
 import { ScorecardPDFData } from "@/lib/student-result-pdf";
+import { calculateQuizRankings } from "@/lib/quiz-ranking";
 
 function findCorrectAnswerIndex(question: any): number {
   if (!question || !Array.isArray(question.options)) return -1;
@@ -177,20 +178,26 @@ export default async function StudentResultDetailPage({
     questionsList = questionsData;
   }
 
+  // Fetch all attempts of this quiz to compute competition rank
+  const allQuizAttempts = await prisma.quizAttempt.findMany({
+    where: { quizId: attempt.quizId },
+  });
+
+  const { rankMap, rankedDetailsMap } = calculateQuizRankings(allQuizAttempts);
+  const overallRank = rankMap.get(attempt.id) || 1;
+  const rankDetails = rankedDetailsMap.get(attempt.id);
+  const isTied = rankDetails?.isTied || false;
+  const submissionDate = rankDetails?.submissionDate || new Date(attempt.completedAt || attempt.createdAt);
+
   let isPassed = attempt.score >= 50;
   let statusLabel = isPassed ? "QUALIFIED / PASSED" : "FAILED / NOT QUALIFIED";
 
   const mode = attempt.quiz.cutoffType || "PERCENTAGE";
   if (mode === "TOP_N") {
-    const allQuizAttempts = await prisma.quizAttempt.findMany({
-      where: { quizId: attempt.quizId },
-      orderBy: [{ score: "desc" }, { pointsEarned: "desc" }, { correctAnswers: "desc" }, { createdAt: "asc" }],
-      select: { id: true },
-    });
-    const rank = allQuizAttempts.findIndex((a) => a.id === attempt.id) + 1;
     const topCount = attempt.quiz.topSelectCount || 10;
-    isPassed = rank > 0 && rank <= topCount;
-    statusLabel = isPassed ? `QUALIFIED (Rank ${rank})` : `FAILED (Rank ${rank})`;
+    isPassed = overallRank > 0 && overallRank <= topCount;
+    const rankSuffix = isTied ? ` (Rank #${overallRank} Tied)` : ` (Rank #${overallRank})`;
+    statusLabel = isPassed ? `QUALIFIED${rankSuffix}` : `FAILED${rankSuffix}`;
   } else if (mode === "MARKS") {
     const minMarks = attempt.quiz.cutoffMarks ?? 0;
     isPassed = (attempt.pointsEarned ?? 0) >= minMarks;
@@ -302,9 +309,25 @@ export default async function StudentResultDetailPage({
         </CardHeader>
 
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
+            <div className="p-4 rounded-xl border border-border/60 bg-card/40 flex flex-col items-center justify-center">
+              <div className="text-xs text-muted-foreground font-semibold uppercase">Rank</div>
+              <div className="text-3xl font-black mt-1 font-mono text-primary flex items-center gap-1 justify-center">
+                #{overallRank}
+              </div>
+              <div className="mt-1">
+                {isTied ? (
+                  <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40 bg-amber-500/10">
+                    Tied
+                  </Badge>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">of {allQuizAttempts.length}</span>
+                )}
+              </div>
+            </div>
+
             <div className="p-4 rounded-xl border border-border/60 bg-card/40">
-              <div className="text-xs text-muted-foreground font-semibold uppercase">Percentage Score</div>
+              <div className="text-xs text-muted-foreground font-semibold uppercase">Score</div>
               <div className={`text-3xl font-black mt-1 ${isPassed ? "text-emerald-500" : "text-destructive"}`}>
                 {attempt.score.toFixed(1)}%
               </div>
@@ -320,7 +343,7 @@ export default async function StudentResultDetailPage({
               <div className="text-3xl font-black mt-1">
                 {attempt.correctAnswers} / {attempt.totalQuestions}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">Total questions</div>
+              <div className="text-xs text-muted-foreground mt-1">Questions</div>
             </div>
 
             <div className="p-4 rounded-xl border border-border/60 bg-card/40">
@@ -329,13 +352,13 @@ export default async function StudentResultDetailPage({
               <div className="text-xs text-muted-foreground mt-1">Points</div>
             </div>
 
-            <div className="p-4 rounded-xl border border-border/60 bg-card/40">
-              <div className="text-xs text-muted-foreground font-semibold uppercase">Submission Date</div>
-              <div className="text-sm font-bold mt-2">
-                {new Date(attempt.createdAt).toLocaleDateString()}
+            <div className="p-4 rounded-xl border border-border/60 bg-card/40 col-span-2 sm:col-span-1">
+              <div className="text-xs text-muted-foreground font-semibold uppercase">Submitted At</div>
+              <div className="text-sm font-bold mt-2 font-mono">
+                {submissionDate.toLocaleDateString()}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {new Date(attempt.createdAt).toLocaleTimeString()}
+              <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                {submissionDate.toLocaleTimeString()}
               </div>
             </div>
           </div>

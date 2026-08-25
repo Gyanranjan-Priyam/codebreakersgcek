@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Activity, Clock, Bell, CheckSquare, Calendar, BrainCircuit } from "lucide-react";
+import { Activity, Clock, CheckSquare, Calendar, BrainCircuit } from "lucide-react";
 import { format } from "date-fns";
 import { RecentActivity } from "../actions";
 
@@ -14,7 +14,6 @@ interface RecentActivitiesProps {
 export function RecentActivities({ activities }: RecentActivitiesProps) {
   const getActivityIcon = (type: RecentActivity['type']) => {
     switch (type) {
-      case 'announcement': return <Bell className="w-4 h-4" />;
       case 'task': return <CheckSquare className="w-4 h-4" />;
       case 'event': return <Calendar className="w-4 h-4" />;
       case 'quiz': return <BrainCircuit className="w-4 h-4" />;
@@ -24,7 +23,6 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
 
   const getActivityColor = (type: RecentActivity['type']) => {
     switch (type) {
-      case 'announcement': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'task': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'event': return 'bg-green-100 text-green-800 border-green-200';
       case 'quiz': return 'bg-purple-100 text-purple-800 border-purple-200';

@@ -27,7 +27,6 @@ import type {
   APIResponse,
   APIError,
   User,
-  Announcement,
   AttendanceSession,
   Task,
   EventPoint,
@@ -38,7 +37,6 @@ import type {
   AllDataSummary,
   ExternalAPIConfig,
   UserQueryParams,
-  AnnouncementQueryParams,
   QuizQueryParams,
   ReviewQueryParams,
   BaseQueryParams,
@@ -52,31 +50,35 @@ export class ExternalAPIClient {
   constructor(config: ExternalAPIConfig) {
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.timeout = config.timeout || 30000; // 30 seconds default
+    this.timeout = config.timeout || 10000; // 10 seconds default
   }
 
   /**
-   * Generic fetch method with error handling
+   * Generic request handler
    */
   private async fetch<T>(
-    resource: string,
-    params: Record<string, any> = {}
+    endpoint: string,
+    params?: Record<string, any>
   ): Promise<APIResponse<T>> {
-    const queryParams = new URLSearchParams({
-      resource,
-      ...this.cleanParams(params),
-    });
+    const url = new URL(`${this.baseUrl}/api/external/data`);
+    url.searchParams.append('resource', endpoint);
 
-    const url = `${this.baseUrl}/api/external/data?${queryParams}`;
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
@@ -87,52 +89,23 @@ export class ExternalAPIClient {
       const data = await response.json();
 
       if (!response.ok) {
-        const error = data as APIError;
-        throw new ExternalAPIError(
-          error.message,
-          error.code,
-          response.status,
-          error
-        );
+        throw data as APIError;
       }
 
       return data as APIResponse<T>;
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
 
-      if (error instanceof ExternalAPIError) {
-        throw error;
+      if (error.name === 'AbortError') {
+        throw {
+          error: 'Request Timeout',
+          message: `Request exceeded timeout of ${this.timeout}ms`,
+          code: 'INTERNAL_ERROR',
+        } as APIError;
       }
 
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new ExternalAPIError(
-          'Request timeout',
-          'TIMEOUT',
-          408
-        );
-      }
-
-      throw new ExternalAPIError(
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        'NETWORK_ERROR',
-        0
-      );
+      throw error;
     }
-  }
-
-  /**
-   * Clean and convert params to string values
-   */
-  private cleanParams(params: Record<string, any>): Record<string, string> {
-    const cleaned: Record<string, string> = {};
-    
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && key !== 'resource') {
-        cleaned[key] = String(value);
-      }
-    }
-    
-    return cleaned;
   }
 
   // ==================== User Methods ====================
@@ -158,30 +131,26 @@ export class ExternalAPIClient {
     byAdmissionYear: async (year: string, limit = 100): Promise<APIResponse<User[]>> => {
       return this.fetch<User[]>('users', { admissionYear: year, limit });
     },
-  };
 
-  // ==================== Announcement Methods ====================
-
-  public announcements = {
     /**
-     * Fetch announcements with optional filtering
+     * Fetch users by role
      */
-    list: async (params?: Omit<AnnouncementQueryParams, 'resource'>): Promise<APIResponse<Announcement[]>> => {
-      return this.fetch<Announcement[]>('announcements', params);
+    byRole: async (role: string, limit = 100): Promise<APIResponse<User[]>> => {
+      return this.fetch<User[]>('users', { role, limit });
     },
 
     /**
-     * Fetch announcements by category
+     * Fetch verified users
      */
-    byCategory: async (category: string, limit = 100): Promise<APIResponse<Announcement[]>> => {
-      return this.fetch<Announcement[]>('announcements', { category, limit });
+    verified: async (limit = 100): Promise<APIResponse<User[]>> => {
+      return this.fetch<User[]>('users', { profileComplete: true, limit });
     },
 
     /**
-     * Fetch pinned announcements
+     * Fetch users with their projects and reviews
      */
-    pinned: async (limit = 100): Promise<APIResponse<Announcement[]>> => {
-      return this.fetch<Announcement[]>('announcements', { isPinned: true, limit });
+    withRelations: async (limit = 100): Promise<APIResponse<User[]>> => {
+      return this.fetch<User[]>('users', { includeRelations: true, limit });
     },
   };
 

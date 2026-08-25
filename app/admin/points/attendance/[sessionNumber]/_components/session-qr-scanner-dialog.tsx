@@ -17,12 +17,10 @@ import { toast } from "sonner";
 import {
   Camera,
   CameraOff,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   Volume2,
   VolumeX,
-  Sparkles,
   QrCode,
   RotateCw,
 } from "lucide-react";
@@ -76,41 +74,55 @@ export default function SessionQRScannerDialog({
   const lastScannedTextRef = useRef<string>("");
   const lastScannedTimeRef = useRef<number>(0);
 
-  const playChime = useCallback((type: "success" | "already" | "error") => {
-    if (!soundEnabled) return;
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+  const playChime = useCallback(
+    (type: "success" | "already" | "error") => {
+      if (!soundEnabled) return;
+      try {
+        const audioCtx = new (
+          window.AudioContext || (window as any).webkitAudioContext
+        )();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
 
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
 
-      if (type === "success") {
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-        osc.frequency.setValueAtTime(1174.66, audioCtx.currentTime + 0.1); // D6
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
-        osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.35);
-      } else if (type === "already") {
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-        osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.2);
-      } else {
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-        osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.25);
+        if (type === "success") {
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+          osc.frequency.setValueAtTime(1174.66, audioCtx.currentTime + 0.1); // D6
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            audioCtx.currentTime + 0.35,
+          );
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.35);
+        } else if (type === "already") {
+          osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            audioCtx.currentTime + 0.2,
+          );
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.2);
+        } else {
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            audioCtx.currentTime + 0.25,
+          );
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.25);
+        }
+      } catch {
+        // Audio context might be restricted
       }
-    } catch {
-      // Audio context might be restricted
-    }
-  }, [soundEnabled]);
+    },
+    [soundEnabled],
+  );
 
   const processScan = useCallback(
     async (scannedText: string) => {
@@ -177,7 +189,7 @@ export default function SessionQRScannerDialog({
         setIsProcessing(false);
       }
     },
-    [sessionId, playChime, onScanSuccess]
+    [sessionId, playChime, onScanSuccess],
   );
 
   const startCamera = useCallback(async () => {
@@ -213,12 +225,13 @@ export default function SessionQRScannerDialog({
           (decodedText) => {
             processScan(decodedText);
           },
-          () => {}
+          () => {},
         );
       } catch (err: any) {
         console.error("Camera start error:", err);
         setCameraError(
-          err?.message || "Could not access camera. Please check device permissions."
+          err?.message ||
+            "Could not access camera. Please check device permissions.",
         );
         setIsScanning(false);
       }
@@ -313,14 +326,18 @@ export default function SessionQRScannerDialog({
                 {isProcessing && (
                   <div className="absolute inset-0 bg-background/60 backdrop-blur-xs flex items-center justify-center gap-2">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <span className="font-medium text-xs">Marking attendance...</span>
+                    <span className="font-medium text-xs">
+                      Marking attendance...
+                    </span>
                   </div>
                 )}
               </div>
             ) : (
               <div className="text-center py-6 px-4 space-y-2">
                 <QrCode className="h-10 w-10 text-muted-foreground mx-auto opacity-50" />
-                <p className="text-xs text-muted-foreground">Camera is turned off</p>
+                <p className="text-xs text-muted-foreground">
+                  Camera is turned off
+                </p>
                 <Button size="sm" onClick={startCamera} className="text-xs h-8">
                   <RotateCw className="h-3.5 w-3.5 mr-1" />
                   Restart Camera
@@ -382,18 +399,26 @@ export default function SessionQRScannerDialog({
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="font-semibold text-xs truncate">{lastScanned.user.name}</p>
+                  <p className="font-semibold text-xs truncate">
+                    {lastScanned.user.name}
+                  </p>
                   <Badge
                     variant={lastScanned.alreadyMarked ? "outline" : "default"}
                     className={`text-[9px] px-1 py-0 ${
-                      lastScanned.alreadyMarked ? "text-amber-600 border-amber-500/40" : "bg-green-600 text-white"
+                      lastScanned.alreadyMarked
+                        ? "text-amber-600 border-amber-500/40"
+                        : "bg-green-600 text-white"
                     }`}
                   >
-                    {lastScanned.alreadyMarked ? "Already Present" : "Present (+10)"}
+                    {lastScanned.alreadyMarked
+                      ? "Already Present"
+                      : "Present (+10)"}
                   </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground font-mono">
-                  {lastScanned.user.cbUserId || lastScanned.user.rollNumber || lastScanned.user.email}
+                  {lastScanned.user.cbUserId ||
+                    lastScanned.user.rollNumber ||
+                    lastScanned.user.email}
                 </p>
               </div>
               <span className="text-[10px] text-muted-foreground shrink-0">
@@ -418,7 +443,11 @@ export default function SessionQRScannerDialog({
                 disabled={isProcessing || !manualInput.trim()}
                 className="text-xs h-8 shrink-0"
               >
-                {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Submit"}
+                {isProcessing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  "Submit"
+                )}
               </Button>
             </form>
           </div>

@@ -60,7 +60,7 @@ export function NavMain({
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       tooltip={item.title}
-                      className="w-full text-sm font-semibold justify-start hover:text-amber-400"
+                      className="w-full text-sm font-semibold justify-start dark:hover:text-amber-400"
                     >
                       {item.icon && <item.icon className="h-4 w-4 shrink-0" />}
                       <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">{item.title}</span>
@@ -76,7 +76,7 @@ export function NavMain({
                       {item.items.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton asChild>
-                            <Link href={subItem.url} className="hover:text-amber-400">
+                            <Link href={subItem.url} prefetch={true} className="dark:hover:text-amber-400">
                               {subItem.icon && <subItem.icon className="h-4 w-4 shrink-0" />}
                               <span>{subItem.title}</span>
                             </Link>
@@ -92,9 +92,9 @@ export function NavMain({
                 <SidebarMenuButton
                   asChild
                   tooltip={item.title}
-                  className="w-full text-sm font-semibold justify-start hover:text-amber-400"
+                  className="w-full text-sm font-semibold justify-start dark:hover:text-amber-400"
                 >
-                  <Link href={item.url} className="flex items-center gap-2">
+                  <Link href={item.url} prefetch={true} className="flex items-center gap-2">
                     {item.icon && <item.icon className="h-4 w-4 shrink-0" />}
                     <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                   </Link>

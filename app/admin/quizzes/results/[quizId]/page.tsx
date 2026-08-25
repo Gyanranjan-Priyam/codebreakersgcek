@@ -17,6 +17,8 @@ import {
 import { PublishResultButton } from "./_components/publish-result-button";
 import { PublishAllResultsButton } from "./_components/publish-all-results-button";
 import { ExportExcelButton } from "./_components/export-excel-button";
+import { calculateQuizRankings } from "@/lib/quiz-ranking";
+
 export default async function QuizResultsPage({ params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
   const result = await getQuizByQuizId(quizId);
@@ -62,33 +64,26 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
 
   const userMap = new Map(users.map(u => [u.id, u]));
 
-  // Calculate top-to-bottom rankings (Rank 1, 2, 3...)
-  const sortedAttempts = [...attempts].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    if (b.pointsEarned !== a.pointsEarned) return b.pointsEarned - a.pointsEarned;
-    if (b.correctAnswers !== a.correctAnswers) return b.correctAnswers - a.correctAnswers;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
-
-  const rankMap = new Map<string, number>();
-  sortedAttempts.forEach((att, idx) => {
-    rankMap.set(att.id, idx + 1);
-  });
+  // Calculate CBT Rankings (Primary: Marks desc, Secondary: Submission time asc, Equal marks & time = identical rank)
+  const { sortedAttempts, rankMap, rankedDetailsMap } = calculateQuizRankings(attempts);
 
   // Evaluate candidate qualification status based on quiz cutoff settings
   const evaluateAttemptQualification = (attempt: { id: string; score: number; pointsEarned: number }) => {
     const rank = rankMap.get(attempt.id) || 1;
+    const isTied = rankedDetailsMap.get(attempt.id)?.isTied || false;
     const mode = quiz.cutoffType || "PERCENTAGE";
 
     if (mode === "TOP_N") {
       const topCount = quiz.topSelectCount || 10;
       const isTop = rank <= topCount;
+      const rankSuffix = isTied ? ` (Rank #${rank} Tied)` : ` (Rank #${rank})`;
       return {
         isQualified: isTop,
-        statusText: isTop ? "Qualified (Top N)" : "Failed",
-        statusLabel: isTop ? `QUALIFIED (Top ${topCount})` : `FAILED (Below Top ${topCount})`,
+        statusText: isTop ? `Qualified (Top ${topCount})` : "Failed",
+        statusLabel: isTop ? `QUALIFIED${rankSuffix}` : `FAILED${rankSuffix}`,
         variant: isTop ? "default" as const : "destructive" as const,
         rank,
+        isTied,
       };
     }
 
@@ -101,6 +96,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
         statusLabel: isPassed ? `QUALIFIED (>= ${minMarks} pts)` : `FAILED (< ${minMarks} pts)`,
         variant: isPassed ? "default" as const : "destructive" as const,
         rank,
+        isTied,
       };
     }
 
@@ -113,11 +109,12 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
       statusLabel: isPassed ? `QUALIFIED (>= ${minPercentage}%)` : `FAILED (< ${minPercentage}%)`,
       variant: isPassed ? "default" as const : "destructive" as const,
       rank,
+      isTied,
     };
   };
 
   // Map attempts to formatted list for export with rankings
-  const rankedAttemptsData = attempts.map((attempt) => {
+  const rankedAttemptsData = sortedAttempts.map((attempt) => {
     const user = userMap.get(attempt.userId);
     const setLetter = attempt.setNumber && attempt.setNumber >= 1 && attempt.setNumber <= 26
       ? String.fromCharCode(64 + attempt.setNumber)
@@ -132,6 +129,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
     } catch {}
 
     const qual = evaluateAttemptQualification(attempt);
+    const details = rankedDetailsMap.get(attempt.id);
 
     return {
       id: attempt.id,
@@ -145,9 +143,12 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
       status: attempt.completedAt ? "Completed" : "In Progress",
       tabSwitches,
       createdAt: attempt.createdAt,
+      completedAt: attempt.completedAt,
       isPublished: attempt.isPublished,
       isQualified: qual.isQualified,
       resultStatus: qual.statusLabel,
+      rank: qual.rank,
+      isTied: details?.isTied || false,
     };
   });
 
@@ -381,7 +382,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">Rank</TableHead>
+                    <TableHead className="w-20">Rank</TableHead>
                     <TableHead>Participant</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Set</TableHead>
@@ -389,7 +390,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                     <TableHead>Correct Answers</TableHead>
                     <TableHead>Points</TableHead>
                     <TableHead>Qualification</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Submitted At</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -400,18 +401,38 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                       ? String.fromCharCode(64 + attempt.setNumber)
                       : "A";
                     const qual = evaluateAttemptQualification(attempt);
+                    const details = rankedDetailsMap.get(attempt.id);
+                    const subDate = details?.submissionDate || new Date(attempt.completedAt || attempt.createdAt);
 
                     return (
                       <TableRow key={attempt.id}>
                         <TableCell className="font-bold text-center">
-                          <Badge variant="outline" className="font-mono text-xs">
-                            #{qual.rank}
-                          </Badge>
+                          <div className="flex flex-col items-center gap-1">
+                            <Badge
+                              variant="outline"
+                              className={`font-mono text-xs font-bold ${
+                                qual.rank === 1
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/40"
+                                  : qual.rank === 2
+                                  ? "bg-slate-500/10 text-slate-400 border-slate-500/40"
+                                  : qual.rank === 3
+                                  ? "bg-amber-700/10 text-amber-700 border-amber-700/40"
+                                  : ""
+                              }`}
+                            >
+                              #{qual.rank}
+                            </Badge>
+                            {qual.isTied && (
+                              <span className="text-[10px] text-amber-500/90 font-mono font-medium">
+                                Tied
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium">
                           {attempt.participantName || user?.name || "Unknown User"}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="text-sm text-muted-foreground font-mono">
                           {attempt.participantEmail || user?.email || "N/A"}
                         </TableCell>
                         <TableCell>
@@ -433,8 +454,9 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                             {qual.statusText}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(attempt.createdAt).toLocaleDateString()}
+                        <TableCell className="text-sm text-muted-foreground font-mono">
+                          <div>{subDate.toLocaleDateString()}</div>
+                          <div className="text-[11px] text-muted-foreground/80">{subDate.toLocaleTimeString()}</div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end items-center gap-2">

@@ -9,9 +9,7 @@ import {
   ShieldCheck,
   Layout,
   Terminal,
-  FileCode2,
   CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,7 +57,9 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
   const [title, setTitle] = useState(initialResume.title);
   const [mode, setMode] = useState<"latex" | "visual">(initialResume.mode);
   const [latexContent, setLatexContent] = useState(initialResume.latexContent);
-  const [visualData, setVisualData] = useState<ResumeData>(initialResume.visualData);
+  const [visualData, setVisualData] = useState<ResumeData>(
+    initialResume.visualData,
+  );
   const [templateId, setTemplateId] = useState(initialResume.templateId);
   const [isSaving, setIsSaving] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -109,7 +109,11 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
     return () => clearTimeout(timer);
   }, [latexContent, visualData, title, handleSave]);
 
-  const handleTemplateChange = (newTemplate: ResumeTemplate, newMode: "latex" | "visual", newTitle: string) => {
+  const handleTemplateChange = (
+    newTemplate: ResumeTemplate,
+    newMode: "latex" | "visual",
+    newTitle: string,
+  ) => {
     setTemplateId(newTemplate.id);
     setMode(newMode);
     setLatexContent(newTemplate.defaultLatex);
@@ -125,7 +129,12 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
       <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 px-4 lg:px-6 bg-card border-b border-border/60 shrink-0 w-full min-w-0">
         {/* Left: Back & Editable Title */}
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" asChild className="h-8 px-2 text-muted-foreground hover:text-foreground shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="h-8 px-2 text-muted-foreground hover:text-foreground shrink-0"
+          >
             <Link href="/dashboard/resume-builder">
               <ArrowLeft className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">Resumes</span>
@@ -147,20 +156,6 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleModeSwitch("latex")}
-            className={`h-7 px-3 text-xs gap-1.5 font-medium transition-all ${
-              mode === "latex"
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Code2 className="w-3.5 h-3.5" />
-            <span>Overleaf LaTeX</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
             onClick={() => handleModeSwitch("visual")}
             className={`h-7 px-3 text-xs gap-1.5 font-medium transition-all ${
               mode === "visual"
@@ -170,6 +165,20 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
           >
             <Palette className="w-3.5 h-3.5" />
             <span>Canva Visual</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleModeSwitch("latex")}
+            className={`h-7 px-3 text-xs gap-1.5 font-medium transition-all ${
+              mode === "latex"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span>Overleaf LaTeX</span>
           </Button>
         </div>
 
@@ -199,7 +208,8 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
                     LaTeX Compilation & Logs
                   </SheetTitle>
                   <SheetDescription className="text-xs">
-                    Real-time AST parsing diagnostics, sections count, and export tokens.
+                    Real-time AST parsing diagnostics, sections count, and
+                    export tokens.
                   </SheetDescription>
                 </SheetHeader>
               </div>
@@ -224,7 +234,9 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
                   </h4>
                   <div className="space-y-1 bg-slate-900/60 p-3 rounded-md border border-slate-800 text-[11px]">
                     <div>• Candidate: {parsedAST.name || "None"}</div>
-                    <div>• Contact Links: {parsedAST.contactLinks.length} parsed</div>
+                    <div>
+                      • Contact Links: {parsedAST.contactLinks.length} parsed
+                    </div>
                     <div>• Sections: {parsedAST.sections.length} parsed</div>
                     {parsedAST.sections.map((s, idx) => (
                       <div key={idx} className="pl-3 text-slate-400">
@@ -279,7 +291,8 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
                     ATS Optimization & Keywords
                   </SheetTitle>
                   <SheetDescription className="text-xs">
-                    Automated scan of your resume against modern Applicant Tracking Systems.
+                    Automated scan of your resume against modern Applicant
+                    Tracking Systems.
                   </SheetDescription>
                 </SheetHeader>
               </div>
@@ -289,7 +302,10 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
                 onWheel={(e) => e.stopPropagation()}
                 onTouchMoveCapture={(e) => e.stopPropagation()}
               >
-                <AtsScoreCard data={visualData} latexContent={mode === "latex" ? latexContent : undefined} />
+                <AtsScoreCard
+                  data={visualData}
+                  latexContent={mode === "latex" ? latexContent : undefined}
+                />
               </div>
             </SheetContent>
           </Sheet>
@@ -313,14 +329,20 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
           className="h-full w-full max-w-full min-w-0 rounded-xl overflow-hidden"
         >
           {/* Left Panel: Editor (LaTeX Monaco or Visual Builder) */}
-          <ResizablePanel defaultSize={50} minSize={25} className="h-full min-w-0 max-w-full overflow-hidden flex flex-col">
+          <ResizablePanel
+            defaultSize={50}
+            minSize={25}
+            className="h-full min-w-0 max-w-full overflow-hidden flex flex-col"
+          >
             <div className="h-full w-full min-w-0 max-w-full overflow-hidden flex flex-col pr-1">
               {mode === "latex" ? (
                 <LatexEditor
                   value={latexContent}
                   onChange={setLatexContent}
                   onResetToTemplate={() => {
-                    const tmpl = RESUME_TEMPLATES.find((t) => t.id === templateId) || RESUME_TEMPLATES[0];
+                    const tmpl =
+                      RESUME_TEMPLATES.find((t) => t.id === templateId) ||
+                      RESUME_TEMPLATES[0];
                     setLatexContent(tmpl.defaultLatex);
                     toast.info("Reset code to default template");
                   }}
@@ -332,10 +354,17 @@ export function StudioEditor({ initialResume }: StudioEditorProps) {
           </ResizablePanel>
 
           {/* Resizable Handle with Clean Indicator */}
-          <ResizableHandle withHandle className="hover:bg-primary/40 transition-colors mx-1" />
+          <ResizableHandle
+            withHandle
+            className="hover:bg-primary/40 transition-colors mx-1"
+          />
 
           {/* Right Panel: Live Preview */}
-          <ResizablePanel defaultSize={50} minSize={25} className="h-full min-w-0 max-w-full overflow-hidden flex flex-col">
+          <ResizablePanel
+            defaultSize={50}
+            minSize={25}
+            className="h-full min-w-0 max-w-full overflow-hidden flex flex-col"
+          >
             <div className="h-full w-full min-w-0 max-w-full overflow-hidden flex flex-col pl-1">
               <ResumePreview
                 mode={mode}

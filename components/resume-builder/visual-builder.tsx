@@ -7,32 +7,18 @@ import {
   GraduationCap,
   FolderGit2,
   Wrench,
-  Award,
   Palette,
   Plus,
   Trash2,
-  GripVertical,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  ExternalLink,
-  Github,
-  Linkedin,
-  Globe,
-  Mail,
-  Phone,
-  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import type { ResumeData, ExperienceItem, EducationItem, ProjectItem, SkillCategory, CertificationItem, AchievementItem } from "@/lib/resume/types";
+import type { ResumeData, ExperienceItem, EducationItem, ProjectItem, SkillCategory } from "@/lib/resume/types";
 
 interface VisualBuilderProps {
   data: ResumeData;

@@ -11,6 +11,8 @@ import {
   ListChecks,
   ReceiptText,
   FileText,
+  Compass,
+  Code2,
 } from "lucide-react";
 
 import { NavMain } from "@/components/public_components/nav-main";
@@ -46,7 +48,6 @@ const data = {
       url: "/dashboard",
       icon: LayoutDashboard,
     },
-
     {
       title: "Quizzes",
       url: "/dashboard/activities/quizzes",
@@ -69,9 +70,14 @@ const data = {
       icon: Users,
     },
     {
-      title: "Resume Builder",
+      title: "Resume Builder (Beta)",
       url: "/dashboard/resume-builder",
       icon: FileText,
+    },
+    {
+      title: "Roadmaps (Beta)",
+      url: "/dashboard/roadmaps",
+      icon: Compass,
     },
     {
       title: "Transactions",
@@ -131,24 +137,25 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
+              size="lg"
               asChild
               tooltip="CodeBreakers"
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
+              className="data-[slot=sidebar-menu-button]:p-1.5 hover:bg-sidebar-accent transition-colors"
             >
-              <Link href="/dashboard">
-                <div className="flex items-center">
-                  <span className="text-[1.1rem] font-bold inline-flex items-center hover:text-amber-400">
-                    <Image
-                      src="/assets/logo.png"
-                      alt="CodeBreakers Logo"
-                      width={32}
-                      height={32}
-                      className="inline-block mr-2 mb-1 shrink-0"
-                      priority
-                    />
-                    <span className="group-data-[collapsible=icon]:hidden">
-                      CodeBreakers
-                    </span>
+              <Link href="/dashboard" className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
+                  <Image
+                    src="/assets/logo.png"
+                    alt="CodeBreakers Logo"
+                    width={28}
+                    height={28}
+                    className="size-7 object-contain shrink-0"
+                    priority
+                  />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-bold text-lg leading-none tracking-tight">
+                    CodeBreakers
                   </span>
                 </div>
               </Link>

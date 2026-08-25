@@ -5,17 +5,14 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { BackButton } from "@/components/ui/back-button"
 import { usePathname } from "next/navigation"
 import { useMemo } from "react"
-import { Bell, ReceiptText } from "lucide-react";
+import { ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNotification } from "./notification-context";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
 import { ThemeSelectorDropdown } from "@/components/ui/theme-selector-dropdown";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { toggleNotification, unreadCount } = useNotification();
 
   // Generate page title based on current path
   const pageTitle = useMemo(() => {
@@ -125,25 +122,6 @@ export function SiteHeader() {
             <ReceiptText size={18} />
           </Link>
         </Button>
-
-        <div className="relative">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            aria-label="Notifications"
-            className="cursor-pointer relative"
-            onClick={toggleNotification}
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <Badge 
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white"
-              >
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </Badge>
-            )}
-          </Button>
-        </div>
       </div>
     </header>
   )

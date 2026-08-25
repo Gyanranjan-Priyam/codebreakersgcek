@@ -19,12 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+
 import { Search, Camera } from "lucide-react";
 import { MemberForAttendance, markAttendance } from "../../actions";
 import { toast } from "sonner";
@@ -39,12 +34,20 @@ interface MemberAttendanceListProps {
   adminId: string;
 }
 
-export default function MemberAttendanceList({ members, sessionId, sessionTitle, initialAttendance, adminId }: MemberAttendanceListProps) {
+export default function MemberAttendanceList({
+  members,
+  sessionId,
+  sessionTitle,
+  initialAttendance,
+  adminId,
+}: MemberAttendanceListProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
-  const [attendanceStatus, setAttendanceStatus] = useState<Record<string, string>>(initialAttendance);
+  const [selectedBatch, setSelectedBatch] = useState<string>("all");
+  const [attendanceStatus, setAttendanceStatus] =
+    useState<Record<string, string>>(initialAttendance);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
 
@@ -81,12 +84,12 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
     }
   };
 
-  // Extract unique years and branches
+  // Extract unique years, branches, and batches
   const admissionYears = useMemo(() => {
     const years = new Set(
       members
         .map((m) => m.admissionYear)
-        .filter((year): year is string => year !== null)
+        .filter((year): year is string => year !== null),
     );
     return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [members]);
@@ -95,9 +98,22 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
     const branchSet = new Set(
       members
         .map((m) => m.branch)
-        .filter((branch): branch is string => branch !== null)
+        .filter((branch): branch is string => branch !== null),
     );
     return Array.from(branchSet).sort();
+  }, [members]);
+
+  const availableBatches = useMemo(() => {
+    const batchMap = new Map<
+      string,
+      { id: string; name: string; code: string }
+    >();
+    members.forEach((m) => {
+      if (m.batch) {
+        batchMap.set(m.batch.id, m.batch);
+      }
+    });
+    return Array.from(batchMap.values());
   }, [members]);
 
   // Filter members
@@ -122,15 +138,19 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
       const matchesBranch =
         selectedBranch === "all" || member.branch === selectedBranch;
 
-      return matchesSearch && matchesYear && matchesBranch;
+      // Batch filter
+      const matchesBatch =
+        selectedBatch === "all" || member.batch?.id === selectedBatch;
+
+      return matchesSearch && matchesYear && matchesBranch && matchesBatch;
     });
-  }, [members, searchQuery, selectedYear, selectedBranch]);
+  }, [members, searchQuery, selectedYear, selectedBranch, selectedBatch]);
 
   return (
     <div className="space-y-4">
       {/* Filters and Scanner Button */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, User ID, email, roll..."
@@ -139,8 +159,23 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
             className="pl-9"
           />
         </div>
+        {availableBatches.length > 1 && (
+          <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Batch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Batches</SelectItem>
+              {availableBatches.map((batch) => (
+                <SelectItem key={batch.id} value={batch.id}>
+                  {batch.code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-full sm:w-[150px]">
+          <SelectTrigger className="w-full sm:w-[140px]">
             <SelectValue placeholder="Admission Year" />
           </SelectTrigger>
           <SelectContent>
@@ -153,7 +188,7 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
           </SelectContent>
         </Select>
         <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-          <SelectTrigger className="w-full sm:w-[150px]">
+          <SelectTrigger className="w-full sm:w-[140px]">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
           <SelectContent>
@@ -165,10 +200,7 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
             ))}
           </SelectContent>
         </Select>
-        <Button
-          onClick={() => setShowScanner(true)}
-          className="gap-2 shrink-0"
-        >
+        <Button onClick={() => setShowScanner(true)} className="gap-2 shrink-0">
           <Camera className="h-4 w-4" />
           Scan Student QR
         </Button>
@@ -209,6 +241,7 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>User ID</TableHead>
+                <TableHead>Batch</TableHead>
                 <TableHead>Username</TableHead>
                 <TableHead>Registration</TableHead>
                 <TableHead>Roll Number</TableHead>
@@ -224,13 +257,17 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
                 <TableRow key={member.id}>
                   <TableCell className="font-medium">{member.name}</TableCell>
                   <TableCell className="font-mono text-xs font-medium">
-                    {member.cbUserId || <span className="text-muted-foreground">-</span>}
+                    {member.cbUserId || (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    {member.username ? (
-                      <Badge variant="outline">@{member.username}</Badge>
+                    {member.batch ? (
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {member.batch.code}
+                      </Badge>
                     ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
+                      <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -263,7 +300,9 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
                   <TableCell className="text-center">
                     <Select
                       value={attendanceStatus[member.id] || "pending"}
-                      onValueChange={(value) => handleAttendanceChange(member.id, value)}
+                      onValueChange={(value) =>
+                        handleAttendanceChange(member.id, value)
+                      }
                       disabled={updatingId === member.id}
                     >
                       <SelectTrigger className="w-[130px]">
@@ -292,16 +331,24 @@ export default function MemberAttendanceList({ members, sessionId, sessionTitle,
                     </Select>
                   </TableCell>
                   <TableCell className="text-center">
-                    {(attendanceStatus[member.id] || "pending") === "pending" ? (
+                    {(attendanceStatus[member.id] || "pending") ===
+                    "pending" ? (
                       <Badge variant="outline" className="bg-yellow-50">
                         Pending
                       </Badge>
-                    ) : (attendanceStatus[member.id] || "pending") === "present" ? (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    ) : (attendanceStatus[member.id] || "pending") ===
+                      "present" ? (
+                      <Badge
+                        variant="outline"
+                        className="bg-green-50 text-green-700 border-green-200"
+                      >
                         +10 pts
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                      <Badge
+                        variant="outline"
+                        className="bg-red-50 text-red-700 border-red-200"
+                      >
                         0 pts
                       </Badge>
                     )}

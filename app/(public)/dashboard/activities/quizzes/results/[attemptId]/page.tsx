@@ -9,6 +9,7 @@ import { CheckCircle2, XCircle, Award, Clock, ArrowLeft, AlertTriangle } from "l
 import Link from "next/link";
 import { ExportResultPdfButton } from "@/app/admin/quizzes/results/[quizId]/_components/export-result-pdf-button";
 import { ScorecardPDFData } from "@/lib/student-result-pdf";
+import { calculateQuizRankings } from "@/lib/quiz-ranking";
 
 function findCorrectAnswerIndex(question: any): number {
   if (!question || !Array.isArray(question.options)) return -1;
@@ -208,6 +209,17 @@ export default async function QuizResultsPage({
     };
   });
 
+  // Fetch all attempts for this quiz to calculate competition ranking
+  const allAttempts = await prisma.quizAttempt.findMany({
+    where: { quizId: attempt.quizId },
+  });
+
+  const { rankMap, rankedDetailsMap } = calculateQuizRankings(allAttempts);
+  const studentRank = rankMap.get(attempt.id) || 1;
+  const rankDetails = rankedDetailsMap.get(attempt.id);
+  const isTied = rankDetails?.isTied || false;
+  const exactSubmissionDate = rankDetails?.submissionDate || new Date(attempt.completedAt || attempt.createdAt);
+
   const scorecardPdfData: ScorecardPDFData = {
     studentName: user.name || "Student",
     studentEmail: user.email || "",
@@ -219,8 +231,9 @@ export default async function QuizResultsPage({
     totalQuestions: attempt.totalQuestions,
     pointsEarned: attempt.pointsEarned,
     tabSwitches,
-    submissionDate: attempt.createdAt,
+    submissionDate: exactSubmissionDate,
     isPublished: attempt.isPublished,
+    statusLabel: attempt.isPublished ? (isTied ? `Rank #${studentRank} (Tied)` : `Rank #${studentRank}`) : undefined,
     questions: scorecardQuestions,
   };
 
@@ -246,17 +259,33 @@ export default async function QuizResultsPage({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Your Performance</CardTitle>
-            <Badge variant={attempt.score >= 70 ? "default" : "secondary"} className="text-lg px-4 py-1">
-              {attempt.score}%
-            </Badge>
+            <div className="flex items-center gap-2">
+              {attempt.isPublished && (
+                <Badge variant="outline" className="font-mono text-sm border-amber-500/40 text-amber-500 bg-amber-500/10">
+                  Rank #{studentRank} {isTied ? "(Tied)" : ""}
+                </Badge>
+              )}
+              <Badge variant={attempt.score >= 70 ? "default" : "secondary"} className="text-lg px-4 py-1">
+                {attempt.score}%
+              </Badge>
+            </div>
           </div>
           <CardDescription>
-            Completed on {attempt.completedAt ? new Date(attempt.completedAt).toLocaleString() : "N/A"}
+            Submitted on {exactSubmissionDate.toLocaleString()}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Score Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className={`grid gap-4 ${attempt.isPublished ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
+            {attempt.isPublished && (
+              <div className="text-center p-4 bg-muted rounded-lg flex flex-col items-center justify-center">
+                <p className="text-sm text-muted-foreground">Rank</p>
+                <p className="text-3xl font-black text-primary font-mono">#{studentRank}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {isTied ? "Tied Position" : `of ${allAttempts.length}`}
+                </p>
+              </div>
+            )}
             <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Score</p>
               <p className="text-3xl font-bold text-primary">{attempt.score}%</p>

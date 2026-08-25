@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { sessionNumber, title, date, day } = await req.json();
+    const { sessionNumber, title, date, day, targetBatchIds } = await req.json();
 
     if (!sessionNumber || !title || !date || !day) {
       return NextResponse.json(
@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
         title,
         date: new Date(date),
         day,
+        targetBatchIds: targetBatchIds || [],
         createdBy: session.user.id,
       },
     });

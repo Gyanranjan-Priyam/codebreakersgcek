@@ -19,13 +19,20 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -33,6 +40,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { updateAttendanceSession, AttendanceSessionData } from "../actions";
+import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
@@ -41,6 +49,7 @@ const formSchema = z.object({
   date: z.date({
     message: "Please select a date",
   }),
+  targetBatchIds: z.array(z.string()).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -54,6 +63,11 @@ interface EditSessionDialogProps {
 export default function EditSessionDialog({ session, open, onOpenChange }: EditSessionDialogProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string }[]>([]);
+
+  useEffect(() => {
+    getActiveBatchesList().then((list) => setBatchesList(list));
+  }, []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -61,6 +75,7 @@ export default function EditSessionDialog({ session, open, onOpenChange }: EditS
       sessionNumber: session.sessionNumber,
       title: session.title,
       date: new Date(session.date),
+      targetBatchIds: session.targetBatchIds || [],
     },
   });
 
@@ -70,6 +85,7 @@ export default function EditSessionDialog({ session, open, onOpenChange }: EditS
         sessionNumber: session.sessionNumber,
         title: session.title,
         date: new Date(session.date),
+        targetBatchIds: session.targetBatchIds || [],
       });
     }
   }, [open, session, form]);
@@ -91,6 +107,7 @@ export default function EditSessionDialog({ session, open, onOpenChange }: EditS
         title: data.title,
         date: data.date,
         day,
+        targetBatchIds: data.targetBatchIds || [],
       });
 
       if (result.status === "success") {
@@ -203,6 +220,54 @@ export default function EditSessionDialog({ session, open, onOpenChange }: EditS
                   <FormMessage />
                 </FormItem>
               )}
+            />
+
+            <FormField
+              control={form.control}
+              name="targetBatchIds"
+              render={({ field }) => {
+                const currentValue =
+                  field.value && field.value.length > 0 ? field.value[0] : "all";
+                return (
+                  <FormItem>
+                    <FormLabel>Target Batch</FormLabel>
+                    <div className="relative">
+                      <Select
+                        value={currentValue}
+                        onValueChange={(val) => {
+                          if (val === "all") {
+                            field.onChange([]);
+                          } else {
+                            field.onChange([val]);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="pl-10">
+                            <SelectValue placeholder="Select Target Batch" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            All Batches (Global - All students)
+                          </SelectItem>
+                          {batchesList.map((batch) => (
+                            <SelectItem key={batch.id} value={batch.id}>
+                              {batch.name} ({batch.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Layers className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Select which batch this attendance session is for.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <DialogFooter>

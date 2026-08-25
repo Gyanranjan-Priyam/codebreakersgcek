@@ -20,6 +20,7 @@ export interface TransactionItem {
   hasFormPaymentField: boolean;
   isValidTransaction: boolean;
   isFakeOrSuspicious: boolean;
+  formDefinition?: any;
 }
 
 export interface FormTransactionSummary {
@@ -171,8 +172,8 @@ export async function getAdminTransactions(): Promise<{
       const isPaymentForm = hasFormPaymentField(formDef);
       const txId = res.transactionId ? res.transactionId.trim() : null;
 
-      // Filter: Show ONLY form responses that are associated with a payment field or have a transaction ID
-      if (!isPaymentForm && !txId) {
+      // Filter: Show ONLY form responses that contain a valid Transaction ID
+      if (!txId || txId.length < 3 || ["null", "undefined", "n/a", "na", "none", "nil", "0", "0000"].includes(txId.toLowerCase())) {
         continue;
       }
 
@@ -220,7 +221,10 @@ export async function getAdminTransactions(): Promise<{
         formSummary.fakeOrSuspiciousCount += 1;
       }
 
-      if (!formSummary.lastSubmissionDate || new Date(res.createdAt) > new Date(formSummary.lastSubmissionDate)) {
+      if (
+        !formSummary.lastSubmissionDate ||
+        new Date(res.createdAt) > new Date(formSummary.lastSubmissionDate)
+      ) {
         formSummary.lastSubmissionDate = res.createdAt.toISOString();
       }
 
@@ -240,6 +244,7 @@ export async function getAdminTransactions(): Promise<{
         hasFormPaymentField: isPaymentForm,
         isValidTransaction: isValid,
         isFakeOrSuspicious,
+        formDefinition: formDef || null,
       });
     }
 

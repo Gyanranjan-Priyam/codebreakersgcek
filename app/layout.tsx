@@ -7,29 +7,30 @@ import { Analytics } from "@vercel/analytics/next";
 import CapacitorProvider from "@/components/providers/capacitor-provider";
 import { MobileRedirect } from "@/components/mobile-redirect";
 
-
 const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
-  variable: "--font-source-code-pro", 
-})
+  variable: "--font-source-code-pro",
+});
 
 export const viewport: Viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
   // Add viewport-fit for safe area insets on notched devices
-  viewportFit: 'cover',
-}
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.codebreakersgcek.tech'),
+  metadataBase: new URL("https://www.codebreakersgcek.tech"),
   title: {
     template: "%s | CodeBreakers GCEK",
-    default: "CodeBreakers - Coding Club | Government College of Engineering Kalahandi"
+    default:
+      "CodeBreakers - Coding Club | Government College of Engineering Kalahandi",
   },
-  description: "Join CodeBreakers, the premier coding club at Government College of Engineering Kalahandi (GCEK). Learn programming, participate in hackathons, compete in coding challenges, and build innovative projects with a community of 500+ passionate developers.",
+  description:
+    "Join CodeBreakers, the premier coding club at Government College of Engineering Kalahandi (GCEK). Learn programming, participate in hackathons, compete in coding challenges, and build innovative projects with a community of 500+ passionate developers.",
   keywords: [
     "CodeBreakers",
     "CodeBreakers GCEK",
@@ -64,7 +65,7 @@ export const metadata: Metadata = {
     "quiz competition",
     "tech workshops",
     "coding events",
-    "best coding club Odisha"
+    "best coding club Odisha",
   ],
   authors: [{ name: "CodeBreakers GCEK" }],
   creator: "CodeBreakers GCEK",
@@ -79,10 +80,10 @@ export const metadata: Metadata = {
       { url: "/assets/logo.png", sizes: "32x32", type: "image/png" },
       { url: "/assets/logo.png", sizes: "16x16", type: "image/png" },
       { url: "/assets/logo.png", sizes: "192x192", type: "image/png" },
-      { url: "/assets/logo.png", sizes: "512x512", type: "image/png" }
+      { url: "/assets/logo.png", sizes: "512x512", type: "image/png" },
     ],
     apple: "/assets/logo.png",
-    shortcut: "/assets/logo.png"
+    shortcut: "/assets/logo.png",
   },
   openGraph: {
     type: "website",
@@ -90,7 +91,8 @@ export const metadata: Metadata = {
     url: "https://www.codebreakersgcek.tech",
     siteName: "CodeBreakers GCEK",
     title: "CodeBreakers - Premier Coding Club at GCEK",
-    description: "Join 500+ developers at CodeBreakers, GCEK's leading coding club. Participate in hackathons, competitive programming, and innovative projects. Build your coding skills and network with passionate developers.",
+    description:
+      "Join 500+ developers at CodeBreakers, GCEK's leading coding club. Participate in hackathons, competitive programming, and innovative projects. Build your coding skills and network with passionate developers.",
     images: [
       {
         url: "/assets/logo.png",
@@ -103,7 +105,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "CodeBreakers - Premier Coding Club at GCEK",
-    description: "Join 500+ developers at CodeBreakers, GCEK's leading coding club. Hackathons, competitive programming, and innovative projects.",
+    description:
+      "Join 500+ developers at CodeBreakers, GCEK's leading coding club. Hackathons, competitive programming, and innovative projects.",
     images: ["/assets/logo.png"],
     creator: "@codebreakers_gcek",
   },
@@ -113,9 +116,9 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
   verification: {
@@ -135,28 +138,33 @@ export default function RootLayout({
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "CodeBreakers GCEK",
-    "alternateName": ["CodeBreakers", "CodeBreakers GCE Kalahandi", "Coding Club of GCE Kalahandi"],
-    "url": "https://www.codebreakersgcek.tech",
-    "logo": "https://www.codebreakersgcek.tech/assets/logo.png",
-    "description": "Premier coding club at Government College of Engineering Kalahandi (GCEK) with 500+ members, organizing hackathons, coding competitions, and tech events.",
-    "foundingLocation": {
+    name: "CodeBreakers GCEK",
+    alternateName: [
+      "CodeBreakers",
+      "CodeBreakers GCE Kalahandi",
+      "Coding Club of GCE Kalahandi",
+    ],
+    url: "https://www.codebreakersgcek.tech",
+    logo: "https://www.codebreakersgcek.tech/assets/logo.png",
+    description:
+      "Premier coding club at Government College of Engineering Kalahandi (GCEK) with 500+ members, organizing hackathons, coding competitions, and tech events.",
+    foundingLocation: {
       "@type": "Place",
-      "address": {
+      address: {
         "@type": "PostalAddress",
-        "addressLocality": "Bhawanipatna",
-        "addressRegion": "Kalahandi",
-        "addressCountry": "India"
-      }
+        addressLocality: "Bhawanipatna",
+        addressRegion: "Kalahandi",
+        addressCountry: "India",
+      },
     },
-    "parentOrganization": {
+    parentOrganization: {
       "@type": "EducationalOrganization",
-      "name": "Government College of Engineering Kalahandi"
+      name: "Government College of Engineering Kalahandi",
     },
-    "sameAs": [
+    sameAs: [
       "https://www.instagram.com/codebreakers_gcek",
-      "https://www.linkedin.com/company/codebreakers-gcek"
-    ]
+      "https://www.linkedin.com/company/codebreakers-gcek",
+    ],
   };
 
   return (
@@ -181,19 +189,17 @@ export default function RootLayout({
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationSchema),
+          }}
         />
       </head>
-      <body
-        className={` ${sourceCodePro.variable} antialiased`}
-      >
+      <body className={` ${sourceCodePro.variable} antialiased`}>
         <CapacitorProvider>
           <MobileRedirect />
-          <LenisProvider>
-            {children}
-          </LenisProvider>
+          <LenisProvider>{children}</LenisProvider>
         </CapacitorProvider>
-        <Toaster position="top-center" richColors closeButton />
+        <Toaster position="bottom-right" richColors closeButton />
         <Analytics />
       </body>
     </html>

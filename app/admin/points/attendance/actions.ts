@@ -25,6 +25,7 @@ export interface MemberForAttendance {
   branch: string | null;
   admissionYear: string | null;
   batchId?: string | null;
+  batch?: { id: string; name: string; code: string } | null;
   mobileNumber: string | null;
   role: string | null;
 }
@@ -51,6 +52,13 @@ export async function getAllMembers(targetBatchIds?: string[]) {
         branch: true,
         admissionYear: true,
         batchId: true,
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
         mobileNumber: true,
         role: true,
       },

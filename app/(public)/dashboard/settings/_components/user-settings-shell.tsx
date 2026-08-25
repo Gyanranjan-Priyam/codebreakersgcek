@@ -223,7 +223,7 @@ export function UserSettingsShell({ userData }: UserSettingsShellProps) {
               <NotifRow
                 icon={Mail}
                 label="Email"
-                description="Receive registrations, updates & announcements via email"
+                description="Receive registrations & event updates via email"
                 active
                 fixed
               />

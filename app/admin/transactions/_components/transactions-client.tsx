@@ -977,16 +977,53 @@ export function TransactionsClient({
                     <FileText className="h-3.5 w-3.5" /> Form Submission Answers
                   </p>
                   <div className="rounded-md border divide-y text-xs">
-                    {Object.entries(selectedTx.answers).map(([key, val]) => (
-                      <div key={key} className="flex justify-between gap-2 px-3 py-2">
-                        <span className="text-muted-foreground capitalize font-medium">
-                          {key.replace(/([A-Z])/g, " $1")}
-                        </span>
-                        <span className="font-mono text-foreground text-right truncate max-w-[200px]">
-                          {typeof val === "object" ? JSON.stringify(val) : String(val ?? "—")}
-                        </span>
-                      </div>
-                    ))}
+                    {Object.entries(selectedTx.answers).map(([key, val]) => {
+                      // Check for sub-questions object
+                      let parsedSub: Record<string, any> | null = null;
+                      if (val && typeof val === "object" && !Array.isArray(val)) {
+                        parsedSub = val as Record<string, any>;
+                      } else if (typeof val === "string" && val.trim().startsWith("{") && val.trim().endsWith("}")) {
+                        try {
+                          const obj = JSON.parse(val);
+                          if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+                            parsedSub = obj;
+                          }
+                        } catch {}
+                      }
+
+                      if (parsedSub) {
+                        return (
+                          <div key={key} className="p-3 space-y-1.5 bg-muted/20">
+                            <span className="text-foreground font-bold capitalize block text-xs">
+                              {key.replace(/([A-Z])/g, " $1")}
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-2 border-l-2 border-primary/20">
+                              {Object.entries(parsedSub).map(([subK, subV]) => (
+                                <div key={subK} className="p-1.5 rounded bg-background border text-[11px]">
+                                  <span className="text-muted-foreground font-medium block">
+                                    {subK.replace(/^sub[-_]/i, "").replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                                  </span>
+                                  <span className="font-semibold text-foreground">
+                                    {String(subV ?? "—")}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={key} className="flex justify-between items-center gap-2 px-3 py-2">
+                          <span className="text-muted-foreground capitalize font-medium">
+                            {key.replace(/([A-Z])/g, " $1")}
+                          </span>
+                          <span className="font-semibold text-foreground text-right">
+                            {Array.isArray(val) ? val.join(", ") : String(val ?? "—")}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

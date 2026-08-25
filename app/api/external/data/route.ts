@@ -15,7 +15,7 @@ import arcjet, { slidingWindow } from "@/lib/arcjet";
  * 
  * Query Parameters:
  * - resource: Specify which resource to fetch (required)
- *   Available resources: users, announcements, attendance, tasks, events, quizzes, 
+ *   Available resources: users, attendance, tasks, events, quizzes, 
  *   projects, reviews, resources, support, all
  * - limit: Number of records to fetch (default: 100, max: 1000)
  * - offset: Number of records to skip for pagination (default: 0)
@@ -26,7 +26,6 @@ import arcjet, { slidingWindow } from "@/lib/arcjet";
  * For quizzes: isActive
  * For tasks: status
  * For support: status, priority
- * For announcements: category, audience
  * 
  * Examples:
  * GET /api/external/data?resource=users&limit=50&branch=CSE
@@ -89,7 +88,7 @@ export async function GET(request: NextRequest) {
           message: "Resource parameter is required",
           code: "MISSING_RESOURCE",
           availableResources: [
-            "users", "announcements", "attendance", "tasks", "events",
+            "users", "attendance", "tasks", "events",
             "quizzes", "projects", "reviews", "resources", "support", "all"
           ]
         },
@@ -106,13 +105,6 @@ export async function GET(request: NextRequest) {
         data = await fetchUsers(searchParams, limit, offset, includeRelations);
         totalCount = await prisma.user.count({
           where: buildUserFilter(searchParams)
-        });
-        break;
-
-      case "announcements":
-        data = await fetchAnnouncements(searchParams, limit, offset);
-        totalCount = await prisma.announcement.count({
-          where: buildAnnouncementFilter(searchParams)
         });
         break;
 
@@ -167,7 +159,7 @@ export async function GET(request: NextRequest) {
             message: `Invalid resource: ${resource}`,
             code: "INVALID_RESOURCE",
             availableResources: [
-              "users", "announcements", "attendance", "tasks", "events",
+              "users", "attendance", "tasks", "events",
               "quizzes", "projects", "reviews", "resources", "all"
             ]
           },
@@ -275,40 +267,6 @@ async function fetchUsers(searchParams: URLSearchParams, limit: number, offset: 
   });
 
   return users;
-}
-
-async function fetchAnnouncements(searchParams: URLSearchParams, limit: number, offset: number) {
-  const where = buildAnnouncementFilter(searchParams);
-
-  const announcements = await prisma.announcement.findMany({
-    where,
-    select: {
-      id: true,
-      slugId: true,
-      title: true,
-      description: true,
-      category: true,
-      priority: true,
-      attachmentKeys: true,
-      imageKeys: true,
-      audience: true,
-      sendNotifications: true,
-      isPinned: true,
-      showInHomeBanner: true,
-      publishDate: true,
-      expiryDate: true,
-      isRecurring: true,
-      recurrenceType: true,
-      createdAt: true,
-      updatedAt: true,
-      createdBy: true,
-    },
-    take: limit,
-    skip: offset,
-    orderBy: { createdAt: 'desc' }
-  });
-
-  return announcements;
 }
 
 async function fetchAttendance(searchParams: URLSearchParams, limit: number, offset: number, includeRelations: boolean) {
@@ -574,7 +532,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
   // For 'all', we'll fetch a summary of each resource with limited data
   const [
     users,
-    announcements,
     attendanceSessions,
     tasks,
     events,
@@ -585,7 +542,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
     systemSettings,
   ] = await Promise.all([
     prisma.user.count(),
-    prisma.announcement.count(),
     prisma.attendanceSession.count(),
     prisma.task.count(),
     prisma.eventPoint.count(),
@@ -606,7 +562,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
   return {
     summary: {
       totalUsers: users,
-      totalAnnouncements: announcements,
       totalAttendanceSessions: attendanceSessions,
       totalTasks: tasks,
       totalEvents: events,
@@ -634,20 +589,6 @@ function buildUserFilter(searchParams: URLSearchParams) {
   if (admissionYear) where.admissionYear = admissionYear;
   if (profileComplete !== null) where.profileComplete = profileComplete === "true";
   if (role) where.role = role;
-
-  return where;
-}
-
-function buildAnnouncementFilter(searchParams: URLSearchParams) {
-  const where: any = { isDeleted: false };
-
-  const category = searchParams.get("category");
-  const audience = searchParams.get("audience");
-  const isPinned = searchParams.get("isPinned");
-
-  if (category) where.category = category;
-  if (audience) where.audience = audience;
-  if (isPinned !== null) where.isPinned = isPinned === "true";
 
   return where;
 }

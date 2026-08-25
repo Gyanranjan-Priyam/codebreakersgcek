@@ -1173,15 +1173,17 @@ export async function publishStudentResult(attemptId: string) {
 
     const mode = attempt.quiz.cutoffType || "PERCENTAGE";
     if (mode === "TOP_N") {
+      const { calculateQuizRankings } = await import("@/lib/quiz-ranking");
       const allQuizAttempts = await prisma.quizAttempt.findMany({
         where: { quizId: attempt.quizId },
-        orderBy: [{ score: "desc" }, { pointsEarned: "desc" }, { correctAnswers: "desc" }, { createdAt: "asc" }],
-        select: { id: true },
       });
-      const rank = allQuizAttempts.findIndex((a) => a.id === attempt.id) + 1;
+      const { rankMap, rankedDetailsMap } = calculateQuizRankings(allQuizAttempts);
+      const rank = rankMap.get(attempt.id) || 1;
+      const isTied = rankedDetailsMap.get(attempt.id)?.isTied || false;
       const topCount = attempt.quiz.topSelectCount || 10;
       isPassed = rank > 0 && rank <= topCount;
-      statusLabel = isPassed ? `QUALIFIED (Rank ${rank})` : `FAILED (Rank ${rank})`;
+      const rankSuffix = isTied ? ` (Rank #${rank} Tied)` : ` (Rank #${rank})`;
+      statusLabel = isPassed ? `QUALIFIED${rankSuffix}` : `FAILED${rankSuffix}`;
     } else if (mode === "MARKS") {
       const minMarks = attempt.quiz.cutoffMarks ?? 0;
       isPassed = (attempt.pointsEarned ?? 0) >= minMarks;

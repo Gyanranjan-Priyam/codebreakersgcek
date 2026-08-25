@@ -1,11 +1,8 @@
 "use client"
 
 import {
-  CreditCard,
   MoreVertical,
   LogOut,
-  Bell,
-  UserCircle,
 } from "lucide-react"
 
 import {
@@ -16,7 +13,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
