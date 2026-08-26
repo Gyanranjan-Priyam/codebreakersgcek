@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, Phone, IdCard, Building2, BookOpen, Award, Timer, CheckCircle2 } from "lucide-react";
 import { submitQuizAttempt } from "../actions";
 import { blockUserFromQuizAction } from "../block-actions";
-import { setSystemAttemptingAction } from "@/app/admin/quizzes/actions";
+import { setSystemAttemptingAction, getSystemState } from "@/app/admin/quizzes/actions";
 import { CloseWindowButton } from "./close-window-button";
 import { toast } from "sonner";
 import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
@@ -44,6 +44,11 @@ interface Question {
   options: string[];
   correctAnswer?: number;
   originalIndex?: number;
+  category?: string;
+  explanation?: string;
+  points?: number;
+  negativePoints?: number;
+  isFlagged?: boolean;
 }
 
 interface QuizProctorInterfaceProps {
@@ -95,6 +100,7 @@ export default function QuizProctorInterface({
   const [timeRemaining, setTimeRemaining] = useState(quiz.duration * 60); // Convert minutes to seconds
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const answersRef = useRef<Record<number, number>>({});
+  const handleSubmitRef = useRef<((isAutoSubmit?: boolean, customAnswers?: Record<number, number>) => Promise<void>) | null>(null);
   const [showTimeOverModal, setShowTimeOverModal] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
@@ -131,6 +137,35 @@ export default function QuizProctorInterface({
     }
   }, [systemCode]);
 
+  // Active shift sync heartbeat during exam attempt to guarantee instant shift end in production
+  useEffect(() => {
+    if (!systemCode || currentStep !== 'quiz-started') return;
+
+    const currentShift = quiz.shift || 1;
+    const interval = setInterval(async () => {
+      try {
+        const res = await getSystemState(systemCode);
+        if (res.status === "success" && res.data) {
+          const sys = res.data;
+          const assignedShift = sys.assignedShift || 1;
+          const activeShift = sys.quiz?.activeShift || 1;
+          
+          // If shift completed, status changed to REGISTERED, or shift moved to next shift
+          if (sys.status === "REGISTERED" || sys.status === "COMPLETED" || assignedShift > currentShift || activeShift > currentShift) {
+            toast.info("Shift time has completed. Automatically submitting your attempted questions...");
+            if (handleSubmitRef.current) {
+              handleSubmitRef.current(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Heartbeat sync error:", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [systemCode, currentStep, quiz.shift]);
+
   // Real-time Socket.IO unblock & shift completed listener inside QuizProctorInterface
   useEffect(() => {
     let roomsToLeave: Array<() => void> = [];
@@ -165,13 +200,17 @@ export default function QuizProctorInterface({
           setIsBlocked(true);
         } else if (data?.status === "REGISTERED" || data?.shiftCompleted) {
           toast.info("Shift has completed. Auto-submitting your attempted questions...");
-          handleSubmitQuiz(true);
+          if (handleSubmitRef.current) {
+            handleSubmitRef.current(true);
+          }
         }
       };
 
       handleShiftCompleted = () => {
         toast.info("Shift has completed. Auto-submitting your attempted questions...");
-        handleSubmitQuiz(true);
+        if (handleSubmitRef.current) {
+          handleSubmitRef.current(true);
+        }
       };
 
       socket.on("unblocked", handleUnblock);
@@ -396,15 +435,33 @@ export default function QuizProctorInterface({
         setSubmissionResult(result.data);
         setCurrentStep('quiz-submitted');
       } else {
-        alert(result.message || "Failed to submit quiz. Please try again.");
+        if (isAutoSubmit) {
+          if (systemCode) {
+            try {
+              localStorage.removeItem(`cb_answers_${systemCode}`);
+              localStorage.removeItem(`cb_qidx_${systemCode}`);
+            } catch (e) {}
+          }
+          setCurrentStep('quiz-submitted');
+        } else {
+          alert(result.message || "Failed to submit quiz. Please try again.");
+        }
       }
     } catch (error) {
       console.error("Error submitting quiz:", error);
-      alert("An error occurred while submitting the quiz. Please try again.");
+      if (isAutoSubmit) {
+        setCurrentStep('quiz-submitted');
+      } else {
+        alert("An error occurred while submitting the quiz. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmitQuiz;
+  });
 
   const handleViewAchievements = () => {
     if (window.opener && !window.opener.closed) {

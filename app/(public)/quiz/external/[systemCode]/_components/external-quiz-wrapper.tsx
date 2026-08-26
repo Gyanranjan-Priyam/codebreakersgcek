@@ -141,19 +141,17 @@ export default function ExternalQuizWrapper({
       socket.on("shift-completed", handleShiftCompleted);
     });
 
-    // Fast polling fallback when blocked (2s) to guarantee instant unblock
-    let pollTimer: NodeJS.Timeout | null = null;
-    if (liveIsBlocked) {
-      pollTimer = setInterval(async () => {
-        const res = await getSystemState(systemCode);
-        if (res.status === "success" && res.data) {
-          if (res.data.status === "ATTEMPTING" || res.data.status === "IN_PROGRESS") {
-            setLiveIsBlocked(false);
-            toast.success("Unblocked by administrator! Continuing exam...");
-          }
+    // Active 2s polling heartbeat to guarantee instant unblock and shift end detection in production
+    const pollTimer = setInterval(async () => {
+      const res = await getSystemState(systemCode);
+      if (res.status === "success" && res.data) {
+        if (res.data.status === "ATTEMPTING" || res.data.status === "IN_PROGRESS") {
+          setLiveIsBlocked(false);
+        } else if (res.data.status === "BLOCKED") {
+          setLiveIsBlocked(true);
         }
-      }, 2000);
-    }
+      }
+    }, 2000);
 
     return () => {
       if (leaveRoomFn) leaveRoomFn();
@@ -164,9 +162,7 @@ export default function ExternalQuizWrapper({
         if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
         if (handleShiftCompleted) socket.off("shift-completed", handleShiftCompleted);
       }
-      if (pollTimer) {
-        clearInterval(pollTimer);
-      }
+      clearInterval(pollTimer);
     };
   }, [systemCode, liveIsBlocked]);
 
