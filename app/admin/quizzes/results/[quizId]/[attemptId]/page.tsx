@@ -160,23 +160,12 @@ export default async function StudentResultDetailPage({
   // Parse questions & student answers
   const userAnswersMap = parseUserAnswersMap(attempt.answersJson);
 
-  let questionsData: any = {};
-  try {
-    questionsData = JSON.parse(attempt.quiz.questionsJson);
-  } catch (e) {
-    console.error(e);
-  }
-
-  let questionsList: any[] = [];
   const setLetter = attempt.setNumber && attempt.setNumber >= 1 && attempt.setNumber <= 26
     ? String.fromCharCode(64 + attempt.setNumber)
     : "A";
 
-  if (typeof questionsData === "object" && !Array.isArray(questionsData) && questionsData !== null) {
-    questionsList = questionsData[setLetter] || questionsData["A"] || [];
-  } else if (Array.isArray(questionsData)) {
-    questionsList = questionsData;
-  }
+  const { getQuestionsForShiftAndSet } = await import("@/app/admin/quizzes/utils");
+  const questionsList = getQuestionsForShiftAndSet(attempt.quiz.questionsJson, attempt.shiftNumber || 1, setLetter);
 
   // Fetch all attempts of this quiz to compute competition rank
   const allQuizAttempts = await prisma.quizAttempt.findMany({

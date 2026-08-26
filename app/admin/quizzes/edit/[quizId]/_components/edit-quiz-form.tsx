@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -26,7 +27,6 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -36,6 +36,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { updateQuiz } from "../../../actions";
 import {
@@ -46,13 +59,13 @@ import {
   Users,
   Globe,
   Key,
-  FileText,
-  Sparkles,
   RefreshCw,
   Award,
   Layers,
+  Edit3,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { parseQuestionsByShiftAndSet } from "@/app/admin/quizzes/utils";
 
 const formSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -121,12 +134,15 @@ interface EditQuizFormProps {
 export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [setQuestions, setSetQuestions] = useState<Record<string, any[]>>({});
+  // Shift-isolated questions: { [shiftNumber]: { [setLetter]: Question[] } }
+  const [shiftQuestions, setShiftQuestions] = useState<Record<number, Record<string, any[]>>>({});
   const [textareaValues, setTextareaValues] = useState<Record<string, string>>({});
-  const [currentSet, setCurrentSet] = useState("A");
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [previewSet, setPreviewSet] = useState<string>("ALL");
+  const [selectedShiftForSidebar, setSelectedShiftForSidebar] = useState<number | null>(null);
+  const [isShiftSidebarOpen, setIsShiftSidebarOpen] = useState(false);
+  const [activeSidebarSet, setActiveSidebarSet] = useState<string>("A");
+  const [activePreviewShiftTab, setActivePreviewShiftTab] = useState<string>("shift-1");
   const [shiftsConfig, setShiftsConfig] = useState<ShiftItem[]>([]);
 
   const generate6DigitCode = () => {
@@ -161,32 +177,21 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
   useEffect(() => {
     if (!isInitialized) {
       try {
-        const parsedQuestions = JSON.parse(quiz.questionsJson);
-        const initialQuestions: Record<string, any[]> = {};
+        const numShifts = quiz.shifts || 1;
+        const numSets = quiz.sets || 1;
+
+        const parsedMap = parseQuestionsByShiftAndSet(quiz.questionsJson, numShifts, numSets);
+        setShiftQuestions(parsedMap);
+
         const initialTextareas: Record<string, string> = {};
-        
-        if (typeof parsedQuestions === 'object' && !Array.isArray(parsedQuestions)) {
-          for (let i = 0; i < quiz.sets; i++) {
-            const setLetter = String.fromCharCode(65 + i);
-            initialQuestions[setLetter] = parsedQuestions[setLetter] || [];
-            initialTextareas[setLetter] = parsedQuestions[setLetter] 
-              ? JSON.stringify(parsedQuestions[setLetter], null, 2)
-              : "";
-          }
-        } else if (Array.isArray(parsedQuestions)) {
-          initialQuestions.A = parsedQuestions;
-          initialTextareas.A = JSON.stringify(parsedQuestions, null, 2);
-          for (let i = 1; i < quiz.sets; i++) {
-            const setLetter = String.fromCharCode(65 + i);
-            initialQuestions[setLetter] = [];
-            initialTextareas[setLetter] = "";
-          }
-        }
-        
-        setSetQuestions(initialQuestions);
+        Object.entries(parsedMap).forEach(([sNumStr, setsMap]: [string, Record<string, any[]>]) => {
+          Object.entries(setsMap).forEach(([sLetter, qList]: [string, any[]]) => {
+            const key = `shift_${sNumStr}_${sLetter}`;
+            initialTextareas[key] = qList && qList.length > 0 ? JSON.stringify(qList, null, 2) : "";
+          });
+        });
         setTextareaValues(initialTextareas);
 
-        // Initialize shiftsConfig
         let parsedShifts: ShiftItem[] = [];
         try {
           if (quiz.shiftsJson) {
@@ -196,8 +201,6 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
           console.error("Error parsing shiftsJson:", e);
         }
 
-        const numShifts = quiz.shifts || 1;
-        const numSets = quiz.sets || 1;
         const availableSetLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
 
         if (parsedShifts.length > 0) {
@@ -238,32 +241,13 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
   const watchPoints = form.watch("pointsPerQuestion");
   const watchAccessCode = form.watch("accessCode");
 
-  const totalQuestions = Object.values(setQuestions).reduce((sum, qList) => sum + (Array.isArray(qList) ? qList.length : 0), 0);
-  
-  useEffect(() => {
-    if (isInitialized) {
-      const sets = watchSets;
-      const newSetQuestions: Record<string, any[]> = {};
-      const newTextareas: Record<string, string> = {};
-      for (let i = 0; i < sets; i++) {
-        const setLetter = String.fromCharCode(65 + i);
-        if (setQuestions[setLetter]) {
-          newSetQuestions[setLetter] = setQuestions[setLetter];
-          newTextareas[setLetter] = textareaValues[setLetter] || "";
-        } else {
-          newSetQuestions[setLetter] = [];
-          newTextareas[setLetter] = "";
-        }
-      }
-      setSetQuestions(newSetQuestions);
-      setTextareaValues(newTextareas);
-      setCurrentSet("A");
-    }
-  }, [watchSets, isInitialized]);
+  const totalQuestions = Object.values(shiftQuestions).reduce(
+    (acc, setsMap) => acc + Object.values(setsMap).reduce((sum, qList) => sum + (qList?.length || 0), 0),
+    0
+  );
 
   const prevSetsRef = useRef(watchSets);
 
-  // Synchronize shiftsConfig whenever shifts count or sets count change
   useEffect(() => {
     if (isInitialized) {
       const numSets = watchSets || 1;
@@ -279,7 +263,6 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
           
           let assignedSets: string[] = [];
           if (setsCountChanged || !existing) {
-            // When sets dropdown changes or new shift is added, auto-assign all available sets
             assignedSets = [...availableSetLetters];
           } else if (existing?.sets && Array.isArray(existing.sets)) {
             assignedSets = existing.sets.filter((s) => availableSetLetters.includes(s));
@@ -301,9 +284,29 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
     }
   }, [watchShifts, watchSets, isInitialized]);
 
-  const validateAndUpdateSet = (jsonString: string, setLetter: string) => {
+  const openShiftSidebar = (shiftNum: number, defaultSetLetter?: string) => {
+    setSelectedShiftForSidebar(shiftNum);
+    const targetShift = shiftsConfig.find((s) => s.shiftNumber === shiftNum);
+    const availableShiftSets = targetShift?.sets && targetShift.sets.length > 0 ? targetShift.sets : ["A"];
+    const setLetterToUse = defaultSetLetter || availableShiftSets[0] || "A";
+    setActiveSidebarSet(setLetterToUse);
+    setJsonError(null);
+    setIsShiftSidebarOpen(true);
+  };
+
+  const validateAndUpdateSet = (jsonString: string, shiftNum: number, setLetter: string) => {
+    const storageKey = `shift_${shiftNum}_${setLetter}`;
     if (!jsonString.trim()) {
+      setShiftQuestions((prev) => ({
+        ...prev,
+        [shiftNum]: {
+          ...(prev[shiftNum] || {}),
+          [setLetter]: [],
+        },
+      }));
+      setTextareaValues((prev) => ({ ...prev, [storageKey]: "" }));
       setJsonError(null);
+      toast.info(`Shift ${shiftNum} · Set ${setLetter} questions cleared`);
       return;
     }
 
@@ -311,12 +314,12 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
       const parsed = JSON.parse(jsonString);
       
       if (!Array.isArray(parsed)) {
-        setJsonError("Questions must be an array");
+        setJsonError("Questions must be an array of objects [ { ... } ]");
         return;
       }
 
       const isValid = parsed.every((q: any) => 
-        q.id && 
+        q.id !== undefined && 
         q.question && 
         Array.isArray(q.options) && 
         q.options.length > 0 &&
@@ -324,115 +327,146 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
       );
 
       if (!isValid) {
-        setJsonError("Each question must have: id, question, options array, and answer");
+        setJsonError("Each question must contain: id, question, options array, and answer");
         return;
       }
 
-      setSetQuestions(prev => ({
+      setShiftQuestions(prev => ({
         ...prev,
-        [setLetter]: parsed
+        [shiftNum]: {
+          ...(prev[shiftNum] || {}),
+          [setLetter]: parsed
+        }
       }));
       setTextareaValues(prev => ({
         ...prev,
-        [setLetter]: JSON.stringify(parsed, null, 2)
+        [storageKey]: jsonString
       }));
       setJsonError(null);
-      toast.success(`Questions updated for Set ${setLetter}`);
-    } catch (error) {
-      setJsonError("Invalid JSON format");
+      toast.success(`Shift ${shiftNum} · Set ${setLetter}: ${parsed.length} questions validated and saved!`);
+    } catch {
+      setJsonError("Invalid JSON format. Please verify JSON syntax.");
     }
   };
 
   const combineAllSets = () => {
-    const allQuestions: any = {};
-    Object.keys(setQuestions).forEach(setLetter => {
-      if (setQuestions[setLetter].length > 0) {
-        allQuestions[setLetter] = setQuestions[setLetter];
-      }
+    const output: Record<string, any> = {};
+    Object.entries(shiftQuestions).forEach(([sNumStr, setsMap]) => {
+      const sNum = parseInt(sNumStr, 10);
+      output[`shift_${sNum}`] = setsMap;
+      Object.entries(setsMap).forEach(([sLetter, qList]) => {
+        output[`shift_${sNum}_${sLetter}`] = qList;
+        output[`${sNum}_${sLetter}`] = qList;
+      });
     });
-    return JSON.stringify(allQuestions);
+    if (shiftQuestions[1]) {
+      Object.entries(shiftQuestions[1]).forEach(([sLetter, qList]) => {
+        output[sLetter] = qList;
+      });
+    }
+    return JSON.stringify(output);
   };
 
   const onSubmit = async (data: FormData) => {
-    const totalQuestions = Object.values(setQuestions).reduce((sum, questions) => sum + questions.length, 0);
+    const totalQ = Object.values(shiftQuestions).reduce(
+      (acc, setsMap) => acc + Object.values(setsMap).reduce((sum, qList) => sum + (qList?.length || 0), 0),
+      0
+    );
     
-    if (totalQuestions === 0) {
-      toast.error("Please add questions for at least one set");
-      return;
-    }
-
-    if (data.targetAudience === "EXTERNAL" && (!data.accessCode || data.accessCode.length !== 6)) {
-      toast.error("External quizzes require a valid 6-digit access code");
+    if (totalQ === 0) {
+      toast.error("Please add questions for at least one shift in the Shift sidebar");
       return;
     }
 
     setIsLoading(true);
+
     const questionsJson = combineAllSets();
     const numShifts = data.shifts || shiftsConfig.length || 1;
     const shiftsJson = JSON.stringify(shiftsConfig);
-    
-    const result = await updateQuiz(quiz.id, {
-      title: data.title,
-      description: data.description,
-      sets: data.sets,
-      shifts: numShifts,
-      shiftsJson,
-      activeShift: quiz.activeShift || 1,
-      duration: data.duration,
-      pointsPerQuestion: data.pointsPerQuestion,
-      cutoffMarks: data.cutoffMarks,
-      cutoffType: data.cutoffType,
-      topSelectCount: data.topSelectCount,
-      startDateTime: data.startDateTime,
-      endDateTime: data.endDateTime,
-      isActive: data.isActive,
-      targetAudience: data.targetAudience,
-      accessCode: data.targetAudience === "EXTERNAL" ? data.accessCode : null,
-      formId: data.targetAudience === "EXTERNAL" ? (data.formId === "none" ? null : data.formId) : null,
-      feedbackFormId: data.targetAudience === "EXTERNAL" ? (data.feedbackFormId === "none" ? null : data.feedbackFormId) : null,
-      questionsJson,
-    });
 
-    if (result.status === "success") {
-      toast.success("Quiz updated successfully");
-      router.push(`/admin/quizzes/${quiz.quizId}`);
-      router.refresh();
-    } else {
-      toast.error(result.message || "Failed to update quiz");
+    try {
+      const result = await updateQuiz(quiz.id, {
+        title: data.title,
+        description: data.description,
+        targetAudience: data.targetAudience,
+        accessCode: data.targetAudience === "EXTERNAL" ? data.accessCode : null,
+        formId: data.targetAudience === "EXTERNAL" ? (data.formId === "none" ? null : data.formId) : null,
+        feedbackFormId: data.targetAudience === "EXTERNAL" ? (data.feedbackFormId === "none" ? null : data.feedbackFormId) : null,
+        sets: data.sets,
+        shifts: numShifts,
+        shiftsJson,
+        duration: data.duration,
+        pointsPerQuestion: data.pointsPerQuestion,
+        cutoffMarks: data.cutoffMarks,
+        cutoffType: data.cutoffType,
+        topSelectCount: data.topSelectCount,
+        startDateTime: data.startDateTime,
+        endDateTime: data.endDateTime,
+        isActive: data.isActive,
+        questionsJson: questionsJson,
+      });
+
+      if (result.status === "success") {
+        toast.success("Quiz updated successfully");
+        router.push(`/admin/quizzes/${quiz.quizId}`);
+      } else {
+        toast.error(result.message || "Failed to update quiz");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred while updating the quiz");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="p-4 border rounded-xl bg-muted/20">
+          <FormField
+            control={form.control}
+            name="targetAudience"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-semibold">Target Audience *</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select audience" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="INTERNAL">Internal Members (Club Quiz)</SelectItem>
+                    <SelectItem value="EXTERNAL">External / Non-members (Kiosk Quiz)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-        {/* External Quiz System Details (If Audience is EXTERNAL) */}
         {watchAudience === "EXTERNAL" && (
-          <div className="p-5 border border-purple-500/30 bg-purple-950/20 rounded-2xl space-y-5 animate-in fade-in-50">
-            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3">
-              <div className="flex items-center gap-2">
-                <Key className="h-5 w-5 text-purple-400" />
-                <h3 className="font-bold text-lg text-purple-200">External Quiz Configuration</h3>
-              </div>
-              <Badge variant="outline" className="border-purple-500/50 text-purple-300">
-                6-Digit Access Code Enabled
-              </Badge>
+          <div className="p-4 border border-blue-500/20 bg-blue-500/5 rounded-xl space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400">
+              <Key className="h-4 w-4" />
+              <span>External Kiosk Settings</span>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="accessCode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-purple-200 font-medium">6-Digit Quiz Access Code</FormLabel>
+                    <FormLabel>Access Code</FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
-                        <Input 
-                          {...field} 
-                          maxLength={6} 
-                          className="font-mono text-xl tracking-widest text-center font-extrabold bg-background/80 border-purple-500/40 text-purple-300" 
+                        <Input
+                          {...field}
+                          className="font-mono text-center tracking-widest text-lg font-bold bg-background"
                         />
                       </FormControl>
                       <Button
@@ -440,15 +474,12 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                         variant="outline"
                         size="icon"
                         onClick={() => form.setValue("accessCode", generate6DigitCode())}
-                        title="Generate New Code"
-                        className="border-purple-500/40 hover:bg-purple-500/20"
+                        title="Regenerate code"
                       >
-                        <RefreshCw className="h-4 w-4 text-purple-400" />
+                        <RefreshCw className="h-4 w-4" />
                       </Button>
                     </div>
-                    <FormDescription className="text-xs text-purple-300/70">
-                      External kiosks enter this 6-digit code to register system numbers in real-time.
-                    </FormDescription>
+                    <FormDescription className="text-xs">Required to connect kiosk laptops</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -459,18 +490,18 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                 name="formId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-purple-200 font-medium flex items-center gap-1.5">
-                      <FileText className="h-4 w-4 text-purple-400" />
-                      Linked Registration Form (Optional)
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                    <FormLabel>Link Registration Form</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "none"}
+                    >
                       <FormControl>
-                        <SelectTrigger className="bg-background/80 border-purple-500/40">
-                          <SelectValue placeholder="Select registration form..." />
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Select a form" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="none">-- None (Manual Name/Email Entry) --</SelectItem>
+                        <SelectItem value="none">None (Direct Registration)</SelectItem>
                         {forms.map((f) => (
                           <SelectItem key={f.id} value={f.formId}>
                             {f.title} ({f.formId})
@@ -478,9 +509,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-xs text-purple-300/70">
-                      Use response IDs from this form to assign participants to registered systems in real-time.
-                    </FormDescription>
+                    <FormDescription className="text-xs">Link candidate details</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -490,19 +519,19 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                 control={form.control}
                 name="feedbackFormId"
                 render={({ field }) => (
-                  <FormItem className="col-span-1 md:col-span-2">
-                    <FormLabel className="text-purple-200 font-medium flex items-center gap-1.5">
-                      <FileText className="h-4 w-4 text-purple-400" />
-                      Feedback Form (Optional)
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                  <FormItem>
+                    <FormLabel>Feedback Form (Optional)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "none"}
+                    >
                       <FormControl>
-                        <SelectTrigger className="bg-background/80 border-purple-500/40">
-                          <SelectValue placeholder="Select feedback form..." />
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Optional" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="none">-- None (No Feedback Form) --</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {forms.map((f) => (
                           <SelectItem key={f.id} value={f.formId}>
                             {f.title} ({f.formId})
@@ -510,9 +539,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-xs text-purple-300/70">
-                      A button will be displayed at the bottom of the external kiosk completion screen for students to fill out feedback.
-                    </FormDescription>
+                    <FormDescription className="text-xs">Shown after submission</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -521,14 +548,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
           </div>
         )}
 
-        {/* Basic Details Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <FormLabel className="font-semibold">System Quiz ID</FormLabel>
-            <Input value={quiz.quizId} disabled className="font-mono bg-muted/60 text-muted-foreground border-border/60" />
-            <FormDescription className="text-xs">Quiz ID cannot be modified</FormDescription>
-          </div>
-
           <FormField
             control={form.control}
             name="title"
@@ -542,33 +562,6 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
               </FormItem>
             )}
           />
-        </div>
-
-        {/* Description */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="font-semibold">Description / Rules & Regulations *</FormLabel>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  placeholder="Enter detailed quiz instructions, proctoring rules..."
-                  rows={4}
-                  className="bg-background/80"
-                />
-              </FormControl>
-              <FormDescription className="text-xs">
-                Displayed to candidates on the instructions screen before starting the quiz.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Configurations: Sets, Shifts, Duration, Points */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-5 border border-border/60 rounded-2xl bg-card/30">
           <FormField
             control={form.control}
             name="sets"
@@ -587,7 +580,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                   <SelectContent>
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
                       <SelectItem key={num} value={num.toString()}>
-                        {num} {num === 1 ? "Set" : "Sets"} (A{num > 1 ? `-${String.fromCharCode(64 + num)}` : ""})
+                        {num} Set{num > 1 ? "s" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -596,15 +589,124 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
               </FormItem>
             )}
           />
+        </div>
 
+        <Card className="border-border/60 bg-card/40">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span>Multi-Shift Configuration</span>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Click on any shift to open the Right Sidebar where you can assign sets and set Question JSON.
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="text-xs font-mono">
+                {shiftsConfig.length} Shift{shiftsConfig.length > 1 ? "s" : ""} Configured
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {shiftsConfig.map((shift) => {
+                const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                const shiftQuestionsCount = currentShiftSets.reduce(
+                  (sum, sLetter) => sum + (shiftQuestions[shift.shiftNumber]?.[sLetter]?.length || 0),
+                  0
+                );
+
+                return (
+                  <div
+                    key={shift.shiftNumber}
+                    onClick={() => openShiftSidebar(shift.shiftNumber)}
+                    className="p-4 border border-border/60 rounded-xl bg-background/50 hover:bg-background/80 hover:border-primary/50 transition-all cursor-pointer space-y-3 group shadow-xs hover:shadow-md"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold flex items-center gap-1.5 group-hover:text-primary transition-colors">
+                          <Layers className="h-4 w-4 text-primary" />
+                          Shift {shift.shiftNumber}
+                        </span>
+                        {shift.status === "COMPLETED" && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Completed
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs font-medium text-primary hover:bg-primary/10 gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openShiftSidebar(shift.shiftNumber);
+                        }}
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        Edit in Sidebar
+                      </Button>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="text-xs text-muted-foreground">Assigned Question Sets:</div>
+                      <div className="flex flex-wrap gap-1">
+                        {currentShiftSets.map((letter) => {
+                          const qCount = shiftQuestions[shift.shiftNumber]?.[letter]?.length || 0;
+                          return (
+                            <Badge
+                              key={letter}
+                              variant="secondary"
+                              className="text-[11px] font-semibold bg-primary/10 text-primary border-primary/20"
+                            >
+                              Set {letter} ({qCount} Qs)
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-border/40 text-xs">
+                      <span className="text-muted-foreground font-medium">Shift Total:</span>
+                      <span className="font-bold text-primary">{shiftQuestionsCount} questions</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold">Quiz Description & Instructions *</FormLabel>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  rows={4}
+                  placeholder="Instructions for participants..."
+                  className="bg-background/80"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField
             control={form.control}
             name="shifts"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="font-semibold">Number of Shifts</FormLabel>
+                <FormLabel className="font-semibold">Total Shifts</FormLabel>
                 <Select
-                  onValueChange={(value) => field.onChange(parseInt(value))}
+                  onValueChange={(val) => field.onChange(parseInt(val))}
                   defaultValue={field.value?.toString() || "1"}
                 >
                   <FormControl>
@@ -615,11 +717,12 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                   <SelectContent>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                       <SelectItem key={num} value={num.toString()}>
-                        {num} {num === 1 ? "Shift" : "Shifts"}
+                        {num} Shift{num > 1 ? "s" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <FormDescription className="text-xs">Number of quiz shifts</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -630,16 +733,17 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
             name="duration"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="font-semibold">Duration (Minutes)</FormLabel>
+                <FormLabel className="font-semibold">Duration (Minutes) *</FormLabel>
                 <FormControl>
                   <Input
+                    {...field}
                     type="number"
                     min={1}
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                     className="bg-background/80"
                   />
                 </FormControl>
+                <FormDescription className="text-xs">Time allowed per attempt</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -650,13 +754,68 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
             name="pointsPerQuestion"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="font-semibold">Points Per Question</FormLabel>
+                <FormLabel className="font-semibold">Points Per Question *</FormLabel>
                 <FormControl>
                   <Input
-                    type="number"
-                    step="any"
-                    min={0.01}
                     {...field}
+                    type="number"
+                    step="0.01"
+                    min={0.01}
+                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    className="bg-background/80"
+                  />
+                </FormControl>
+                <FormDescription className="text-xs">Points for each correct answer</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="cutoffType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-semibold">Cutoff Mode</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value || "PERCENTAGE"}>
+                  <FormControl>
+                    <SelectTrigger className="bg-background/80">
+                      <SelectValue placeholder="Cutoff type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="PERCENTAGE">Percentage (%)</SelectItem>
+                    <SelectItem value="MARKS">Absolute Marks</SelectItem>
+                    <SelectItem value="TOP_N">Top N Candidates</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription className="text-xs">Qualification criteria</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="cutoffMarks"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-semibold">
+                  {form.watch("cutoffType") === "TOP_N"
+                    ? "Minimum Marks (to be eligible for Top N)"
+                    : form.watch("cutoffType") === "MARKS"
+                    ? "Cutoff Marks"
+                    : "Cutoff Percentage (%)"}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={field.value ?? 50}
                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                     className="bg-background/80"
                   />
@@ -665,249 +824,35 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
               </FormItem>
             )}
           />
+
+          {form.watch("cutoffType") === "TOP_N" && (
+            <FormField
+              control={form.control}
+              name="topSelectCount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-semibold flex items-center gap-1.5">
+                    <Award className="h-4 w-4 text-primary" /> Top N Count
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      min={1}
+                      value={field.value ?? 10}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                      className="bg-background/80"
+                    />
+                  </FormControl>
+                  <FormDescription className="text-xs">Number of top students to qualify</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
 
-        {/* Dynamic Shift & Question Set Configuration Card */}
-        <Card className="border-border/60 bg-card/40">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-primary" />
-                  <span>Multi-Shift & Question Set Configuration</span>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Select which question sets are available in each shift. You can assign single or multiple question sets per shift.
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="text-xs font-mono">
-                {shiftsConfig.length} Shift{shiftsConfig.length > 1 ? "s" : ""}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {shiftsConfig.map((shift) => {
-                const availableSetLetters = Array.from({ length: watchSets }, (_, i) => String.fromCharCode(65 + i));
-                const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
-
-                const toggleSet = (letter: string) => {
-                  setShiftsConfig((prev) =>
-                    prev.map((s) => {
-                      if (s.shiftNumber !== shift.shiftNumber) return s;
-                      let updatedSets = s.sets ? [...s.sets] : [s.set || "A"];
-                      if (updatedSets.includes(letter)) {
-                        if (updatedSets.length > 1) {
-                          updatedSets = updatedSets.filter((l) => l !== letter);
-                        }
-                      } else {
-                        updatedSets.push(letter);
-                        updatedSets.sort();
-                      }
-                      return {
-                        ...s,
-                        sets: updatedSets,
-                        set: updatedSets[0] || "A",
-                      };
-                    })
-                  );
-                };
-
-                const selectAllSets = () => {
-                  setShiftsConfig((prev) =>
-                    prev.map((s) =>
-                      s.shiftNumber === shift.shiftNumber
-                        ? { ...s, sets: [...availableSetLetters], set: availableSetLetters[0] || "A" }
-                        : s
-                    )
-                  );
-                };
-
-                return (
-                  <div key={shift.shiftNumber} className="p-3.5 border border-border/60 rounded-xl bg-background/50 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">Shift {shift.shiftNumber}</span>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={shift.status === "COMPLETED" ? "secondary" : "default"} className="text-[10px]">
-                          {shift.status === "COMPLETED" ? "Completed" : "Active / Pending"}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] font-mono">
-                          {currentShiftSets.length} Set{currentShiftSets.length > 1 ? "s" : ""}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <Label className="text-xs text-muted-foreground">Available Question Sets</Label>
-                        {watchSets > 1 && (
-                          <button
-                            type="button"
-                            onClick={selectAllSets}
-                            className="text-[10px] text-primary hover:underline font-medium"
-                          >
-                            Select All
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Interactive Set Selection Badges */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {availableSetLetters.map((letter) => {
-                          const isSelected = currentShiftSets.includes(letter);
-                          return (
-                            <button
-                              key={letter}
-                              type="button"
-                              onClick={() => toggleSet(letter)}
-                              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
-                                isSelected
-                                  ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                                  : "bg-background text-muted-foreground border-border/80 hover:border-primary/50 hover:bg-muted"
-                              }`}
-                            >
-                              {isSelected ? `✓ Set ${letter}` : `Set ${letter}`}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-muted-foreground leading-tight pt-1 border-t border-border/40">
-                      Candidates in Shift {shift.shiftNumber} will receive:{" "}
-                      <strong>
-                        {currentShiftSets.map((s) => `Set ${s}`).join(", ")}
-                      </strong>
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Passing / Qualification Criteria Card */}
-        <Card className="border-border bg-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Award className="h-4 w-4 text-primary" />
-              <span>Passing & Qualification Criteria</span>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Configure how candidates qualify (passing score cutoff or selecting top ranked candidates)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="cutoffType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Qualification Mode</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value || "PERCENTAGE"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select criteria" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="PERCENTAGE">
-                          Minimum Percentage Score (%)
-                        </SelectItem>
-                        <SelectItem value="MARKS">
-                          Minimum Marks / Points Cutoff
-                        </SelectItem>
-                        <SelectItem value="TOP_N">
-                          Top Ranked Candidates (Top N)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription className="text-xs">
-                      {form.watch("cutoffType") === "TOP_N"
-                        ? "Only the highest scoring top N candidates will qualify"
-                        : form.watch("cutoffType") === "MARKS"
-                        ? "Candidates scoring at or above this raw score qualify"
-                        : "Candidates with percentage at or above this threshold qualify"}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {form.watch("cutoffType") === "TOP_N" ? (
-                <FormField
-                  control={form.control}
-                  name="topSelectCount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Top Candidate Selection Count</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          placeholder="e.g. 10"
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? parseInt(e.target.value, 10) : undefined
-                            )
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs">
-                        Top {field.value || 10} candidates will be marked QUALIFIED; rest will be marked FAILED
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="cutoffMarks"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {form.watch("cutoffType") === "MARKS"
-                          ? "Cutoff Marks (Points)"
-                          : "Cutoff Percentage (%)"}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="any"
-                          min={0}
-                          placeholder={
-                            form.watch("cutoffType") === "MARKS" ? "e.g. 15.0" : "e.g. 50"
-                          }
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? parseFloat(e.target.value) : undefined
-                            )
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs">
-                        {form.watch("cutoffType") === "MARKS"
-                          ? "Scores below this mark will be marked FAILED"
-                          : "Percentages below this cutoff % will be marked FAILED"}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Start & End Dates and Active Switch */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="startDateTime"
@@ -917,9 +862,14 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                 <FormControl>
                   <Input
                     type="datetime-local"
-                    required
-                    value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
-                    onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                    value={
+                      field.value instanceof Date && !isNaN(field.value.getTime())
+                        ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000)
+                            .toISOString()
+                            .slice(0, 16)
+                        : ""
+                    }
+                    onChange={(e) => field.onChange(new Date(e.target.value))}
                     className="bg-background/80"
                   />
                 </FormControl>
@@ -937,9 +887,14 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                 <FormControl>
                   <Input
                     type="datetime-local"
-                    required
-                    value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
-                    onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                    value={
+                      field.value instanceof Date && !isNaN(field.value.getTime())
+                        ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000)
+                            .toISOString()
+                            .slice(0, 16)
+                        : ""
+                    }
+                    onChange={(e) => field.onChange(new Date(e.target.value))}
                     className="bg-background/80"
                   />
                 </FormControl>
@@ -947,131 +902,248 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
               </FormItem>
             )}
           />
-
-          <FormField
-            control={form.control}
-            name="isActive"
-            render={({ field }) => (
-              <FormItem className="flex flex-col justify-center border border-border/60 rounded-xl p-3 bg-card/40">
-                <FormLabel className="font-semibold mb-2">Quiz Status</FormLabel>
-                <div className="flex items-center gap-3">
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <Badge variant={field.value ? "default" : "secondary"}>
-                    {field.value ? "Active & Accepting Attempts" : "Inactive / Draft"}
-                  </Badge>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
 
-        {/* Set Tabs for Questions */}
-        {watchSets > 0 && (
-          <div className="space-y-4 pt-4 border-t border-border/60">
-            <div>
-              <h3 className="text-lg font-bold">Question Sets Configuration</h3>
-              <p className="text-xs text-muted-foreground">
-                Update questions for each set. The current questions are pre-loaded below.
-              </p>
-            </div>
+        <FormField
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between p-4 border rounded-xl bg-muted/20">
+              <div className="space-y-0.5">
+                <FormLabel className="font-semibold">Quiz Status</FormLabel>
+                <FormDescription className="text-xs">
+                  {field.value
+                    ? "Active - users/systems can access the quiz within scheduled dates"
+                    : "Inactive - quiz is hidden and cannot be attempted"}
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
 
-            <Tabs value={currentSet} onValueChange={setCurrentSet}>
-              <TabsList className="grid w-full bg-muted/50 p-1 rounded-xl" style={{ gridTemplateColumns: `repeat(${watchSets}, 1fr)` }}>
-                {Array.from({ length: watchSets }, (_, i) => {
-                  const setLetter = String.fromCharCode(65 + i);
-                  const hasQuestions = setQuestions[setLetter]?.length > 0;
-                  return (
-                    <TabsTrigger key={setLetter} value={setLetter} className="relative rounded-lg font-bold">
-                      Set {setLetter}
-                      {hasQuestions && (
-                        <Badge variant="default" className="ml-2 h-5 px-1.5 text-xs bg-primary">
-                          {setQuestions[setLetter].length}
+        {/* Questions Display Section */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span>Configured Shift Questions Preview</span>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Review questions per shift. To edit questions, click "Configure Shift in Sidebar".
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  {totalQuestions} Total Questions
+                </Badge>
+                {shiftsConfig.length > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openShiftSidebar(shiftsConfig[0].shiftNumber)}
+                    className="h-8 text-xs font-semibold gap-1.5 cursor-pointer text-primary border-primary/30 hover:bg-primary/10"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    Open Shift Sidebar
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {shiftsConfig.length === 0 ? (
+              <div className="p-8 text-center border-2 border-dashed rounded-xl bg-muted/20">
+                <p className="text-sm font-semibold">No shifts configured yet</p>
+              </div>
+            ) : (
+              <Tabs
+                value={activePreviewShiftTab}
+                onValueChange={setActivePreviewShiftTab}
+                className="w-full space-y-4"
+              >
+                {/* Tabs of Shifts */}
+                <TabsList
+                  className="grid w-full h-auto p-1 bg-muted/60 rounded-xl gap-1"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.min(shiftsConfig.length, 6)}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {shiftsConfig.map((shift) => {
+                    const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                    const shiftTotalQ = currentShiftSets.reduce(
+                      (sum, sLetter) => sum + (shiftQuestions[shift.shiftNumber]?.[sLetter]?.length || 0),
+                      0
+                    );
+                    return (
+                      <TabsTrigger
+                        key={shift.shiftNumber}
+                        value={`shift-${shift.shiftNumber}`}
+                        className="py-2 px-3 rounded-lg text-xs font-bold transition-all data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Layers className="h-3.5 w-3.5" />
+                        <span>Shift {shift.shiftNumber}</span>
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-0.5">
+                          {shiftTotalQ} Qs
                         </Badge>
-                      )}
-                    </TabsTrigger>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+
+                {/* Tab Content for Each Shift */}
+                {shiftsConfig.map((shift) => {
+                  const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                  const shiftTotalQ = currentShiftSets.reduce(
+                    (sum, sLetter) => sum + (shiftQuestions[shift.shiftNumber]?.[sLetter]?.length || 0),
+                    0
+                  );
+
+                  return (
+                    <TabsContent
+                      key={shift.shiftNumber}
+                      value={`shift-${shift.shiftNumber}`}
+                      className="space-y-4 focus-visible:outline-none"
+                    >
+                      {/* Shift Header Bar */}
+                      <div className="flex items-center justify-between p-3.5 rounded-xl border bg-muted/20 flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm">Shift {shift.shiftNumber} Question Sets</span>
+                          <div className="flex items-center gap-1">
+                            {currentShiftSets.map((sLetter) => (
+                              <Badge
+                                key={sLetter}
+                                variant="outline"
+                                className="text-[10px] bg-primary/5 text-primary border-primary/20"
+                              >
+                                Set {sLetter}
+                              </Badge>
+                            ))}
+                          </div>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {shiftTotalQ} Total Questions
+                          </Badge>
+                        </div>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openShiftSidebar(shift.shiftNumber)}
+                          className="h-7 text-xs font-semibold gap-1 text-primary cursor-pointer"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                          Configure Shift {shift.shiftNumber} in Sidebar
+                        </Button>
+                      </div>
+
+                      {/* Sets in Accordion */}
+                      <Accordion
+                        type="multiple"
+                        defaultValue={currentShiftSets.map((s) => `set-${s}`)}
+                        className="w-full space-y-2.5"
+                      >
+                        {currentShiftSets.map((sLetter) => {
+                          const list = shiftQuestions[shift.shiftNumber]?.[sLetter] || [];
+                          return (
+                            <AccordionItem
+                              key={sLetter}
+                              value={`set-${sLetter}`}
+                              className="border rounded-xl bg-card overflow-hidden"
+                            >
+                              <AccordionTrigger className="px-4 py-3 hover:no-underline bg-muted/20 hover:bg-muted/30">
+                                <div className="flex items-center justify-between w-full pr-3 gap-2 flex-wrap">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-xs text-foreground">
+                                      Question Set {sLetter}
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {list.length} Question{list.length !== 1 ? "s" : ""}
+                                    </Badge>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-[11px] text-primary hover:bg-primary/10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openShiftSidebar(shift.shiftNumber, sLetter);
+                                    }}
+                                  >
+                                    Edit Set {sLetter} JSON →
+                                  </Button>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent className="px-4 pb-4 pt-3 space-y-2.5">
+                                {list.length === 0 ? (
+                                  <div className="p-4 text-center border border-dashed rounded-lg bg-muted/20 text-xs text-muted-foreground">
+                                    <span>No questions added for Shift {shift.shiftNumber} · Set {sLetter} yet. </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => openShiftSidebar(shift.shiftNumber, sLetter)}
+                                      className="text-primary font-semibold hover:underline cursor-pointer ml-1"
+                                    >
+                                      Add Question JSON in Sidebar →
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2.5 max-h-80 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-1">
+                                    {list.map((qItem: any, qIdx: number) => (
+                                      <div key={qIdx} className="p-3 border rounded-lg bg-muted/20 space-y-2 text-xs">
+                                        <p className="font-semibold text-xs text-foreground">
+                                          Q{qIdx + 1}. {qItem.question}
+                                        </p>
+                                        {Array.isArray(qItem.options) && (
+                                          <div className="space-y-1 pl-1">
+                                            {qItem.options.map((opt: string, optIdx: number) => {
+                                              const isCorrect =
+                                                qItem.answer === optIdx ||
+                                                qItem.answer === String.fromCharCode(65 + optIdx) ||
+                                                qItem.answer === opt;
+                                              return (
+                                                <div
+                                                  key={optIdx}
+                                                  className={`p-1.5 px-2.5 rounded border text-[11px] flex items-center justify-between ${
+                                                    isCorrect
+                                                      ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
+                                                      : "border-border/60 bg-background text-muted-foreground"
+                                                  }`}
+                                                >
+                                                  <span>
+                                                    <strong>{String.fromCharCode(65 + optIdx)}.</strong> {opt}
+                                                  </span>
+                                                  {isCorrect && (
+                                                    <Badge variant="outline" className="text-[9px] border-green-600 text-green-600 py-0">
+                                                      Correct Answer
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                      </Accordion>
+                    </TabsContent>
                   );
                 })}
-              </TabsList>
-
-              {Array.from({ length: watchSets }, (_, i) => {
-                const setLetter = String.fromCharCode(65 + i);
-                return (
-                  <TabsContent key={setLetter} value={setLetter} className="space-y-4 mt-4">
-                    <Card className="p-5 border-border/60 bg-card/60 rounded-2xl">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-sm">JSON Questions for Set {setLetter}</h4>
-                          {setQuestions[setLetter]?.length > 0 && (
-                            <Badge variant="outline" className="border-primary/50 text-primary">
-                              {setQuestions[setLetter].length} Questions Validated
-                            </Badge>
-                          )}
-                        </div>
-
-                        <Textarea
-                          placeholder={`[\n  {\n    "id": 1,\n    "question": "What is 2+2?",\n    "options": ["3", "4", "5", "6"],\n    "answer": "4"\n  }\n]`}
-                          rows={12}
-                          className="font-mono text-sm bg-background/90"
-                          key={`questions-textarea-${setLetter}`}
-                          value={textareaValues[setLetter] || ""}
-                          onChange={(e) => {
-                            setTextareaValues(prev => ({
-                              ...prev,
-                              [setLetter]: e.target.value
-                            }));
-                          }}
-                          id={`questions-${setLetter}`}
-                        />
-
-                        <div className="flex flex-wrap gap-3">
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              validateAndUpdateSet(textareaValues[setLetter] || "", setLetter);
-                            }}
-                            variant="secondary"
-                            className="flex-1 rounded-xl font-semibold"
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
-                            Update Questions for Set {setLetter}
-                          </Button>
-
-                          {setQuestions[setLetter]?.length > 0 && (
-                            <Button
-                              type="button"
-                              onClick={() => {
-                                setPreviewSet(setLetter);
-                                setIsPreviewOpen(true);
-                              }}
-                              variant="outline"
-                              className="flex-1 rounded-xl font-semibold border-primary/40 text-primary hover:bg-primary/10"
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              Preview Questions ({setQuestions[setLetter].length})
-                            </Button>
-                          )}
-                        </div>
-
-                        {jsonError && currentSet === setLetter && (
-                          <div className="flex items-center gap-2 text-destructive text-sm font-medium bg-destructive/10 p-3 rounded-xl border border-destructive/30">
-                            <XCircle className="h-4 w-4 flex-shrink-0" />
-                            {jsonError}
-                          </div>
-                        )}
-                      </div>
-                    </Card>
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
-          </div>
-        )}
+              </Tabs>
+            )}
+          </CardContent>
+        </Card>
 
         <FormField
           control={form.control}
@@ -1085,190 +1157,340 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
           )}
         />
 
-        <div className="flex items-center justify-between pt-4 border-t border-border/60">
+        <div className="flex items-center justify-between gap-3 pt-6 border-t border-border">
           <Button
             type="button"
             variant="outline"
             onClick={() => setIsPreviewOpen(true)}
             className="cursor-pointer"
           >
-            <Eye className="h-4 w-4 mr-1.5" />
-            Preview Quiz
+            <Eye className="h-4 w-4 mr-1.5" /> Full Quiz Live Preview
           </Button>
-
           <div className="flex items-center gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={() => router.push(`/admin/quizzes/${quiz.quizId}`)}
               disabled={isLoading}
-              className="rounded-xl px-6"
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isLoading}
-              className="rounded-xl px-8 font-bold bg-primary text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/20"
+              className="cursor-pointer font-bold"
             >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
             </Button>
           </div>
         </div>
-      </form>
 
-      {/* ── RIGHT SIDEBAR LIVE PREVIEW SHEET WITH LENIS SCROLL FIX ── */}
-      <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <SheetContent side="right" className="sm:max-w-xl w-full p-0 flex h-dvh max-h-screen flex-col overflow-hidden bg-background border-l shadow-2xl">
-          <div className="shrink-0 border-b bg-card">
-            <SheetHeader className="px-6 pt-6 pb-4">
-              <div className="flex items-center gap-2">
-                <Eye className="h-5 w-5 text-primary" />
-                <SheetTitle className="text-lg">Quiz Live Preview</SheetTitle>
-              </div>
-              <SheetDescription className="text-xs">
-                Real-time preview of quiz details, settings, and parsed question sets.
-              </SheetDescription>
-            </SheetHeader>
-          </div>
-
-          {/* Scrollable Body Container with Lenis Prevent */}
-          <div 
-            data-lenis-prevent 
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 space-y-6"
-            onWheel={(e) => e.stopPropagation()}
-            onTouchMoveCapture={(e) => e.stopPropagation()}
+        <Sheet open={isShiftSidebarOpen} onOpenChange={setIsShiftSidebarOpen}>
+          <SheetContent
+            side="right"
+            className="sm:max-w-xl w-full p-0 flex h-dvh max-h-screen flex-col overflow-hidden bg-background border-l shadow-2xl"
           >
-            {/* Header Info */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant={watchAudience === "EXTERNAL" ? "secondary" : "outline"}>
-                  {watchAudience === "EXTERNAL" ? <><Globe className="h-3 w-3 mr-1" />External Kiosk</> : <><Users className="h-3 w-3 mr-1" />Internal Members</>}
-                </Badge>
-                {watchAudience === "EXTERNAL" && watchAccessCode && (
-                  <Badge variant="outline" className="font-mono text-xs">
-                    Access Code: {watchAccessCode}
-                  </Badge>
-                )}
-              </div>
-              <h3 className="text-xl font-bold">{watchTitle || "Untitled Quiz"}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                {watchDescription || "No description provided yet."}
-              </p>
-            </div>
-
-            <Separator />
-
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 bg-muted rounded-lg text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Duration</p>
-                <p className="text-base font-bold">{watchDuration || 0} mins</p>
-              </div>
-              <div className="p-3 bg-muted rounded-lg text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Sets</p>
-                <p className="text-base font-bold">{watchSets}</p>
-              </div>
-              <div className="p-3 bg-muted rounded-lg text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Points/Q</p>
-                <p className="text-base font-bold">{watchPoints || 1}</p>
-              </div>
-              <div className="p-3 bg-muted rounded-lg text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Questions</p>
-                <p className="text-base font-bold">{totalQuestions}</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Detailed Question Sets Preview */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                  <span>Question Sets Breakdown</span>
-                  <span className="text-xs text-muted-foreground font-normal">{totalQuestions} total questions</span>
-                </h4>
-                {watchSets > 1 && (
-                  <Select value={previewSet} onValueChange={setPreviewSet}>
-                    <SelectTrigger className="w-[110px] h-8 text-xs font-medium bg-muted/30">
-                      <SelectValue placeholder="All Sets" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All Sets</SelectItem>
-                      {Array.from({ length: watchSets }).map((_, i) => {
-                        const sLetter = String.fromCharCode(65 + i);
-                        return <SelectItem key={sLetter} value={sLetter}>Set {sLetter}</SelectItem>;
-                      })}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {Object.keys(setQuestions).length === 0 || totalQuestions === 0 ? (
-                <div className="p-8 text-center border-2 border-dashed rounded-xl bg-muted/30">
-                  <p className="text-sm text-muted-foreground">No questions added yet.</p>
-                  <p className="text-xs text-muted-foreground mt-1">Add and validate question JSON in the form to see preview.</p>
+            <div className="shrink-0 border-b bg-card p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap mt-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-5 w-5 text-primary" />
+                    <SheetTitle className="text-base font-bold">
+                      Shift {selectedShiftForSidebar} Configuration
+                    </SheetTitle>
+                  </div>
+                  <SheetDescription className="text-xs mt-0.5">
+                    Select a question set, assign sets, and paste question JSON for Shift {selectedShiftForSidebar}
+                  </SheetDescription>
                 </div>
-              ) : (
-                Object.keys(setQuestions)
-                  .filter((sLetter) => previewSet === "ALL" || previewSet === sLetter)
-                  .map((sLetter) => {
-                  const setList = setQuestions[sLetter] || [];
-                  return (
-                    <Card key={sLetter} className="overflow-hidden border">
-                      <CardHeader className="p-4 bg-muted/50 border-b">
-                        <CardTitle className="text-sm flex items-center justify-between">
-                          <span>Set {sLetter}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {setList.length} Question{setList.length !== 1 ? 's' : ''}
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 space-y-4">
-                        {setList.length === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">No questions in this set.</p>
-                        ) : (
-                          setList.map((qItem: any, qIdx: number) => (
-                            <div key={qIdx} className="p-3 border rounded-lg bg-card space-y-2 text-xs">
-                              <p className="font-semibold text-sm">
-                                Q{qIdx + 1}. {qItem.question}
-                              </p>
-                              {Array.isArray(qItem.options) && (
-                                <div className="space-y-1 pl-2">
-                                  {qItem.options.map((opt: string, optIdx: number) => (
-                                    <div
-                                      key={optIdx}
-                                      className={`p-2 rounded border flex items-center justify-between ${
-                                        qItem.answer === optIdx
-                                          ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
-                                          : "border-border bg-background text-muted-foreground"
-                                      }`}
-                                    >
-                                      <span>
-                                        {String.fromCharCode(65 + optIdx)}. {opt}
-                                      </span>
-                                      {qItem.answer === optIdx && (
-                                        <Badge variant="outline" className="text-[10px] border-green-600 text-green-600">
-                                          Answer
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedShiftForSidebar) {
+                      const curKey = `shift_${selectedShiftForSidebar}_${activeSidebarSet}`;
+                      const currentText =
+                        textareaValues[curKey] ??
+                        (shiftQuestions[selectedShiftForSidebar]?.[activeSidebarSet]?.length > 0
+                          ? JSON.stringify(shiftQuestions[selectedShiftForSidebar][activeSidebarSet], null, 2)
+                          : "");
+                      validateAndUpdateSet(currentText, selectedShiftForSidebar, activeSidebarSet);
+                    }
+                  }}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs cursor-pointer shadow-xs gap-1.5"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Update Set {activeSidebarSet}
+                </Button>
+              </div>
+            </div>
+
+            <div
+              data-lenis-prevent
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              onWheel={(e) => e.stopPropagation()}
+              onTouchMoveCapture={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">Select Question Set to Edit *</Label>
+                  {selectedShiftForSidebar && shiftQuestions[selectedShiftForSidebar]?.[activeSidebarSet]?.length > 0 && (
+                    <Badge variant="outline" className="text-[10px] border-green-600 text-green-600 font-medium">
+                      ✓ {shiftQuestions[selectedShiftForSidebar][activeSidebarSet].length} Validated Questions
+                    </Badge>
+                  )}
+                </div>
+                <Select value={activeSidebarSet} onValueChange={setActiveSidebarSet}>
+                  <SelectTrigger className="h-9 text-xs bg-background">
+                    <SelectValue placeholder="Select Set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: watchSets }, (_, i) => {
+                      const sLetter = String.fromCharCode(65 + i);
+                      const qCount = selectedShiftForSidebar ? (shiftQuestions[selectedShiftForSidebar]?.[sLetter]?.length || 0) : 0;
+                      return (
+                        <SelectItem key={sLetter} value={sLetter} className="text-xs">
+                          Question Set {sLetter} ({qCount} question{qCount !== 1 ? "s" : ""})
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedShiftForSidebar && (
+                <div className="space-y-2 p-3 rounded-lg border bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">
+                      Sets Assigned to Shift {selectedShiftForSidebar}
+                    </Label>
+                    <span className="text-[10px] text-muted-foreground">Click to toggle sets</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: watchSets }, (_, i) => {
+                      const letter = String.fromCharCode(65 + i);
+                      const currentShift = shiftsConfig.find((s) => s.shiftNumber === selectedShiftForSidebar);
+                      const isAssigned = currentShift?.sets?.includes(letter) || false;
+                      return (
+                        <button
+                          key={letter}
+                          type="button"
+                          onClick={() => {
+                            setShiftsConfig((prev) =>
+                              prev.map((s) => {
+                                if (s.shiftNumber !== selectedShiftForSidebar) return s;
+                                const existingSets = s.sets || [];
+                                let nextSets = existingSets.includes(letter)
+                                  ? existingSets.filter((x) => x !== letter)
+                                  : [...existingSets, letter];
+                                if (nextSets.length === 0) nextSets = [letter];
+                                nextSets.sort();
+                                return { ...s, sets: nextSets, set: nextSets[0] || "A" };
+                              })
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
+                            isAssigned
+                              ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                              : "bg-background text-muted-foreground border-border/80 hover:border-primary/50"
+                          }`}
+                        >
+                          {isAssigned ? `✓ Set ${letter}` : `Set ${letter}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">
+                    Question JSON for Shift {selectedShiftForSidebar} · Set {activeSidebarSet} *
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground font-mono">JSON Array format</span>
+                </div>
+                <Textarea
+                  value={
+                    selectedShiftForSidebar
+                      ? (textareaValues[`shift_${selectedShiftForSidebar}_${activeSidebarSet}`] ??
+                          (shiftQuestions[selectedShiftForSidebar]?.[activeSidebarSet]?.length > 0
+                            ? JSON.stringify(shiftQuestions[selectedShiftForSidebar][activeSidebarSet], null, 2)
+                            : ""))
+                      : ""
+                  }
+                  onChange={(e) => {
+                    if (selectedShiftForSidebar) {
+                      const val = e.target.value;
+                      const curKey = `shift_${selectedShiftForSidebar}_${activeSidebarSet}`;
+                      setTextareaValues((prev) => ({ ...prev, [curKey]: val }));
+                    }
+                  }}
+                  rows={14}
+                  placeholder={`[\n  {\n    "id": 1,\n    "question": "Sample question for Shift ${selectedShiftForSidebar} Set ${activeSidebarSet}?",\n    "options": ["Option A", "Option B", "Option C", "Option D"],\n    "answer": 0\n  }\n]`}
+                  className="font-mono text-xs leading-relaxed"
+                />
+              </div>
+
+              {jsonError && (
+                <Alert variant="destructive" className="py-2.5">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">{jsonError}</AlertDescription>
+                </Alert>
               )}
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
+
+        <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+          <SheetContent side="right" className="sm:max-w-xl w-full p-0 flex h-dvh max-h-screen flex-col overflow-hidden bg-background border-l shadow-2xl">
+            <div className="shrink-0 border-b bg-card">
+              <SheetHeader className="px-6 pt-6 pb-4">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-primary" />
+                  <SheetTitle className="text-lg">Quiz Live Preview</SheetTitle>
+                </div>
+                <SheetDescription className="text-xs">
+                  Real-time preview of quiz details, settings, and shift-wise question sets.
+                </SheetDescription>
+              </SheetHeader>
+            </div>
+
+            <div 
+              data-lenis-prevent 
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 space-y-6 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              onWheel={(e) => e.stopPropagation()}
+              onTouchMoveCapture={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant={watchAudience === "EXTERNAL" ? "secondary" : "outline"}>
+                    {watchAudience === "EXTERNAL" ? <><Globe className="h-3 w-3 mr-1" />External Kiosk</> : <><Users className="h-3 w-3 mr-1" />Internal Members</>}
+                  </Badge>
+                  {watchAudience === "EXTERNAL" && watchAccessCode && (
+                    <Badge variant="outline" className="font-mono text-xs">
+                      Access Code: {watchAccessCode}
+                    </Badge>
+                  )}
+                </div>
+                <h3 className="text-xl font-bold">{watchTitle || "Untitled Quiz"}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                  {watchDescription || "No description provided yet."}
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Duration</p>
+                  <p className="text-base font-bold">{watchDuration || 0} mins</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Shifts / Sets</p>
+                  <p className="text-base font-bold">{watchShifts} Shifts · {watchSets} Sets</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Points/Q</p>
+                  <p className="text-base font-bold">{watchPoints || 1}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Total Questions</p>
+                  <p className="text-base font-bold">{totalQuestions}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm">Shift-wise Question Sets Breakdown</h4>
+                {totalQuestions === 0 ? (
+                  <div className="p-8 text-center border-2 border-dashed rounded-xl bg-muted/30">
+                    <p className="text-sm text-muted-foreground">No questions added yet.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Add and validate question JSON in the shift sidebar to see preview.</p>
+                  </div>
+                ) : (
+                  shiftsConfig.map((shift) => {
+                    const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                    return (
+                      <div key={shift.shiftNumber} className="space-y-3 p-3.5 border rounded-xl bg-muted/10">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs">Shift {shift.shiftNumber}</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {currentShiftSets.reduce((sum, s) => sum + (shiftQuestions[shift.shiftNumber]?.[s]?.length || 0), 0)} Questions
+                          </Badge>
+                        </div>
+                        {currentShiftSets.map((sLetter) => {
+                          const setList = shiftQuestions[shift.shiftNumber]?.[sLetter] || [];
+                          return (
+                            <Card key={sLetter} className="overflow-hidden border">
+                              <CardHeader className="p-3 bg-muted/50 border-b">
+                                <CardTitle className="text-xs flex items-center justify-between">
+                                  <span>Shift {shift.shiftNumber} · Set {sLetter}</span>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {setList.length} Question{setList.length !== 1 ? "s" : ""}
+                                  </Badge>
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-3 space-y-3">
+                                {setList.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground italic">No questions in this set.</p>
+                                ) : (
+                                  setList.map((qItem: any, qIdx: number) => (
+                                    <div key={qIdx} className="p-2.5 border rounded-lg bg-card space-y-1.5 text-xs">
+                                      <p className="font-semibold text-xs">
+                                        Q{qIdx + 1}. {qItem.question}
+                                      </p>
+                                      {Array.isArray(qItem.options) && (
+                                        <div className="space-y-1 pl-2">
+                                          {qItem.options.map((opt: string, optIdx: number) => {
+                                            const isCorrect =
+                                              qItem.answer === optIdx ||
+                                              qItem.answer === String.fromCharCode(65 + optIdx) ||
+                                              qItem.answer === opt;
+                                            return (
+                                              <div
+                                                key={optIdx}
+                                                className={`p-1.5 rounded border flex items-center justify-between text-[11px] ${
+                                                  isCorrect
+                                                    ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
+                                                    : "border-border bg-background text-muted-foreground"
+                                                }`}
+                                              >
+                                                <span>
+                                                  {String.fromCharCode(65 + optIdx)}. {opt}
+                                                </span>
+                                                {isCorrect && (
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="text-[9px] border-green-600 text-green-600 py-0"
+                                                  >
+                                                    Answer
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </form>
     </Form>
   );
 }

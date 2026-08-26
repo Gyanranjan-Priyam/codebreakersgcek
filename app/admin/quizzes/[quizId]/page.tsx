@@ -7,6 +7,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Edit, Clock, Calendar, CheckCircle2, Globe, Users, Monitor, BarChart3, BookOpen, Layers, HelpCircle, Award } from "lucide-react";
 import Link from "next/link";
@@ -26,20 +32,13 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
   }
 
   const quiz = result.data;
-  let questionsData: any = {};
+  const { parseQuestionsByShiftAndSet } = await import("@/app/admin/quizzes/utils");
+  const shiftMap = parseQuestionsByShiftAndSet(quiz.questionsJson, quiz.shifts || 1, quiz.sets || 1);
 
-  try {
-    questionsData = JSON.parse(quiz.questionsJson);
-  } catch (error) {
-    console.error("Error parsing questions:", error);
-  }
-
-  let totalQuestions = 0;
-  if (typeof questionsData === "object" && !Array.isArray(questionsData)) {
-    totalQuestions = Object.values(questionsData).reduce((sum: number, questions: any) => sum + questions.length, 0);
-  } else if (Array.isArray(questionsData)) {
-    totalQuestions = questionsData.length;
-  }
+  let totalQuestions = Object.values(shiftMap).reduce(
+    (acc, setsMap) => acc + Object.values(setsMap).reduce((sum, qList) => sum + (qList?.length || 0), 0),
+    0
+  );
 
   // Fetch form responses if linked form exists
   let formResponses: Array<{ id: string; submittedByName?: string; submittedByEmail?: string }> = [];
@@ -262,142 +261,124 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
         />
       )}
 
-      {/* Questions by Set */}
-      {typeof questionsData === "object" && !Array.isArray(questionsData) ? (
-        <Card>
+      {/* Questions by Shift & Set */}
+      <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <CardTitle className="text-lg">Questions by Set</CardTitle>
-                <CardDescription>Click a set to review its questions</CardDescription>
+                <CardTitle className="text-lg">Questions by Shift & Set</CardTitle>
+                <CardDescription>{totalQuestions} questions across {Object.keys(shiftMap).length} shifts</CardDescription>
               </div>
               <ExportQuizPDF
                 quizTitle={quiz.title}
                 quizId={quiz.quizId}
                 description={quiz.description}
                 duration={quiz.duration}
-                questions={Object.values(questionsData).flat() as any[]}
-                questionsBySet={questionsData}
+                questions={Object.values(shiftMap).flatMap((m) => Object.values(m).flat()) as any[]}
+                questionsBySet={shiftMap[1] || {}}
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <Accordion type="single" collapsible className="w-full">
-              {Object.keys(questionsData).sort().map((setKey) => (
-                <AccordionItem key={setKey} value={`set-${setKey}`}>
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center justify-between w-full pr-4">
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium">Set {setKey}</span>
-                        <Badge variant="outline">
-                          {questionsData[setKey].length} question{questionsData[setKey].length > 1 ? "s" : ""}
-                        </Badge>
-                      </div>
-                      <ExportQuizPDF
-                        quizTitle={quiz.title}
-                        quizId={quiz.quizId}
-                        description={quiz.description}
-                        duration={quiz.duration}
-                        setNumber={setKey}
-                        questions={questionsData[setKey] as any[]}
-                        size="sm"
-                        stopPropagation
-                      />
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-3 pt-3">
-                      {questionsData[setKey].map((question: any, index: number) => (
-                        <Card key={index} className="bg-muted/40">
-                          <CardContent className="p-4">
-                            <div className="space-y-3">
-                              <div className="flex items-start gap-3">
-                                <Badge variant="outline" className="mt-0.5 shrink-0">Q{question.id}</Badge>
-                                <p className="font-medium flex-1 text-sm">{question.question}</p>
+          <CardContent className="space-y-4">
+            <Tabs defaultValue={`shift-1`} className="w-full space-y-4">
+              <TabsList
+                className="grid w-full h-auto p-1 bg-muted/60 rounded-xl gap-1"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(Object.keys(shiftMap).length, 6)}, minmax(0, 1fr))`,
+                }}
+              >
+                {Object.keys(shiftMap).map((sNumStr) => {
+                  const sNum = parseInt(sNumStr, 10);
+                  const setsObj = shiftMap[sNum] || {};
+                  const sTotalQ = Object.values(setsObj).reduce((s, list) => s + (list?.length || 0), 0);
+                  return (
+                    <TabsTrigger
+                      key={sNum}
+                      value={`shift-${sNum}`}
+                      className="py-2 px-3 rounded-lg text-xs font-bold transition-all data-[state=active]:bg-card data-[state=active]:text-primary flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      <span>Shift {sNum}</span>
+                      <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-0.5">
+                        {sTotalQ} Qs
+                      </Badge>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+
+              {Object.entries(shiftMap).map(([sNumStr, setsObj]) => {
+                const sNum = parseInt(sNumStr, 10);
+                return (
+                  <TabsContent key={sNum} value={`shift-${sNum}`} className="space-y-3 focus-visible:outline-none">
+                    <Accordion type="single" collapsible className="w-full space-y-2">
+                      {Object.keys(setsObj).sort().map((setKey) => {
+                        const qList = setsObj[setKey] || [];
+                        return (
+                          <AccordionItem key={setKey} value={`set-${setKey}`} className="border rounded-xl bg-card overflow-hidden">
+                            <AccordionTrigger className="px-4 py-3 hover:no-underline bg-muted/20 hover:bg-muted/30">
+                              <div className="flex items-center justify-between w-full pr-4">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-semibold text-xs text-foreground">Shift {sNum} · Question Set {setKey}</span>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {qList.length} question{qList.length !== 1 ? "s" : ""}
+                                  </Badge>
+                                </div>
                               </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-10">
-                                {question.options.map((opt: string, i: number) => (
-                                  <div
-                                    key={i}
-                                    className={`p-2 rounded-lg border text-sm ${
-                                      opt === question.answer
-                                        ? "border-primary bg-primary/10"
-                                        : "border-border bg-background"
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant={opt === question.answer ? "default" : "outline"} className="text-xs h-5 px-1.5">
-                                        {String.fromCharCode(65 + i)}
-                                      </Badge>
-                                      <span className="flex-1">{opt}</span>
-                                      {opt === question.answer && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="ml-10 text-xs text-muted-foreground">
-                                Correct: <span className="font-medium text-primary">{question.answer}</span>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-4 pt-3">
+                              {qList.length === 0 ? (
+                                <p className="text-xs text-muted-foreground italic">No questions in this set.</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {qList.map((question: any, index: number) => (
+                                    <Card key={index} className="bg-muted/30 border">
+                                      <CardContent className="p-3.5 space-y-2.5 text-xs">
+                                        <div className="flex items-start gap-2.5">
+                                          <Badge variant="outline" className="mt-0.5 shrink-0 text-[10px]">Q{question.id || index + 1}</Badge>
+                                          <p className="font-medium flex-1 text-xs text-foreground">{question.question}</p>
+                                        </div>
+                                        {Array.isArray(question.options) && (
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-7">
+                                            {question.options.map((opt: string, i: number) => {
+                                              const isCorrect = opt === question.answer || question.answer === i || question.answer === String.fromCharCode(65 + i);
+                                              return (
+                                                <div
+                                                  key={i}
+                                                  className={`p-2 rounded-lg border text-xs ${
+                                                    isCorrect
+                                                      ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
+                                                      : "border-border bg-background text-muted-foreground"
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center gap-2">
+                                                    <Badge variant={isCorrect ? "default" : "outline"} className="text-[10px] h-4 px-1.5">
+                                                      {String.fromCharCode(65 + i)}
+                                                    </Badge>
+                                                    <span className="flex-1">{opt}</span>
+                                                    {isCorrect && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              )}
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      })}
+                    </Accordion>
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
           </CardContent>
         </Card>
-      ) : Array.isArray(questionsData) ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <CardTitle className="text-lg">Questions</CardTitle>
-                <CardDescription>{questionsData.length} total questions</CardDescription>
-              </div>
-              <ExportQuizPDF
-                quizTitle={quiz.title}
-                quizId={quiz.quizId}
-                description={quiz.description}
-                duration={quiz.duration}
-                questions={questionsData as any[]}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {questionsData.map((question: any, index: number) => (
-                <Card key={index} className="bg-muted/40">
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <Badge variant="outline" className="mt-0.5 shrink-0">Q{question.id}</Badge>
-                        <p className="font-medium flex-1 text-sm">{question.question}</p>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-10">
-                        {question.options.map((opt: string, i: number) => (
-                          <div key={i} className={`p-2 rounded-lg border text-sm ${opt === question.answer ? "border-primary bg-primary/10" : "border-border bg-background"}`}>
-                            <div className="flex items-center gap-2">
-                              <Badge variant={opt === question.answer ? "default" : "outline"} className="text-xs h-5 px-1.5">{String.fromCharCode(65 + i)}</Badge>
-                              <span className="flex-1">{opt}</span>
-                              {opt === question.answer && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="ml-10 text-xs text-muted-foreground">
-                        Correct: <span className="font-medium text-primary">{question.answer}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
     </div>
   );
 }

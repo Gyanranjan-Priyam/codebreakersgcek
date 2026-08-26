@@ -161,27 +161,38 @@ export async function createQuiz(data: {
     try {
       const questions = JSON.parse(data.questionsJson);
       
-      if (typeof questions === 'object' && !Array.isArray(questions)) {
+      if (typeof questions === 'object' && !Array.isArray(questions) && questions !== null) {
         for (const setKey of Object.keys(questions)) {
-          if (!Array.isArray(questions[setKey])) {
-            return {
-              status: "error" as const,
-              message: `Set ${setKey} must contain an array of questions`,
-            };
-          }
-          
-          for (const q of questions[setKey]) {
-            if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
-              return {
-                status: "error" as const,
-                message: `Each question in Set ${setKey} must have id, question, options array, and answer`,
-              };
+          const val = questions[setKey];
+          if (Array.isArray(val)) {
+            for (const q of val) {
+              if (q.id === undefined || !q.question || !Array.isArray(q.options) || q.answer === undefined) {
+                return {
+                  status: "error" as const,
+                  message: `Each question in Set ${setKey} must have id, question, options array, and answer`,
+                };
+              }
+            }
+          } else if (typeof val === 'object' && val !== null) {
+            // Nested shift map: { "shift_1": { "A": [...], "B": [...] } }
+            for (const subKey of Object.keys(val)) {
+              const subVal = val[subKey];
+              if (Array.isArray(subVal)) {
+                for (const q of subVal) {
+                  if (q.id === undefined || !q.question || !Array.isArray(q.options) || q.answer === undefined) {
+                    return {
+                      status: "error" as const,
+                      message: `Each question in ${setKey} Set ${subKey} must have id, question, options array, and answer`,
+                    };
+                  }
+                }
+              }
             }
           }
         }
       } else if (Array.isArray(questions)) {
         for (const q of questions) {
-          if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
+          if (q.id === undefined || !q.question || !Array.isArray(q.options) || q.answer === undefined) {
             return {
               status: "error" as const,
               message: "Each question must have id, question, options array, and answer",
@@ -286,27 +297,38 @@ export async function updateQuiz(
     try {
       const questions = JSON.parse(data.questionsJson);
       
-      if (typeof questions === 'object' && !Array.isArray(questions)) {
+      if (typeof questions === 'object' && !Array.isArray(questions) && questions !== null) {
         for (const setKey of Object.keys(questions)) {
-          if (!Array.isArray(questions[setKey])) {
-            return {
-              status: "error" as const,
-              message: `Set ${setKey} must contain an array of questions`,
-            };
-          }
-          
-          for (const q of questions[setKey]) {
-            if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
-              return {
-                status: "error" as const,
-                message: `Each question in Set ${setKey} must have id, question, options array, and answer`,
-              };
+          const val = questions[setKey];
+          if (Array.isArray(val)) {
+            for (const q of val) {
+              if (q.id === undefined || !q.question || !Array.isArray(q.options) || q.answer === undefined) {
+                return {
+                  status: "error" as const,
+                  message: `Each question in Set ${setKey} must have id, question, options array, and answer`,
+                };
+              }
+            }
+          } else if (typeof val === 'object' && val !== null) {
+            // Nested shift map: { "shift_1": { "A": [...], "B": [...] } }
+            for (const subKey of Object.keys(val)) {
+              const subVal = val[subKey];
+              if (Array.isArray(subVal)) {
+                for (const q of subVal) {
+                  if (q.id === undefined || !q.question || !Array.isArray(q.options) || q.answer === undefined) {
+                    return {
+                      status: "error" as const,
+                      message: `Each question in ${setKey} Set ${subKey} must have id, question, options array, and answer`,
+                    };
+                  }
+                }
+              }
             }
           }
         }
       } else if (Array.isArray(questions)) {
         for (const q of questions) {
-          if (!q.id || !q.question || !Array.isArray(q.options) || !q.answer) {
+          if (q.id === undefined || !q.question || !Array.isArray(q.options) || q.answer === undefined) {
             return {
               status: "error" as const,
               message: "Each question must have id, question, options array, and answer",
@@ -832,6 +854,14 @@ export async function completeQuizShift(quizId: string, shiftNumber: number) {
     const nextPendingShift = shiftsList.find((s) => s.status !== "COMPLETED" && s.shiftNumber > shiftNumber);
     const nextActiveShift = nextPendingShift ? nextPendingShift.shiftNumber : Math.min(shiftNumber + 1, totalShifts);
 
+    // Update next active shift status in shiftsList if found
+    shiftsList = shiftsList.map((s) => {
+      if (s.shiftNumber === nextActiveShift && s.status !== "COMPLETED") {
+        return { ...s, status: "ACTIVE" };
+      }
+      return s;
+    });
+
     await prisma.quiz.update({
       where: { id: quiz.id },
       data: {
@@ -847,7 +877,7 @@ export async function completeQuizShift(quizId: string, shiftNumber: number) {
       where: { quizId: quiz.id },
     });
 
-    // 1. Broadcast force-submit and shift-completed to all kiosks so active exams submit their local answers
+    // 1. Broadcast force-submit and shift-completed to all kiosks
     systems.forEach((s) => {
       emitSocketEvent(`system-${s.systemCode}`, "shift-completed", {
         shiftCompleted: shiftNumber,
@@ -858,15 +888,22 @@ export async function completeQuizShift(quizId: string, shiftNumber: number) {
         shiftCompleted: shiftNumber,
         nextActiveShift,
       });
+      emitSocketEvent(`system-${s.systemCode}`, "shift-changed", {
+        activeShift: nextActiveShift,
+        completedShift: shiftNumber,
+      });
     });
 
-    // 2. For any candidate who was assigned/in-progress and has no attempt recorded in DB yet, record their attempt
+    // 2. For any candidate who was assigned/in-progress during this shift and has no attempt recorded in DB yet, record their attempt
     for (const sys of systems) {
       if (sys.assignedStudentName && sys.assignedStudentEmail) {
+        const currentShiftNum = sys.assignedShift || shiftNumber;
         const existingAttempt = await prisma.quizAttempt.findFirst({
           where: {
             quizId: quiz.id,
             externalSystemId: sys.id,
+            shiftNumber: currentShiftNum,
+            participantEmail: sys.assignedStudentEmail,
           },
         });
 
@@ -882,29 +919,33 @@ export async function completeQuizShift(quizId: string, shiftNumber: number) {
             }
           } catch (e) {}
 
-          const currentShiftNum = sys.assignedShift || shiftNumber;
           const currentShiftName = sys.assignedShiftName || `Shift ${currentShiftNum}`;
           const currentSetNum = (sys.assignedSet || "A").charCodeAt(0) - 64;
+          const uniqueUserId = `ext_${sys.id}_s${currentShiftNum}_${sys.assignedResponseId || sys.assignedStudentEmail.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}`;
 
-          await prisma.quizAttempt.create({
-            data: {
-              quizId: quiz.id,
-              userId: `ext_${sys.id}`,
-              participantName: sys.assignedStudentName,
-              participantEmail: sys.assignedStudentEmail,
-              externalSystemId: sys.id,
-              setNumber: currentSetNum,
-              shiftNumber: currentShiftNum,
-              shiftName: currentShiftName,
-              score: 0,
-              totalQuestions: totalQ,
-              correctAnswers: 0,
-              pointsEarned: 0,
-              answersJson: JSON.stringify({ answers: [], note: "Submitted on Shift Completion" }),
-              startedAt: sys.startedAt || new Date(),
-              completedAt: new Date(),
-            },
-          });
+          try {
+            await prisma.quizAttempt.create({
+              data: {
+                quizId: quiz.id,
+                userId: uniqueUserId,
+                participantName: sys.assignedStudentName,
+                participantEmail: sys.assignedStudentEmail,
+                externalSystemId: sys.id,
+                setNumber: currentSetNum,
+                shiftNumber: currentShiftNum,
+                shiftName: currentShiftName,
+                score: 0,
+                totalQuestions: totalQ,
+                correctAnswers: 0,
+                pointsEarned: 0,
+                answersJson: JSON.stringify({ answers: [], note: "Submitted on Shift Completion" }),
+                startedAt: sys.startedAt || new Date(),
+                completedAt: new Date(),
+              },
+            });
+          } catch (createErr) {
+            console.error("Error creating fallback quiz attempt on shift completion:", createErr);
+          }
         }
       }
     }
@@ -938,11 +979,22 @@ export async function completeQuizShift(quizId: string, shiftNumber: number) {
       completedShift: shiftNumber,
       nextActiveShift,
     });
+    emitSocketEvent(`quiz-${quiz.id}`, "shift-changed", {
+      quizId: quiz.id,
+      activeShift: nextActiveShift,
+      completedShift: shiftNumber,
+    });
+    emitSocketEvent(`quiz-${quiz.quizId}`, "shift-changed", {
+      quizId: quiz.quizId,
+      activeShift: nextActiveShift,
+      completedShift: shiftNumber,
+    });
 
     revalidatePath(`/admin/quizzes/${quiz.id}`);
     revalidatePath(`/admin/quizzes/${quiz.quizId}`);
     revalidatePath(`/admin/quizzes/${quiz.quizId}/systems`);
     revalidatePath(`/admin/quizzes/results/${quiz.quizId}`);
+    revalidatePath(`/quiz/system-register`);
 
     return {
       status: "success" as const,
@@ -952,6 +1004,124 @@ export async function completeQuizShift(quizId: string, shiftNumber: number) {
   } catch (error) {
     console.error("Error completing shift:", error);
     return { status: "error" as const, message: "Failed to complete shift" };
+  }
+}
+
+/**
+ * Manually switch or activate a specific Shift
+ */
+export async function setActiveQuizShift(quizId: string, targetShiftNumber: number) {
+  await requireAdmin();
+
+  try {
+    const quiz = await prisma.quiz.findFirst({
+      where: {
+        OR: [{ id: quizId }, { quizId: quizId }],
+      },
+    });
+
+    if (!quiz) {
+      return { status: "error" as const, message: "Quiz not found" };
+    }
+
+    let shiftsList: QuizShiftConfig[] = [];
+    try {
+      if (quiz.shiftsJson) {
+        shiftsList = JSON.parse(quiz.shiftsJson);
+      }
+    } catch (e) {
+      console.error("Error parsing shiftsJson:", e);
+    }
+
+    const totalShifts = quiz.shifts || 1;
+    if (shiftsList.length === 0) {
+      for (let i = 1; i <= totalShifts; i++) {
+        shiftsList.push({
+          shiftNumber: i,
+          name: `Shift ${i}`,
+          set: String.fromCharCode(65 + ((i - 1) % (quiz.sets || 1))),
+          status: i === targetShiftNumber ? "ACTIVE" : i < targetShiftNumber ? "COMPLETED" : "PENDING",
+        });
+      }
+    } else {
+      shiftsList = shiftsList.map((s) => {
+        if (s.shiftNumber === targetShiftNumber) {
+          return { ...s, status: "ACTIVE" };
+        }
+        return s;
+      });
+    }
+
+    await prisma.quiz.update({
+      where: { id: quiz.id },
+      data: {
+        shiftsJson: JSON.stringify(shiftsList),
+        activeShift: targetShiftNumber,
+      },
+    });
+
+    // Update all registered systems to point to this active shift if currently in REGISTERED status
+    await prisma.externalQuizSystem.updateMany({
+      where: {
+        quizId: quiz.id,
+        status: "REGISTERED",
+      },
+      data: {
+        assignedShift: targetShiftNumber,
+        assignedShiftName: `Shift ${targetShiftNumber}`,
+      },
+    });
+
+    const { emitSocketEvent } = await import("@/lib/socket-server");
+
+    // Fetch systems
+    const systems = await prisma.externalQuizSystem.findMany({
+      where: { quizId: quiz.id },
+      select: { systemCode: true },
+    });
+
+    systems.forEach((s) => {
+      emitSocketEvent(`system-${s.systemCode}`, "shift-changed", {
+        activeShift: targetShiftNumber,
+      });
+      emitSocketEvent(`system-${s.systemCode}`, "status-changed", {
+        status: "REGISTERED",
+        activeShift: targetShiftNumber,
+      });
+    });
+
+    emitSocketEvent(`quiz-${quiz.id}`, "shift-changed", {
+      quizId: quiz.id,
+      activeShift: targetShiftNumber,
+    });
+    emitSocketEvent(`quiz-${quiz.quizId}`, "shift-changed", {
+      quizId: quiz.quizId,
+      activeShift: targetShiftNumber,
+    });
+    emitSocketEvent(`quiz-${quiz.id}`, "system-updated", {
+      quizId: quiz.id,
+      action: "shift-changed",
+      activeShift: targetShiftNumber,
+    });
+    emitSocketEvent(`quiz-${quiz.quizId}`, "system-updated", {
+      quizId: quiz.quizId,
+      action: "shift-changed",
+      activeShift: targetShiftNumber,
+    });
+
+    revalidatePath(`/admin/quizzes/${quiz.id}`);
+    revalidatePath(`/admin/quizzes/${quiz.quizId}`);
+    revalidatePath(`/admin/quizzes/${quiz.quizId}/systems`);
+    revalidatePath(`/quiz/system-register`);
+
+    return {
+      status: "success" as const,
+      message: `Shift ${targetShiftNumber} is now active!`,
+      activeShift: targetShiftNumber,
+    };
+  } catch (error) {
+    console.error("Error setting active shift:", error);
+    return { status: "error" as const, message: "Failed to activate shift" };
   }
 }
 

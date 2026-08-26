@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -87,38 +88,54 @@ export default function ExternalQuizWrapper({
 
     let leaveRoomFn: (() => void) | null = null;
     let handleUnblocked: (() => void) | null = null;
-    let handleStatusChanged: ((data: { status?: string }) => void) | null = null;
+    let handleStatusChanged: ((data: { status?: string; shiftCompleted?: number; nextActiveShift?: number }) => void) | null = null;
+    let handleShiftCompleted: ((data: { shiftCompleted?: number; nextActiveShift?: number }) => void) | null = null;
+    let handleConnect: (() => void) | null = null;
+
+    const cleanupAndRedirect = () => {
+      try {
+        localStorage.removeItem(`cb_answers_${systemCode}`);
+        localStorage.removeItem(`cb_qidx_${systemCode}`);
+      } catch (e) {}
+      window.location.replace("/quiz/system-register");
+    };
 
     initSocket().then((socket) => {
       if (!socket) return;
 
       leaveRoomFn = joinRoom(`system-${systemCode}`);
 
+      handleConnect = async () => {
+        const res = await getSystemState(systemCode);
+        if (res.status === "success" && res.data) {
+          if (res.data.status === "REGISTERED") {
+            cleanupAndRedirect();
+          } else if (res.data.status === "BLOCKED") {
+            setLiveIsBlocked(true);
+          } else if (res.data.status === "ATTEMPTING" || res.data.status === "IN_PROGRESS") {
+            setLiveIsBlocked(false);
+          }
+        }
+      };
+
       handleUnblocked = () => {
         setLiveIsBlocked(false);
         toast.success("You have been unblocked by the administrator! Resuming exam...");
       };
 
-      handleStatusChanged = (data: { status?: string; shiftCompleted?: number }) => {
+      handleStatusChanged = (data) => {
         if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
           setLiveIsBlocked(false);
         } else if (data?.status === "BLOCKED") {
           setLiveIsBlocked(true);
-        } else if (data?.status === "REGISTERED" || data?.shiftCompleted) {
-          toast.info("Shift has ended. Returning to kiosk waiting room...");
-          setTimeout(() => {
-            window.location.href = "/quiz/system-register";
-          }, 1500);
         }
       };
 
-      const handleShiftCompleted = () => {
-        toast.info("Shift completed by administrator. Returning to kiosk registration...");
-        setTimeout(() => {
-          window.location.href = "/quiz/system-register";
-        }, 1500);
+      handleShiftCompleted = (data) => {
+        toast.info(`Shift ${data?.shiftCompleted || ""} completed. Auto-submitting answers...`);
       };
 
+      socket.on("connect", handleConnect);
       socket.on("unblocked", handleUnblocked);
       socket.on("status-changed", handleStatusChanged);
       socket.on("shift-completed", handleShiftCompleted);
@@ -142,9 +159,10 @@ export default function ExternalQuizWrapper({
       if (leaveRoomFn) leaveRoomFn();
       const socket = getSocket();
       if (socket) {
+        if (handleConnect) socket.off("connect", handleConnect);
         if (handleUnblocked) socket.off("unblocked", handleUnblocked);
         if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
-        socket.off("shift-completed");
+        if (handleShiftCompleted) socket.off("shift-completed", handleShiftCompleted);
       }
       if (pollTimer) {
         clearInterval(pollTimer);
@@ -218,8 +236,15 @@ export default function ExternalQuizWrapper({
     answers: Record<number, number>;
     tabSwitches: number;
     questionsJson: string;
+    shiftNumber?: number;
   }) => {
-    return submitExternalQuizAttemptFromInterface({ ...data, systemCode });
+    return submitExternalQuizAttemptFromInterface({
+      ...data,
+      systemCode,
+      participantName: user.name,
+      participantEmail: user.email,
+      shiftNumber: data.shiftNumber || quiz.shift || 1,
+    });
   };
 
   const afterSubmitContent = (

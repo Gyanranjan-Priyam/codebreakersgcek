@@ -9,6 +9,8 @@ import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, IdCard, Book
 import { submitExternalQuizAttempt } from "@/app/admin/quizzes/actions";
 import { useRouter } from "next/navigation";
 
+import { getQuestionsForShiftAndSet } from "@/app/admin/quizzes/utils";
+
 interface Quiz {
   id: string;
   quizId: string;
@@ -18,6 +20,8 @@ interface Quiz {
   duration: number;
   pointsPerQuestion: number;
   questionsJson: string;
+  shift?: number;
+  shiftName?: string;
   feedbackFormId?: string | null;
 }
 
@@ -78,31 +82,20 @@ export default function ExternalQuizInterface({
     tabSwitches: number;
   } | null>(null);
 
-  // Parse questions
-  let questionsData: Record<string, Question[]> = {};
-  try {
-    const raw = JSON.parse(quiz.questionsJson);
-    if (typeof raw === "object" && !Array.isArray(raw)) {
-      questionsData = raw;
-    } else if (Array.isArray(raw)) {
-      questionsData = { A: raw };
-    }
-  } catch (e) {
-    console.error(e);
-  }
+  const getQuestionCount = (set: string) => {
+    const list = getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, set);
+    return Array.isArray(list) ? list.length : 0;
+  };
 
-  const getQuestionCount = (set: string) =>
-    Array.isArray(questionsData[set]) ? questionsData[set].length : 0;
-
-  // Load questions for the assigned set when quiz starts
+  // Load questions for the assigned shift and set when quiz starts
   useEffect(() => {
     if (currentStep === "quiz-started" && selectedSet) {
-      const questionsForSet = questionsData[selectedSet];
+      const questionsForSet = getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, selectedSet);
       if (Array.isArray(questionsForSet)) {
         setQuestions(questionsForSet as Question[]);
       }
     }
-  }, [currentStep, selectedSet]);
+  }, [currentStep, selectedSet, quiz.questionsJson, quiz.shift]);
 
   // Timer countdown
   useEffect(() => {
@@ -144,16 +137,12 @@ export default function ExternalQuizInterface({
     setIsSubmitting(true);
 
     try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      }
-
-      const currentQuestions = questions.length > 0 ? questions : (questionsData[selectedSet] || []);
+      const currentQuestions = questions.length > 0 ? questions : getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, selectedSet);
       let correctCount = 0;
 
       // Build answer map: questionIndex -> selected option string
       const answersStringMap: Record<string, string> = {};
-      currentQuestions.forEach((q, idx) => {
+      currentQuestions.forEach((q: any, idx: number) => {
         const selectedOptionIndex = answers[idx];
         if (selectedOptionIndex !== undefined) {
           const selectedOption = q.options[selectedOptionIndex] || "";
@@ -187,7 +176,6 @@ export default function ExternalQuizInterface({
           tabSwitches,
         });
         setCurrentStep("quiz-submitted");
-        localStorage.removeItem("cb_external_system_session");
       } else {
         alert(res.message || "Failed to submit quiz. Please try again.");
       }

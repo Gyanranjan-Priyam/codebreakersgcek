@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { prisma } from "@/lib/db";
@@ -11,6 +12,9 @@ interface ExternalSubmitData {
   tabSwitches: number;
   questionsJson: string;
   systemCode: string;
+  participantName?: string;
+  participantEmail?: string;
+  shiftNumber?: number;
 }
 
 function findCorrectAnswerIndex(question: any): number {
@@ -39,7 +43,7 @@ function findCorrectAnswerIndex(question: any): number {
     }
   }
 
-  // 4. Exact or trimmed / case-insensitive match against option strings
+  // 4. Exact or case-insensitive match against option strings
   if (typeof rawAnswer === "string") {
     const cleaned = rawAnswer.trim().toLowerCase();
     const matchIdx = question.options.findIndex(
@@ -62,19 +66,20 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
       return { status: "error" as const, message: "External system session not found" };
     }
 
-    if (system.status === "COMPLETED") {
-      return { status: "error" as const, message: "Quiz already submitted for this system" };
+    const shiftNumber = data.shiftNumber || system.assignedShift || 1;
+    const shiftName = `Shift ${shiftNumber}`;
+    const studentEmail = data.participantEmail || system.assignedStudentEmail;
+    const studentName = data.participantName || system.assignedStudentName || "Candidate";
+
+    // Parse shift-isolated questions for the assigned set
+    const { getQuestionsForShiftAndSet } = await import("@/app/admin/quizzes/utils");
+    const questions = getQuestionsForShiftAndSet(data.questionsJson, shiftNumber, data.assignedSet);
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return { status: "error" as const, message: `No questions found for Shift ${shiftNumber} Set ${data.assignedSet}` };
     }
 
-    // Parse questions for the assigned set
-    const questionsData = JSON.parse(data.questionsJson);
-    const questions = questionsData[data.assignedSet];
-
-    if (!Array.isArray(questions)) {
-      return { status: "error" as const, message: "Invalid questions data for the assigned set" };
-    }
-
-    // Calculate score accurately
+    // Calculate score accurately based on attempted answers
     let correctAnswers = 0;
     const detailedResults: Array<{
       questionIndex: number;
@@ -116,7 +121,7 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
     const pointsEarned = Number((correctAnswers * pointsPerQ).toFixed(2));
     const setNumber = data.assignedSet.charCodeAt(0) - 64; // A=1, B=2 ...
 
-    // Build answersJson in the same format as internal
+    // Build answersJson
     const answersJson = JSON.stringify({
       answers: Object.entries(data.answers).map(([qIndex, aIndex]) => ({
         questionIndex: parseInt(qIndex),
@@ -127,19 +132,25 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
       submittedAt: new Date().toISOString(),
     });
 
-    // Check for existing attempt by this external system
+    // Check for existing attempt specifically FOR THIS SHIFT and candidate on this system
     const existingAttempt = await prisma.quizAttempt.findFirst({
       where: {
         quizId: data.quizDbId,
-        externalSystemId: system.id,
+        shiftNumber: shiftNumber,
+        OR: [
+          { externalSystemId: system.id },
+          ...(studentEmail ? [{ participantEmail: studentEmail }] : []),
+        ],
       },
+      orderBy: { createdAt: "desc" },
     });
 
-    const shiftNumber = system.assignedShift || 1;
-    const shiftName = system.assignedShiftName || `Shift ${shiftNumber}`;
+    const uniqueUserId = `ext_${system.id}_s${shiftNumber}_${system.assignedResponseId || studentEmail?.replace(/[^a-zA-Z0-9]/g, "_") || Date.now()}`;
+
+    let attemptRecordId: string = "";
 
     if (existingAttempt) {
-      await prisma.quizAttempt.update({
+      const updated = await prisma.quizAttempt.update({
         where: { id: existingAttempt.id },
         data: {
           score,
@@ -150,13 +161,17 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
           shiftName,
           completedAt: new Date(),
           answersJson,
+          participantName: studentName,
+          participantEmail: studentEmail,
+          externalSystemId: system.id,
         },
       });
+      attemptRecordId = updated.id;
     } else {
-      await prisma.quizAttempt.create({
+      const created = await prisma.quizAttempt.create({
         data: {
           quizId: data.quizDbId,
-          userId: `ext_${system.id}`,
+          userId: uniqueUserId,
           setNumber,
           shiftNumber,
           shiftName,
@@ -166,23 +181,30 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
           pointsEarned,
           completedAt: new Date(),
           answersJson,
-          participantName: system.assignedStudentName,
-          participantEmail: system.assignedStudentEmail,
+          participantName: studentName,
+          participantEmail: studentEmail,
           externalSystemId: system.id,
+        },
+      });
+      attemptRecordId = created.id;
+    }
+
+    // Mark system as completed if not reset
+    if (system.status !== "REGISTERED") {
+      await prisma.externalQuizSystem.update({
+        where: { id: system.id },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+          attemptId: attemptRecordId,
         },
       });
     }
 
-    // Mark system as completed
-    await prisma.externalQuizSystem.update({
-      where: { id: system.id },
-      data: { status: "COMPLETED", completedAt: new Date() },
-    });
-
     const { emitSocketEvent } = await import("@/lib/socket-server");
-    emitSocketEvent(`quiz-${data.quizDbId}`, "system-updated", { systemCode: data.systemCode, status: "COMPLETED" });
-    emitSocketEvent(`quiz-${data.quizId}`, "system-updated", { systemCode: data.systemCode, status: "COMPLETED" });
-    emitSocketEvent(`system-${data.systemCode}`, "status-changed", { status: "COMPLETED" });
+    emitSocketEvent(`quiz-${data.quizDbId}`, "system-updated", { systemCode: data.systemCode, status: "COMPLETED", shiftNumber });
+    emitSocketEvent(`quiz-${data.quizId}`, "system-updated", { systemCode: data.systemCode, status: "COMPLETED", shiftNumber });
+    emitSocketEvent(`system-${data.systemCode}`, "status-changed", { status: "COMPLETED", shiftNumber });
 
     revalidatePath(`/admin/quizzes/results/${data.quizId}`);
 

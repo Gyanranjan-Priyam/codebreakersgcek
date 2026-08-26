@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -55,14 +57,20 @@ export default function SystemRegisterPage() {
       if (res.status === "success" && res.data) {
         setLiveState(res.data);
         
-        // Auto-enter fullscreen if candidate is assigned or in-progress
-        if (res.data.status === "ASSIGNED" || res.data.status === "IN_PROGRESS") {
-          if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
-          }
+        // Reset any leftover local answer cache if system is REGISTERED or clean waiting
+        if (res.data.status === "REGISTERED") {
+          try {
+            localStorage.removeItem(`cb_answers_${activeSession.systemCode}`);
+            localStorage.removeItem(`cb_qidx_${activeSession.systemCode}`);
+          } catch (e) {}
         }
 
-        if (res.data.status === "IN_PROGRESS") {
+        // Always maintain fullscreen for external kiosk screens during the entire session
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+
+        if (res.data.status === "IN_PROGRESS" || res.data.status === "ATTEMPTING") {
           toast.success("Quiz started! Launching exam environment...");
           router.push(`/quiz-external/${activeSession.systemCode}`);
         }
@@ -92,14 +100,27 @@ export default function SystemRegisterPage() {
     window.addEventListener("keydown", handleAutoFullscreenInteraction, { capture: true });
 
     // Subscribe to Socket.IO for instant updates
-    let leaveRoomFn: (() => void) | null = null;
+    let leaveSystemRoom: (() => void) | null = null;
+    let leaveQuizRoom: (() => void) | null = null;
     let handleStatusChanged: ((data: any) => void) | null = null;
     let handleQuizStarted: (() => void) | null = null;
+    let handleShiftCompleted: ((data: any) => void) | null = null;
+    let handleShiftChanged: ((data: any) => void) | null = null;
+    let handleSystemUpdated: ((data: any) => void) | null = null;
+    let handleConnect: (() => void) | null = null;
 
     initSocket().then((socket) => {
       if (!socket) return;
 
-      leaveRoomFn = joinRoom(`system-${activeSession.systemCode}`);
+      leaveSystemRoom = joinRoom(`system-${activeSession.systemCode}`);
+      if (activeSession.quizId) {
+        leaveQuizRoom = joinRoom(`quiz-${activeSession.quizId}`);
+      }
+
+      handleConnect = () => {
+        // Immediate server sync on socket reconnection
+        checkState();
+      };
 
       handleStatusChanged = (data: any) => {
         if (data?.status === "DISCONNECTED") {
@@ -114,9 +135,44 @@ export default function SystemRegisterPage() {
           return;
         }
 
+        if (data?.status === "REGISTERED") {
+          try {
+            localStorage.removeItem(`cb_answers_${activeSession.systemCode}`);
+            localStorage.removeItem(`cb_qidx_${activeSession.systemCode}`);
+          } catch (e) {}
+        }
+
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch(() => {});
         }
+        checkState();
+      };
+
+      handleShiftCompleted = (data: any) => {
+        try {
+          localStorage.removeItem(`cb_answers_${activeSession.systemCode}`);
+          localStorage.removeItem(`cb_qidx_${activeSession.systemCode}`);
+        } catch (e) {}
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+        if (data?.shiftCompleted) {
+          toast.info(`Shift ${data.shiftCompleted} completed. System ready for Shift ${data.nextActiveShift || ""}`);
+        }
+        checkState();
+      };
+
+      handleShiftChanged = (data: any) => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+        if (data?.activeShift) {
+          toast.info(`Shift ${data.activeShift} is now active!`);
+        }
+        checkState();
+      };
+
+      handleSystemUpdated = () => {
         checkState();
       };
 
@@ -128,7 +184,11 @@ export default function SystemRegisterPage() {
         router.push(`/quiz-external/${activeSession.systemCode}`);
       };
 
+      socket.on("connect", handleConnect);
       socket.on("status-changed", handleStatusChanged);
+      socket.on("shift-completed", handleShiftCompleted);
+      socket.on("shift-changed", handleShiftChanged);
+      socket.on("system-updated", handleSystemUpdated);
       socket.on("quiz-started", handleQuizStarted);
     });
 
@@ -140,10 +200,15 @@ export default function SystemRegisterPage() {
     }, 3000);
 
     return () => {
-      if (leaveRoomFn) leaveRoomFn();
+      if (leaveSystemRoom) leaveSystemRoom();
+      if (leaveQuizRoom) leaveQuizRoom();
       const socket = getSocket();
       if (socket) {
+        if (handleConnect) socket.off("connect", handleConnect);
         if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
+        if (handleShiftCompleted) socket.off("shift-completed", handleShiftCompleted);
+        if (handleShiftChanged) socket.off("shift-changed", handleShiftChanged);
+        if (handleSystemUpdated) socket.off("system-updated", handleSystemUpdated);
         if (handleQuizStarted) socket.off("quiz-started", handleQuizStarted);
       }
       window.removeEventListener("click", handleAutoFullscreenInteraction, { capture: true });

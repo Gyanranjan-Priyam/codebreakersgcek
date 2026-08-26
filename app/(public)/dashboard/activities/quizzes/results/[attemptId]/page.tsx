@@ -157,22 +157,12 @@ export default async function QuizResultsPage({
   const userAnswersMap = parseUserAnswersMap(attempt.answersJson);
 
   let questionsData: any = {};
-  try {
-    questionsData = JSON.parse(attempt.quiz.questionsJson);
-  } catch (e) {
-    console.error(e);
-  }
-
   const setLetter = attempt.setNumber && attempt.setNumber >= 0 && attempt.setNumber <= 25
     ? String.fromCharCode(65 + attempt.setNumber)
     : "A";
 
-  let questions: any[] = [];
-  if (typeof questionsData === "object" && !Array.isArray(questionsData) && questionsData !== null) {
-    questions = questionsData[setLetter] || questionsData["A"] || [];
-  } else if (Array.isArray(questionsData)) {
-    questions = questionsData;
-  }
+  const { getQuestionsForShiftAndSet } = await import("@/app/admin/quizzes/utils");
+  const questions = getQuestionsForShiftAndSet(attempt.quiz.questionsJson, attempt.shiftNumber || 1, setLetter);
 
   // Build detailed results
   const detailedResults = questions.map((question: any, idx: number) => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import ExternalQuizWrapper from "./_components/external-quiz-wrapper";
@@ -38,35 +39,40 @@ export default async function ExternalExamRoomPage({
     }
   }
 
-  const userId = `ext_${system.id}`;
+  const shiftNumber = system.assignedShift || system.quiz.activeShift || 1;
+  const shiftName = system.assignedShiftName || `Shift ${shiftNumber}`;
+  const userId = `ext_${system.id}_s${shiftNumber}_${system.assignedResponseId || system.assignedStudentEmail?.replace(/[^a-zA-Z0-9]/g, "_") || "kiosk"}`;
 
-  // Check if candidate is blocked for this quiz
+  // Check if candidate is blocked for this quiz and shift
   const existingBlock = await prisma.quizBlock.findFirst({
     where: {
       quizId: system.quiz.id,
       OR: [
         { userId: userId },
+        { userId: `ext_${system.id}` },
         { userId: system.id },
         { userId: system.systemCode },
       ],
     },
   });
 
-  // Check if an attempt was already submitted for this external system
-  const existingAttempt = await prisma.quizAttempt.findFirst({
-    where: {
-      quizId: system.quiz.id,
-      externalSystemId: system.id,
-    },
-  });
+  // Check if an attempt was already submitted for THIS system in THIS active shift for THIS student
+  const existingAttempt = system.assignedStudentEmail
+    ? await prisma.quizAttempt.findFirst({
+        where: {
+          quizId: system.quiz.id,
+          externalSystemId: system.id,
+          shiftNumber: shiftNumber,
+          participantEmail: system.assignedStudentEmail,
+        },
+      })
+    : null;
 
   const isBlocked = system.status === "BLOCKED" || !!existingBlock;
-  const isCompleted = system.status === "COMPLETED" || !!existingAttempt;
+  const isCompleted = system.status === "COMPLETED" && !!existingAttempt;
   const isAttempting = system.status === "ATTEMPTING" || system.status === "IN_PROGRESS";
 
   const assignedSet = system.assignedSet || "A";
-  const shiftNumber = system.assignedShift || system.quiz.activeShift || 1;
-  const shiftName = system.assignedShiftName || `Shift ${shiftNumber}`;
 
   const quiz = {
     id: system.quiz.id,

@@ -18,7 +18,10 @@ import {
   startAllSystems,
   getStudentDetailsByResponseId,
   completeQuizShift,
+  setActiveQuizShift,
+  getQuizMonitorData,
 } from "@/app/admin/quizzes/actions";
+import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 import {
   Monitor,
   RefreshCw,
@@ -182,24 +185,83 @@ export default function SystemsManagementView({
 
   const sortedSystems = sortSystemsNaturally(systems);
 
-  // Poll systems list every 3 seconds for real-time updates
+  // Fetch systems list and monitor data
   const refreshSystems = () => {
     startTransition(async () => {
-      const res = await getExternalSystems(quizId);
+      const res = await getQuizMonitorData(quizId);
       if (res.status === "success" && res.data) {
-        const sortedData = (res.data as System[]).sort((a, b) =>
+        const sortedData = (res.data.systems as System[]).sort((a, b) =>
           a.systemNumber.localeCompare(b.systemNumber, undefined, { numeric: true, sensitivity: "base" })
         );
         setSystems(sortedData);
+        if (res.data.quiz) {
+          if (res.data.quiz.activeShift) {
+            setActiveShiftState(res.data.quiz.activeShift);
+          }
+          if (res.data.quiz.shiftsJson) {
+            try {
+              setShiftsConfig(JSON.parse(res.data.quiz.shiftsJson));
+            } catch (e) {}
+          }
+        }
         setLastUpdated(new Date());
       }
     });
   };
 
   useEffect(() => {
-    const timer = setInterval(refreshSystems, 3000);
-    return () => clearInterval(timer);
+    refreshSystems();
+
+    let leaveRoom: (() => void) | null = null;
+
+    initSocket().then((socket) => {
+      if (!socket) return;
+
+      leaveRoom = joinRoom(`quiz-${quizId}`);
+
+      socket.on("connect", () => {
+        refreshSystems();
+      });
+      socket.on("system-updated", refreshSystems);
+      socket.on("shift-changed", (data: any) => {
+        if (data?.activeShift) {
+          setActiveShiftState(data.activeShift);
+        }
+        refreshSystems();
+      });
+      socket.on("shift-completed", (data: any) => {
+        if (data?.nextActiveShift) {
+          setActiveShiftState(data.nextActiveShift);
+        }
+        refreshSystems();
+      });
+      socket.on("quiz-started-all", refreshSystems);
+    });
+
+    const timer = setInterval(refreshSystems, 4000);
+    return () => {
+      if (leaveRoom) leaveRoom();
+      const socket = getSocket();
+      if (socket) {
+        socket.off("system-updated", refreshSystems);
+        socket.off("shift-changed");
+        socket.off("shift-completed");
+        socket.off("quiz-started-all", refreshSystems);
+      }
+      clearInterval(timer);
+    };
   }, [quizId]);
+
+  const handleActivateShift = async (shiftNum: number) => {
+    const res = await setActiveQuizShift(quizId, shiftNum);
+    if (res.status === "success") {
+      toast.success(res.message);
+      setActiveShiftState(shiftNum);
+      refreshSystems();
+    } else {
+      toast.error(res.message || "Failed to activate shift");
+    }
+  };
 
   // Auto-calculate question set ensuring consecutive systems get alternating sets
   const getAutoSetForSystem = (sysCode: string, shiftNum: number) => {
@@ -421,14 +483,22 @@ export default function SystemsManagementView({
                 const isDone = s.status === "COMPLETED" || s.shiftNumber < activeShiftState;
                 const shiftSets = s.sets && s.sets.length > 0 ? s.sets : [s.set || "A"];
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={s.shiftNumber}
+                    onClick={() => {
+                      if (!isActive && !isDone) {
+                        if (confirm(`Activate Shift ${s.shiftNumber} now? This will set Shift ${s.shiftNumber} as the active shift for all connected kiosks.`)) {
+                          handleActivateShift(s.shiftNumber);
+                        }
+                      }
+                    }}
                     className={`p-2 rounded-lg border text-center text-xs transition-all ${
                       isActive
-                        ? "border-primary bg-primary/10 text-primary font-bold shadow-xs"
+                        ? "border-primary bg-primary/10 text-primary font-bold shadow-xs cursor-default"
                         : isDone
-                        ? "border-green-600/30 bg-green-500/5 text-green-700 dark:text-green-400 font-medium"
-                        : "border-border bg-card text-muted-foreground"
+                        ? "border-green-600/30 bg-green-500/5 text-green-700 dark:text-green-400 font-medium cursor-default"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted/30 cursor-pointer"
                     }`}
                   >
                     <div className="font-semibold">{s.name || `Shift ${s.shiftNumber}`}</div>
@@ -436,9 +506,9 @@ export default function SystemsManagementView({
                       {shiftSets.length > 1 ? `Sets: ${shiftSets.join(", ")}` : `Set ${shiftSets[0]}`}
                     </div>
                     <div className="text-[10px] mt-1 opacity-80">
-                      {isDone ? "✓ Completed" : isActive ? "● Active Now" : "Upcoming"}
+                      {isDone ? "✓ Completed" : isActive ? "● Active Now" : "Upcoming (Click to Activate)"}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

@@ -14,6 +14,8 @@ import { CloseWindowButton } from "./close-window-button";
 import { toast } from "sonner";
 import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 
+import { getQuestionsForShiftAndSet } from "@/app/admin/quizzes/utils";
+
 interface Quiz {
   id: string;
   quizId: string;
@@ -23,6 +25,8 @@ interface Quiz {
   duration: number;
   pointsPerQuestion: number;
   questionsJson: string;
+  shift?: number;
+  shiftName?: string;
 }
 
 interface User {
@@ -127,18 +131,25 @@ export default function QuizProctorInterface({
     }
   }, [systemCode]);
 
-  // Real-time Socket.IO unblock listener inside QuizProctorInterface
+  // Real-time Socket.IO unblock & shift completed listener inside QuizProctorInterface
   useEffect(() => {
-    if (!systemCode) return;
-
-    let leaveRoomFn: (() => void) | null = null;
+    let roomsToLeave: Array<() => void> = [];
     let handleUnblock: (() => void) | null = null;
-    let handleStatusChanged: ((data: { status?: string }) => void) | null = null;
+    let handleStatusChanged: ((data: { status?: string; shiftCompleted?: number }) => void) | null = null;
+    let handleShiftCompleted: ((data?: any) => void) | null = null;
 
     initSocket().then((socket) => {
       if (!socket) return;
 
-      leaveRoomFn = joinRoom(`system-${systemCode}`);
+      if (systemCode) {
+        roomsToLeave.push(joinRoom(`system-${systemCode}`));
+      }
+      if (quiz.id) {
+        roomsToLeave.push(joinRoom(`quiz-${quiz.id}`));
+      }
+      if (quiz.quizId) {
+        roomsToLeave.push(joinRoom(`quiz-${quiz.quizId}`));
+      }
 
       handleUnblock = () => {
         setIsBlocked(false);
@@ -158,7 +169,7 @@ export default function QuizProctorInterface({
         }
       };
 
-      const handleShiftCompleted = () => {
+      handleShiftCompleted = () => {
         toast.info("Shift has completed. Auto-submitting your attempted questions...");
         handleSubmitQuiz(true);
       };
@@ -169,15 +180,15 @@ export default function QuizProctorInterface({
     });
 
     return () => {
-      if (leaveRoomFn) leaveRoomFn();
+      roomsToLeave.forEach((leaveFn) => leaveFn());
       const socket = getSocket();
       if (socket) {
         if (handleUnblock) socket.off("unblocked", handleUnblock);
         if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
-        socket.off("shift-completed");
+        if (handleShiftCompleted) socket.off("shift-completed", handleShiftCompleted);
       }
     };
-  }, [systemCode, currentStep]);
+  }, [systemCode, quiz.id, quiz.quizId, currentStep]);
 
   // Set system to ATTEMPTING status in database & real-time when quiz starts
   useEffect(() => {
@@ -239,17 +250,15 @@ export default function QuizProctorInterface({
     }>;
   } | null>(null);
 
-  // Parse questions to get set information
-  const questionsData = JSON.parse(quiz.questionsJson);
-  const availableSets = Object.keys(questionsData);
   const getQuestionCount = (set: string) => {
-    return Array.isArray(questionsData[set]) ? questionsData[set].length : 0;
+    const list = getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, set);
+    return Array.isArray(list) ? list.length : 0;
   };
 
   // Load and deterministically scramble questions per system / candidate
   useEffect(() => {
     if (currentStep === 'quiz-started' && selectedSet) {
-      const rawQuestions = questionsData[selectedSet];
+      const rawQuestions = getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, selectedSet);
       if (Array.isArray(rawQuestions)) {
         // Unique deterministic seed per system or user
         const seedStr = `${systemCode || user.username || user.id || "kiosk"}_${selectedSet}_${quiz.id}`;
@@ -369,6 +378,7 @@ export default function QuizProctorInterface({
         answers: finalAnswers,
         tabSwitches,
         questionsJson: quiz.questionsJson,
+        shiftNumber: quiz.shift || 1,
       };
 
       // Use custom onSubmit if provided (external quiz), otherwise fall back to internal action
@@ -760,7 +770,7 @@ export default function QuizProctorInterface({
                 <BookOpen className="h-5 w-5 text-primary shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Available Sets</p>
-                  <p className="font-semibold">{availableSets.length} set{availableSets.length > 1 ? 's' : ''}</p>
+                  <p className="font-semibold">{quiz.sets} set{quiz.sets > 1 ? 's' : ''}</p>
                 </div>
               </div>
 

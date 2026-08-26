@@ -23,7 +23,7 @@ export default async function EditQuizPage({ params }: { params: Promise<{ quizI
   });
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-8xl mx-auto w-full">
       <div className="flex items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Edit Quiz</h1>

@@ -107,13 +107,14 @@ export async function submitQuizAttempt(data: SubmitQuizData) {
     }
 
     // Parse questions to calculate score
-    const questionsData = JSON.parse(data.questionsJson);
-    const questions = questionsData[data.assignedSet];
+    const shiftNumber = (data as any).shiftNumber || 1;
+    const { getQuestionsForShiftAndSet } = await import("@/app/admin/quizzes/utils");
+    const questions = getQuestionsForShiftAndSet(data.questionsJson, shiftNumber, data.assignedSet);
     
-    if (!Array.isArray(questions)) {
+    if (!Array.isArray(questions) || questions.length === 0) {
       return {
         status: "error" as const,
-        message: "Invalid questions data",
+        message: `No questions found for Shift ${shiftNumber} Set ${data.assignedSet}`,
       };
     }
 
