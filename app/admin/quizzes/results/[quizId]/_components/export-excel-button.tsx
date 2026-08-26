@@ -13,6 +13,8 @@ export interface RankedAttemptItem {
   id: string;
   participantName: string;
   participantEmail: string;
+  shiftNumber?: number;
+  shiftName?: string;
   setLetter: string;
   score: number;
   correctAnswers: number;
@@ -69,6 +71,7 @@ export function ExportExcelButton({
           "Rank": rankDisplay,
           "Participant Name": att.participantName || "N/A",
           "Email Address": att.participantEmail || "N/A",
+          "Shift": att.shiftName || `Shift ${att.shiftNumber || 1}`,
           "Quiz Set": `Set ${att.setLetter || "A"}`,
           "Score (%)": `${att.score.toFixed(1)}%`,
           "Correct Answers": att.correctAnswers,
@@ -93,6 +96,7 @@ export function ExportExcelButton({
         { wch: 8 },  // Rank
         { wch: 26 }, // Name
         { wch: 32 }, // Email
+        { wch: 12 }, // Shift
         { wch: 10 }, // Set
         { wch: 12 }, // Score
         { wch: 16 }, // Correct

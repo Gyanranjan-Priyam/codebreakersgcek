@@ -77,7 +77,7 @@ export default async function SystemRegistrationPage({
   }));
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-8xl mx-auto w-full">
       {/* Top Header */}
       <div className="flex items-center gap-3">
         <div>
@@ -93,6 +93,9 @@ export default async function SystemRegistrationPage({
         quizTitle={quiz.title}
         accessCode={quiz.accessCode}
         sets={quiz.sets}
+        shifts={quiz.shifts || 1}
+        shiftsJson={quiz.shiftsJson || null}
+        activeShift={quiz.activeShift || 1}
         formId={quiz.formId}
         initialSystems={serializedSystems}
         formResponses={formResponses}

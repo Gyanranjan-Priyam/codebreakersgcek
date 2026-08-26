@@ -286,6 +286,9 @@ model Quiz {
   title             String
   description       String               @db.Text // Description and rules
   sets              Int                  @default(1) // Number of sets (1-8)
+  shifts            Int?                 @default(1) // Number of shifts (1-10)
+  shiftsJson        String?              @db.Text // Shift configuration JSON (shift name, assigned set, status)
+  activeShift       Int?                 @default(1) // Currently active shift number
   duration          Int                  // Duration in minutes
   pointsPerQuestion Float                @default(1) // Points awarded per correct answer
   startDateTime     DateTime?            // Quiz start date and time
@@ -319,6 +322,8 @@ model ExternalQuizSystem {
   assignedStudentName String?
   assignedStudentEmail String?
   assignedSet         String?   // A, B, C, etc.
+  assignedShift       Int?      @default(1) // Shift number (1, 2, 3, etc.)
+  assignedShiftName   String?   // "Shift 1", "Shift 2", etc.
   status              String    @default("REGISTERED") // "REGISTERED" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   attemptId           String?
   startedAt           DateTime?
@@ -353,6 +358,8 @@ model QuizAttempt {
   participantEmail String?   // For external participants
   externalSystemId String?   // Linked ExternalQuizSystem ID
   setNumber        Int       // Which set (1 for A, 2 for B, etc.)
+  shiftNumber      Int?      // Which shift (1, 2, 3, etc.)
+  shiftName        String?   // "Shift 1", "Shift 2", etc.
   score            Float     @default(0)
   totalQuestions   Int
   correctAnswers   Int       @default(0)

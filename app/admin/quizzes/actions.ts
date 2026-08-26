@@ -7,12 +7,23 @@ import { requireAdmin } from "@/app/data/admin/require-admin";
 import { revalidatePath } from "next/cache";
 import { emitSocketEvent, emitSocketEventToRooms } from "@/lib/socket-server";
 
+export interface QuizShiftConfig {
+  shiftNumber: number;
+  name: string;
+  set?: string;
+  sets?: string[];
+  status?: "PENDING" | "ACTIVE" | "COMPLETED";
+}
+
 export interface QuizData {
   id: string;
   quizId: string;
   title: string;
   description: string;
   sets: number;
+  shifts?: number | null;
+  shiftsJson?: string | null;
+  activeShift?: number | null;
   duration: number;
   pointsPerQuestion: number;
   startDateTime: Date | null;
@@ -125,6 +136,9 @@ export async function createQuiz(data: {
   title: string;
   description: string;
   sets: number;
+  shifts?: number | null;
+  shiftsJson?: string | null;
+  activeShift?: number | null;
   duration: number;
   pointsPerQuestion: number;
   startDateTime: Date | null;
@@ -205,6 +219,9 @@ export async function createQuiz(data: {
         title: data.title,
         description: data.description,
         sets: data.sets,
+        shifts: data.shifts || 1,
+        shiftsJson: data.shiftsJson || null,
+        activeShift: data.activeShift || 1,
         duration: data.duration,
         pointsPerQuestion: data.pointsPerQuestion,
         startDateTime: data.startDateTime,
@@ -244,6 +261,9 @@ export async function updateQuiz(
     title: string;
     description: string;
     sets: number;
+    shifts?: number | null;
+    shiftsJson?: string | null;
+    activeShift?: number | null;
     duration: number;
     pointsPerQuestion: number;
     startDateTime: Date | null;
@@ -312,6 +332,9 @@ export async function updateQuiz(
         title: data.title,
         description: data.description,
         sets: data.sets,
+        ...(data.shifts !== undefined ? { shifts: data.shifts || 1 } : {}),
+        ...(data.shiftsJson !== undefined ? { shiftsJson: data.shiftsJson } : {}),
+        ...(data.activeShift !== undefined ? { activeShift: data.activeShift || 1 } : {}),
         duration: data.duration,
         pointsPerQuestion: data.pointsPerQuestion,
         startDateTime: data.startDateTime,
@@ -642,6 +665,8 @@ export async function assignStudentToSystem({
   studentName,
   studentEmail,
   assignedSet = "A",
+  assignedShift,
+  assignedShiftName,
 }: {
   systemId?: string;
   systemCode?: string;
@@ -649,6 +674,8 @@ export async function assignStudentToSystem({
   studentName: string;
   studentEmail: string;
   assignedSet?: string;
+  assignedShift?: number;
+  assignedShiftName?: string;
 }) {
   await requireAdmin();
 
@@ -664,7 +691,7 @@ export async function assignStudentToSystem({
 
     const existingSys = await prisma.externalQuizSystem.findUnique({
       where: whereClause,
-      include: { quiz: { select: { id: true, quizId: true, sets: true } } },
+      include: { quiz: { select: { id: true, quizId: true, sets: true, shifts: true, shiftsJson: true, activeShift: true } } },
     });
 
     if (!existingSys) {
@@ -696,9 +723,32 @@ export async function assignStudentToSystem({
       };
     }
 
+    const finalShiftNumber = assignedShift || existingSys.quiz.activeShift || existingSys.assignedShift || 1;
+    const finalShiftName = assignedShiftName || `Shift ${finalShiftNumber}`;
+
     let finalAssignedSet = assignedSet;
     if (!finalAssignedSet || finalAssignedSet === "AUTO") {
-      finalAssignedSet = existingSys?.assignedSet || "A";
+      // Check if shift configuration specifies question sets for this shift
+      let availableSets: string[] = [];
+      try {
+        if (existingSys.quiz.shiftsJson) {
+          const shiftConfigs: QuizShiftConfig[] = JSON.parse(existingSys.quiz.shiftsJson);
+          const matchedShift = shiftConfigs.find((s) => s.shiftNumber === finalShiftNumber);
+          if (matchedShift?.sets && matchedShift.sets.length > 0) {
+            availableSets = matchedShift.sets;
+          } else if (matchedShift?.set) {
+            availableSets = [matchedShift.set];
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing shift set:", e);
+      }
+
+      if (availableSets.length > 0) {
+        finalAssignedSet = availableSets[0];
+      } else {
+        finalAssignedSet = existingSys?.assignedSet || "A";
+      }
     }
 
     const system = await prisma.externalQuizSystem.update({
@@ -708,12 +758,20 @@ export async function assignStudentToSystem({
         assignedStudentName: studentName.trim(),
         assignedStudentEmail: cleanEmail,
         assignedSet: finalAssignedSet,
+        assignedShift: finalShiftNumber,
+        assignedShiftName: finalShiftName,
         status: "ASSIGNED",
       },
     });
 
     emitSocketEvent(`quiz-${system.quizId}`, "system-updated", { systemCode: system.systemCode });
-    emitSocketEvent(`system-${system.systemCode}`, "status-changed", { status: "ASSIGNED", assignedStudentName: system.assignedStudentName, assignedSet: system.assignedSet });
+    emitSocketEvent(`system-${system.systemCode}`, "status-changed", {
+      status: "ASSIGNED",
+      assignedStudentName: system.assignedStudentName,
+      assignedSet: system.assignedSet,
+      assignedShift: system.assignedShift,
+      assignedShiftName: system.assignedShiftName,
+    });
 
     revalidatePath(`/admin/quizzes/${system.quizId}`);
 
@@ -721,6 +779,179 @@ export async function assignStudentToSystem({
   } catch (error) {
     console.error("Error assigning student to system:", error);
     return { status: "error" as const, message: "Failed to assign student" };
+  }
+}
+
+/**
+ * Mark Shift X as Completed, reset active student assignments on connected systems, and advance to next shift.
+ */
+export async function completeQuizShift(quizId: string, shiftNumber: number) {
+  await requireAdmin();
+
+  try {
+    const quiz = await prisma.quiz.findFirst({
+      where: {
+        OR: [{ id: quizId }, { quizId: quizId }],
+      },
+    });
+
+    if (!quiz) {
+      return { status: "error" as const, message: "Quiz not found" };
+    }
+
+    // Parse shift configuration
+    let shiftsList: QuizShiftConfig[] = [];
+    try {
+      if (quiz.shiftsJson) {
+        shiftsList = JSON.parse(quiz.shiftsJson);
+      }
+    } catch (e) {
+      console.error("Error parsing shiftsJson:", e);
+    }
+
+    const totalShifts = quiz.shifts || 1;
+    if (shiftsList.length === 0) {
+      for (let i = 1; i <= totalShifts; i++) {
+        shiftsList.push({
+          shiftNumber: i,
+          name: `Shift ${i}`,
+          set: String.fromCharCode(65 + ((i - 1) % (quiz.sets || 1))),
+          status: i < shiftNumber ? "COMPLETED" : i === shiftNumber ? "COMPLETED" : "PENDING",
+        });
+      }
+    } else {
+      shiftsList = shiftsList.map((s) => {
+        if (s.shiftNumber === shiftNumber) {
+          return { ...s, status: "COMPLETED" };
+        }
+        return s;
+      });
+    }
+
+    // Determine next active shift
+    const nextPendingShift = shiftsList.find((s) => s.status !== "COMPLETED" && s.shiftNumber > shiftNumber);
+    const nextActiveShift = nextPendingShift ? nextPendingShift.shiftNumber : Math.min(shiftNumber + 1, totalShifts);
+
+    await prisma.quiz.update({
+      where: { id: quiz.id },
+      data: {
+        shiftsJson: JSON.stringify(shiftsList),
+        activeShift: nextActiveShift,
+      },
+    });
+
+    const { emitSocketEvent } = await import("@/lib/socket-server");
+
+    // Fetch all external kiosk systems for this quiz
+    const systems = await prisma.externalQuizSystem.findMany({
+      where: { quizId: quiz.id },
+    });
+
+    // 1. Broadcast force-submit and shift-completed to all kiosks so active exams submit their local answers
+    systems.forEach((s) => {
+      emitSocketEvent(`system-${s.systemCode}`, "shift-completed", {
+        shiftCompleted: shiftNumber,
+        nextActiveShift,
+      });
+      emitSocketEvent(`system-${s.systemCode}`, "status-changed", {
+        status: "REGISTERED",
+        shiftCompleted: shiftNumber,
+        nextActiveShift,
+      });
+    });
+
+    // 2. For any candidate who was assigned/in-progress and has no attempt recorded in DB yet, record their attempt
+    for (const sys of systems) {
+      if (sys.assignedStudentName && sys.assignedStudentEmail) {
+        const existingAttempt = await prisma.quizAttempt.findFirst({
+          where: {
+            quizId: quiz.id,
+            externalSystemId: sys.id,
+          },
+        });
+
+        if (!existingAttempt) {
+          let totalQ = 0;
+          try {
+            const qData = JSON.parse(quiz.questionsJson);
+            const setKey = sys.assignedSet || "A";
+            if (qData && typeof qData === "object" && Array.isArray(qData[setKey])) {
+              totalQ = qData[setKey].length;
+            } else if (Array.isArray(qData)) {
+              totalQ = qData.length;
+            }
+          } catch (e) {}
+
+          const currentShiftNum = sys.assignedShift || shiftNumber;
+          const currentShiftName = sys.assignedShiftName || `Shift ${currentShiftNum}`;
+          const currentSetNum = (sys.assignedSet || "A").charCodeAt(0) - 64;
+
+          await prisma.quizAttempt.create({
+            data: {
+              quizId: quiz.id,
+              userId: `ext_${sys.id}`,
+              participantName: sys.assignedStudentName,
+              participantEmail: sys.assignedStudentEmail,
+              externalSystemId: sys.id,
+              setNumber: currentSetNum,
+              shiftNumber: currentShiftNum,
+              shiftName: currentShiftName,
+              score: 0,
+              totalQuestions: totalQ,
+              correctAnswers: 0,
+              pointsEarned: 0,
+              answersJson: JSON.stringify({ answers: [], note: "Submitted on Shift Completion" }),
+              startedAt: sys.startedAt || new Date(),
+              completedAt: new Date(),
+            },
+          });
+        }
+      }
+    }
+
+    // 3. Reset active student assignments on connected kiosk systems without deleting the kiosk registrations
+    await prisma.externalQuizSystem.updateMany({
+      where: { quizId: quiz.id },
+      data: {
+        assignedResponseId: null,
+        assignedStudentName: null,
+        assignedStudentEmail: null,
+        assignedSet: null,
+        assignedShift: nextActiveShift,
+        assignedShiftName: `Shift ${nextActiveShift}`,
+        status: "REGISTERED",
+        attemptId: null,
+        startedAt: null,
+        completedAt: null,
+      },
+    });
+
+    emitSocketEvent(`quiz-${quiz.id}`, "system-updated", {
+      quizId: quiz.id,
+      action: "shift-completed",
+      completedShift: shiftNumber,
+      nextActiveShift,
+    });
+    emitSocketEvent(`quiz-${quiz.quizId}`, "system-updated", {
+      quizId: quiz.quizId,
+      action: "shift-completed",
+      completedShift: shiftNumber,
+      nextActiveShift,
+    });
+
+    revalidatePath(`/admin/quizzes/${quiz.id}`);
+    revalidatePath(`/admin/quizzes/${quiz.quizId}`);
+    revalidatePath(`/admin/quizzes/${quiz.quizId}/systems`);
+    revalidatePath(`/admin/quizzes/results/${quiz.quizId}`);
+
+    return {
+      status: "success" as const,
+      message: `Shift ${shiftNumber} marked as completed successfully! Active student assignments have been reset for Shift ${nextActiveShift}. All completed quiz attempts and overall rankings remain fully preserved.`,
+      nextActiveShift,
+    };
+  } catch (error) {
+    console.error("Error completing shift:", error);
+    return { status: "error" as const, message: "Failed to complete shift" };
   }
 }
 
@@ -755,18 +986,13 @@ export async function autoShuffleAndAssignSets(quizId: string) {
   await requireAdmin();
 
   try {
-    const quiz = await prisma.quiz.findUnique({
-      where: { id: quizId },
-      select: { id: true, quizId: true, sets: true },
+    const quiz = await prisma.quiz.findFirst({
+      where: { OR: [{ id: quizId }, { quizId }] },
+      select: { id: true, quizId: true, sets: true, shiftsJson: true, activeShift: true },
     });
 
     if (!quiz) {
       return { status: "error" as const, message: "Quiz not found" };
-    }
-
-    const numSets = quiz.sets || 1;
-    if (numSets <= 1) {
-      return { status: "error" as const, message: "This quiz only has 1 question set (Set A)." };
     }
 
     const systems = await prisma.externalQuizSystem.findMany({
@@ -777,23 +1003,40 @@ export async function autoShuffleAndAssignSets(quizId: string) {
       return { status: "error" as const, message: "No systems registered to assign sets." };
     }
 
+    // Determine available set letters for active shift or quiz
+    let setLetters: string[] = [];
+    const currentShift = quiz.activeShift || 1;
+    if (quiz.shiftsJson) {
+      try {
+        const shiftConfigs: QuizShiftConfig[] = JSON.parse(quiz.shiftsJson);
+        const matched = shiftConfigs.find((s) => s.shiftNumber === currentShift);
+        if (matched?.sets && matched.sets.length > 0) {
+          setLetters = matched.sets;
+        } else if (matched?.set) {
+          setLetters = [matched.set];
+        }
+      } catch (e) {
+        console.error("Error parsing shifts in shuffle:", e);
+      }
+    }
+
+    if (setLetters.length === 0) {
+      const numSets = quiz.sets || 1;
+      setLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
+    }
+
     // Sort systems naturally by system number
     systems.sort((a, b) =>
       a.systemNumber.localeCompare(b.systemNumber, undefined, { numeric: true, sensitivity: "base" })
     );
-
-    // Available set letters (e.g. ['A', 'B', 'C'])
-    const setLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
 
     // Generate non-consecutive shuffled set sequence
     const assignedSequence: string[] = [];
     let lastSet = "";
 
     for (let i = 0; i < systems.length; i++) {
-      // Valid options excluding the immediately preceding system's set
-      const validOptions = setLetters.filter((s) => s !== lastSet);
-      // Pick a random set from validOptions
-      const chosenSet = validOptions[Math.floor(Math.random() * validOptions.length)] || setLetters[i % numSets];
+      const validOptions = setLetters.length > 1 ? setLetters.filter((s) => s !== lastSet) : setLetters;
+      const chosenSet = validOptions[Math.floor(Math.random() * validOptions.length)] || setLetters[i % setLetters.length];
       assignedSequence.push(chosenSet);
       lastSet = chosenSet;
     }
@@ -821,10 +1064,11 @@ export async function autoShuffleAndAssignSets(quizId: string) {
     emitSocketEvent(`quiz-${quiz.quizId}`, "system-updated", { quizId: quiz.quizId, action: "sets-shuffled" });
 
     revalidatePath(`/admin/quizzes/${quiz.id}`);
+    revalidatePath(`/admin/quizzes/${quiz.quizId}`);
 
     return {
       status: "success" as const,
-      message: `Successfully shuffled and auto-assigned sets across ${systems.length} systems! (Consecutive systems have non-matching sets)`,
+      message: `Successfully shuffled and distributed question sets (${setLetters.join(", ")}) across ${systems.length} systems!`,
     };
   } catch (error) {
     console.error("Error auto-shuffling sets:", error);
@@ -927,6 +1171,9 @@ export async function getSystemState(systemCode: string) {
             pointsPerQuestion: true,
             questionsJson: true,
             sets: true,
+            shifts: true,
+            shiftsJson: true,
+            activeShift: true,
             isActive: true,
           },
         },
@@ -972,6 +1219,8 @@ export async function submitExternalQuizAttempt({
     }
 
     const userId = `ext_${system.id}`;
+    const shiftNumber = system.assignedShift || 1;
+    const shiftName = system.assignedShiftName || `Shift ${shiftNumber}`;
 
     const attempt = await prisma.quizAttempt.create({
       data: {
@@ -981,6 +1230,8 @@ export async function submitExternalQuizAttempt({
         participantEmail: system.assignedStudentEmail,
         externalSystemId: system.id,
         setNumber,
+        shiftNumber,
+        shiftName,
         score,
         totalQuestions,
         correctAnswers,
@@ -1356,16 +1607,19 @@ export async function getStudentDetailsByResponseId(responseId: string) {
  */
 export async function getQuizMonitorData(quizId: string) {
   try {
-    const [quiz, systems, blocks] = await Promise.all([
-      prisma.quiz.findUnique({
-        where: { id: quizId },
-        select: { sets: true },
-      }),
+    const quiz = await prisma.quiz.findFirst({
+      where: { OR: [{ id: quizId }, { quizId }] },
+      select: { id: true, quizId: true, title: true, sets: true, shifts: true, shiftsJson: true, activeShift: true },
+    });
+
+    const targetIds = quiz ? [quiz.id, quiz.quizId] : [quizId];
+
+    const [systems, blocks] = await Promise.all([
       prisma.externalQuizSystem.findMany({
-        where: { quizId },
+        where: { quizId: { in: targetIds } },
       }),
       prisma.quizBlock.findMany({
-        where: { quizId },
+        where: { quizId: { in: targetIds } },
         orderBy: { blockedAt: "desc" },
       }),
     ]);
@@ -1436,7 +1690,7 @@ export async function getQuizMonitorData(quizId: string) {
         if (!blockedMembersMap.has(uId) && !blockedMembersMap.has(sys.id) && !blockedMembersMap.has(sys.systemCode)) {
           blockedMembersMap.set(uId, {
             id: sys.id,
-            quizId,
+            quizId: quiz?.id || quizId,
             userId: uId,
             reason: "Multiple proctoring violations detected",
             violationType: "SECURITY_VIOLATION",
@@ -1455,6 +1709,7 @@ export async function getQuizMonitorData(quizId: string) {
     return {
       status: "success" as const,
       data: {
+        quiz,
         systems: processedSystems,
         blockedMembers,
       },
@@ -1538,5 +1793,6 @@ export async function unblockQuizCandidate(quizId: string, userId: string) {
     return { status: "error" as const, message: "Failed to unblock candidate" };
   }
 }
+
 
 

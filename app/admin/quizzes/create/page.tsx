@@ -30,7 +30,7 @@ export default async function CreateQuizPage({
   });
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full max-w-6xl mx-auto">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full max-w-8xl mx-auto">
       <div className="flex items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create New Quiz</h1>

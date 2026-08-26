@@ -135,6 +135,8 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
       id: attempt.id,
       participantName: attempt.participantName || user?.name || "Unknown User",
       participantEmail: attempt.participantEmail || user?.email || "N/A",
+      shiftNumber: attempt.shiftNumber || 1,
+      shiftName: attempt.shiftName || `Shift ${attempt.shiftNumber || 1}`,
       setLetter,
       score: attempt.score,
       correctAnswers: attempt.correctAnswers,
@@ -385,6 +387,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                     <TableHead className="w-20">Rank</TableHead>
                     <TableHead>Participant</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Shift</TableHead>
                     <TableHead>Set</TableHead>
                     <TableHead>Score</TableHead>
                     <TableHead>Correct Answers</TableHead>
@@ -412,7 +415,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                               variant="outline"
                               className={`font-mono text-xs font-bold ${
                                 qual.rank === 1
-                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/40"
+                                   ? "bg-amber-500/10 text-amber-500 border-amber-500/40"
                                   : qual.rank === 2
                                   ? "bg-slate-500/10 text-slate-400 border-slate-500/40"
                                   : qual.rank === 3
@@ -434,6 +437,11 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground font-mono">
                           {attempt.participantEmail || user?.email || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs font-mono">
+                            {attempt.shiftName || `Shift ${attempt.shiftNumber || 1}`}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">Set {setLetter}</Badge>

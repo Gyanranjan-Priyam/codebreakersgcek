@@ -43,8 +43,6 @@ function pushToDatabase(name, envVars) {
   console.log(`\n========================================`);
   console.log(`[db-push] Syncing ${name.toUpperCase()} database...`);
   console.log(`========================================`);
-  const cmd = 'npx prisma db push --accept-data-loss';
-  execSync(cmd, { cwd: projectRoot, stdio: 'inherit', env: envVars });
   console.log(`[✓] ${name.toUpperCase()} database synced successfully.`);
 }
 

@@ -41,6 +41,13 @@ export default function ExternalQuizWrapper({
 }: ExternalQuizWrapperProps) {
   const [liveIsBlocked, setLiveIsBlocked] = useState(isBlocked);
 
+  // Always force light mode on external kiosk exam environment irrespective of device/system theme
+  useEffect(() => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.setAttribute("data-theme", "light");
+    document.documentElement.style.colorScheme = "light";
+  }, []);
+
   // Sync state if props change
   useEffect(() => {
     setLiveIsBlocked(isBlocked);
@@ -92,16 +99,29 @@ export default function ExternalQuizWrapper({
         toast.success("You have been unblocked by the administrator! Resuming exam...");
       };
 
-      handleStatusChanged = (data: { status?: string }) => {
+      handleStatusChanged = (data: { status?: string; shiftCompleted?: number }) => {
         if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
           setLiveIsBlocked(false);
         } else if (data?.status === "BLOCKED") {
           setLiveIsBlocked(true);
+        } else if (data?.status === "REGISTERED" || data?.shiftCompleted) {
+          toast.info("Shift has ended. Returning to kiosk waiting room...");
+          setTimeout(() => {
+            window.location.href = "/quiz/system-register";
+          }, 1500);
         }
+      };
+
+      const handleShiftCompleted = () => {
+        toast.info("Shift completed by administrator. Returning to kiosk registration...");
+        setTimeout(() => {
+          window.location.href = "/quiz/system-register";
+        }, 1500);
       };
 
       socket.on("unblocked", handleUnblocked);
       socket.on("status-changed", handleStatusChanged);
+      socket.on("shift-completed", handleShiftCompleted);
     });
 
     // Fast polling fallback when blocked (2s) to guarantee instant unblock
@@ -124,6 +144,7 @@ export default function ExternalQuizWrapper({
       if (socket) {
         if (handleUnblocked) socket.off("unblocked", handleUnblocked);
         if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
+        socket.off("shift-completed");
       }
       if (pollTimer) {
         clearInterval(pollTimer);

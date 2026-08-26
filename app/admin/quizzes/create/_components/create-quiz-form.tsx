@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,15 +46,12 @@ import {
   Users,
   Globe,
   Key,
-  FileText,
   RefreshCw,
-  BookOpen,
-  Clock,
   Award,
-  Calendar,
-  AlertTriangle,
   Eye,
+  Layers,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   quizId: z.string().min(1, "Quiz ID is required"),
@@ -65,6 +62,7 @@ const formSchema = z.object({
   formId: z.string().optional(),
   feedbackFormId: z.string().optional(),
   sets: z.number().min(1).max(8),
+  shifts: z.number().min(1).max(10).optional(),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   pointsPerQuestion: z.number().min(0.01, "Points must be greater than 0"),
   cutoffMarks: z.number().min(0).optional(),
@@ -86,6 +84,13 @@ interface CreateQuizFormProps {
   initialAudience?: "INTERNAL" | "EXTERNAL";
 }
 
+interface ShiftItem {
+  shiftNumber: number;
+  name: string;
+  set: string;
+  sets: string[];
+}
+
 export default function CreateQuizForm({ userId, forms = [], initialAudience = "INTERNAL" }: CreateQuizFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -94,6 +99,9 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewSet, setPreviewSet] = useState<string>("ALL");
+  const [shiftsConfig, setShiftsConfig] = useState<ShiftItem[]>([
+    { shiftNumber: 1, name: "Shift 1", set: "A", sets: ["A"] }
+  ]);
 
   const generate6DigitCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -108,6 +116,7 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
       formId: "",
       feedbackFormId: "",
       sets: 1,
+      shifts: 1,
       duration: 30,
       pointsPerQuestion: 1,
       cutoffMarks: 50,
@@ -126,6 +135,7 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
 
   const watchAudience = form.watch("targetAudience");
   const watchSets = form.watch("sets");
+  const watchShifts = form.watch("shifts") || 1;
   const watchTitle = form.watch("title");
   const watchDescription = form.watch("description");
   const watchDuration = form.watch("duration");
@@ -141,6 +151,43 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
     setSetQuestions(newSetQuestions);
     setCurrentSet("A");
   }, [watchSets]);
+
+  const prevSetsRef = useRef(watchSets);
+
+  // Synchronize shiftsConfig whenever shifts count or sets count change
+  useEffect(() => {
+    const numShifts = watchShifts;
+    const numSets = watchSets || 1;
+    const availableSetLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
+    const setsCountChanged = prevSetsRef.current !== watchSets;
+    prevSetsRef.current = watchSets;
+
+    setShiftsConfig((prev) => {
+      const next: ShiftItem[] = [];
+      for (let i = 1; i <= numShifts; i++) {
+        const existing = prev.find((p) => p.shiftNumber === i);
+        
+        let assignedSets: string[] = [];
+        if (setsCountChanged || !existing) {
+          // When sets dropdown changes or new shift is added, auto-assign all available sets
+          assignedSets = [...availableSetLetters];
+        } else if (existing?.sets && Array.isArray(existing.sets)) {
+          assignedSets = existing.sets.filter((s) => availableSetLetters.includes(s));
+          if (assignedSets.length === 0) assignedSets = [...availableSetLetters];
+        } else {
+          assignedSets = [...availableSetLetters];
+        }
+
+        next.push({
+          shiftNumber: i,
+          name: existing?.name || `Shift ${i}`,
+          set: assignedSets[0] || "A",
+          sets: assignedSets,
+        });
+      }
+      return next;
+    });
+  }, [watchShifts, watchSets]);
 
   const validateAndUpdateSet = (jsonString: string, setLetter: string) => {
     if (!jsonString.trim()) { setJsonError(null); return; }
@@ -169,6 +216,8 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
     setIsLoading(true);
 
     const questionsJson = combineAllSets();
+    const numShifts = data.shifts || shiftsConfig.length || 1;
+    const shiftsJson = JSON.stringify(shiftsConfig);
 
     const result = await createQuiz({
       quizId: data.quizId,
@@ -177,6 +226,9 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
       targetAudience: data.targetAudience,
       accessCode: data.targetAudience === "EXTERNAL" ? data.accessCode : undefined,
       sets: data.sets,
+      shifts: numShifts,
+      shiftsJson,
+      activeShift: 1,
       duration: data.duration,
       pointsPerQuestion: data.pointsPerQuestion,
       cutoffMarks: data.cutoffMarks,
@@ -202,7 +254,7 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-4xl mx-auto w-full">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between gap-4 p-4 border rounded-xl bg-muted/40">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
@@ -344,7 +396,7 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
           )}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border border-border rounded-lg bg-muted/20">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 border border-border rounded-lg bg-muted/20">
           <FormField
             control={form.control}
             name="sets"
@@ -356,6 +408,24 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                   <SelectContent>
                     {[1,2,3,4,5,6,7,8].map(n => (
                       <SelectItem key={n} value={n.toString()}>{n} Set{n > 1 ? "s" : ""} (A{n > 1 ? `-${String.fromCharCode(64+n)}` : ""})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="shifts"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Number of Shifts</FormLabel>
+                <Select onValueChange={(v) => field.onChange(parseInt(v))} defaultValue={field.value?.toString() || "1"}>
+                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                      <SelectItem key={n} value={n.toString()}>{n} Shift{n > 1 ? "s" : ""}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -390,6 +460,123 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
             )}
           />
         </div>
+
+        {/* Dynamic Shift & Question Set Configuration Card */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span>Multi-Shift & Question Set Configuration</span>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Select which question sets are available in each shift. You can assign single or multiple question sets per shift.
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="text-xs font-mono">
+                {shiftsConfig.length} Shift{shiftsConfig.length > 1 ? "s" : ""}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {shiftsConfig.map((shift) => {
+                const availableSetLetters = Array.from({ length: watchSets }, (_, i) => String.fromCharCode(65 + i));
+                const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                
+                const toggleSet = (letter: string) => {
+                  setShiftsConfig((prev) =>
+                    prev.map((s) => {
+                      if (s.shiftNumber !== shift.shiftNumber) return s;
+                      let updatedSets = s.sets ? [...s.sets] : [s.set || "A"];
+                      if (updatedSets.includes(letter)) {
+                        // Prevent deselecting the only remaining set
+                        if (updatedSets.length > 1) {
+                          updatedSets = updatedSets.filter((l) => l !== letter);
+                        }
+                      } else {
+                        updatedSets.push(letter);
+                        updatedSets.sort();
+                      }
+                      return {
+                        ...s,
+                        sets: updatedSets,
+                        set: updatedSets[0] || "A",
+                      };
+                    })
+                  );
+                };
+
+                const selectAllSets = () => {
+                  setShiftsConfig((prev) =>
+                    prev.map((s) =>
+                      s.shiftNumber === shift.shiftNumber
+                        ? { ...s, sets: [...availableSetLetters], set: availableSetLetters[0] || "A" }
+                        : s
+                    )
+                  );
+                };
+
+                return (
+                  <div key={shift.shiftNumber} className="p-3.5 border rounded-xl bg-muted/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">Shift {shift.shiftNumber}</span>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="secondary" className="text-[10px] font-mono">
+                          {currentShiftSets.length} Set{currentShiftSets.length > 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-xs text-muted-foreground">Available Question Sets</Label>
+                        {watchSets > 1 && (
+                          <button
+                            type="button"
+                            onClick={selectAllSets}
+                            className="text-[10px] text-primary hover:underline font-medium"
+                          >
+                            Select All
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Interactive Set Selection Badges */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {availableSetLetters.map((letter) => {
+                          const isSelected = currentShiftSets.includes(letter);
+                          return (
+                            <button
+                              key={letter}
+                              type="button"
+                              onClick={() => toggleSet(letter)}
+                              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                                  : "bg-background text-muted-foreground border-border/80 hover:border-primary/50 hover:bg-muted"
+                              }`}
+                            >
+                              {isSelected ? `✓ Set ${letter}` : `Set ${letter}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground leading-tight pt-1 border-t border-border/40">
+                      Candidates in Shift {shift.shiftNumber} will receive:{" "}
+                      <strong>
+                        {currentShiftSets.map((s) => `Set ${s}`).join(", ")}
+                      </strong>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Passing / Qualification Criteria Card */}
         <Card className="border-border bg-card">

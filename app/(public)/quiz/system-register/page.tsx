@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { registerExternalSystem, getSystemState, unregisterExternalSystem } from "@/app/admin/quizzes/actions";
-import { Monitor, Key, Loader2, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { Monitor, Key, Loader2, CheckCircle2, Clock, AlertTriangle, Layers } from "lucide-react";
 import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 
 export default function SystemRegisterPage() {
@@ -26,6 +26,13 @@ export default function SystemRegisterPage() {
   } | null>(null);
 
   const [liveState, setLiveState] = useState<any>(null);
+
+  // Always force light mode on external kiosk screens irrespective of system/browser theme
+  useEffect(() => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.setAttribute("data-theme", "light");
+    document.documentElement.style.colorScheme = "light";
+  }, []);
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -201,9 +208,17 @@ export default function SystemRegisterPage() {
 
   // ── Registered & Waiting Screen ──
   if (activeSession) {
+    const activeShiftNum = liveState?.quiz?.activeShift || 1;
+    let shiftConfigs: any[] = [];
+    if (liveState?.quiz?.shiftsJson) {
+      try {
+        shiftConfigs = JSON.parse(liveState.quiz.shiftsJson);
+      } catch (e) {}
+    }
+
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
-        <Card className="max-w-lg w-full">
+      <div className="light min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-slate-50 to-slate-200 text-slate-900">
+        <Card className="max-w-lg w-full bg-white text-slate-900 border-slate-200 shadow-md">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -225,6 +240,19 @@ export default function SystemRegisterPage() {
               <span className="font-mono text-xs">{activeSession.systemCode}</span>
             </div>
 
+            {/* Current Ongoing Shift Status Details */}
+            <div className="p-3.5 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold text-foreground">Current Shift Ongoing:</span>
+                </div>
+                <Badge variant="default" className="text-xs bg-primary font-bold">
+                  Shift {activeShiftNum} Active Now
+                </Badge>
+              </div>
+            </div>
+
             {/* Live Status */}
             <div className="p-4 bg-muted rounded-lg space-y-3">
               {liveState?.status === "ASSIGNED" ? (
@@ -236,16 +264,21 @@ export default function SystemRegisterPage() {
                   <div className="space-y-1">
                     <p className="font-medium">{liveState.assignedStudentName}</p>
                     <p className="text-xs text-muted-foreground font-mono">{liveState.assignedStudentEmail}</p>
-                    {liveState.assignedSet && (
-                      <Badge variant="outline" className="text-xs mt-1">
-                        Assigned Set {liveState.assignedSet}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      <Badge variant="outline" className="text-xs font-mono bg-primary/5">
+                        {liveState.assignedShiftName || `Shift ${liveState.assignedShift || activeShiftNum}`}
                       </Badge>
-                    )}
+                      {liveState.assignedSet && (
+                        <Badge variant="outline" className="text-xs font-bold">
+                          Question Set {liveState.assignedSet}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <Alert>
                     <Clock className="h-4 w-4" />
                     <AlertDescription className="text-sm">
-                      Waiting for admin to start the quiz... Fullscreen will launch automatically.
+                      Waiting for admin to start Shift {liveState.assignedShift || activeShiftNum}... Fullscreen will launch automatically.
                     </AlertDescription>
                   </Alert>
                 </>
@@ -260,7 +293,7 @@ export default function SystemRegisterPage() {
                 <Alert>
                   <Clock className="h-4 w-4" />
                   <AlertDescription className="text-sm">
-                    System ready. Waiting for admin to assign your candidate details. Keep this tab open.
+                    System ready for <strong>Shift {activeShiftNum}</strong>. Waiting for admin to assign candidate details. Keep this tab open.
                   </AlertDescription>
                 </Alert>
               )}
@@ -274,7 +307,7 @@ export default function SystemRegisterPage() {
             </Alert>
 
             <div className="pt-2 text-center">
-              <Button variant="ghost" size="sm" onClick={handleDisconnect} className="text-muted-foreground text-xs">
+              <Button variant="ghost" size="sm" onClick={handleDisconnect} className="text-muted-foreground text-xs cursor-pointer">
                 Clear Registration
               </Button>
             </div>
@@ -286,8 +319,8 @@ export default function SystemRegisterPage() {
 
   // ── Registration Form ──
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
-      <Card className="max-w-md w-full">
+    <div className="light min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-slate-50 to-slate-200 text-slate-900">
+      <Card className="max-w-md w-full bg-white text-slate-900 border-slate-200 shadow-md">
         <CardHeader>
           <CardTitle className="text-2xl flex items-center gap-2">
             <Monitor className="h-6 w-6" />

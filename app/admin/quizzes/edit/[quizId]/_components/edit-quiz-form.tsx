@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -50,7 +50,9 @@ import {
   Sparkles,
   RefreshCw,
   Award,
+  Layers,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -60,6 +62,7 @@ const formSchema = z.object({
   formId: z.string().optional(),
   feedbackFormId: z.string().optional(),
   sets: z.number().min(1).max(8),
+  shifts: z.number().min(1).max(10).optional(),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   pointsPerQuestion: z.number().min(0.01, "Points must be greater than 0"),
   cutoffMarks: z.number().min(0).optional(),
@@ -78,12 +81,23 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+interface ShiftItem {
+  shiftNumber: number;
+  name: string;
+  set?: string;
+  sets: string[];
+  status?: string;
+}
+
 interface Quiz {
   id: string;
   quizId: string;
   title: string;
   description: string;
   sets: number;
+  shifts?: number | null;
+  shiftsJson?: string | null;
+  activeShift?: number | null;
   duration: number;
   pointsPerQuestion: number;
   startDateTime: Date | null;
@@ -113,6 +127,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewSet, setPreviewSet] = useState<string>("ALL");
+  const [shiftsConfig, setShiftsConfig] = useState<ShiftItem[]>([]);
 
   const generate6DigitCode = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -128,6 +143,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
       formId: quiz.formId || "",
       feedbackFormId: quiz.feedbackFormId || "",
       sets: quiz.sets,
+      shifts: quiz.shifts || 1,
       duration: quiz.duration,
       pointsPerQuestion: quiz.pointsPerQuestion,
       cutoffMarks: quiz.cutoffMarks ?? 50,
@@ -169,16 +185,53 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
         
         setSetQuestions(initialQuestions);
         setTextareaValues(initialTextareas);
+
+        // Initialize shiftsConfig
+        let parsedShifts: ShiftItem[] = [];
+        try {
+          if (quiz.shiftsJson) {
+            parsedShifts = JSON.parse(quiz.shiftsJson);
+          }
+        } catch (e) {
+          console.error("Error parsing shiftsJson:", e);
+        }
+
+        const numShifts = quiz.shifts || 1;
+        const numSets = quiz.sets || 1;
+        const availableSetLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
+
+        if (parsedShifts.length > 0) {
+          const normalized = parsedShifts.map((s: any) => ({
+            ...s,
+            sets: s.sets && Array.isArray(s.sets) && s.sets.length > 0 ? s.sets : [s.set || "A"],
+            set: s.set || (s.sets && s.sets[0]) || "A",
+          }));
+          setShiftsConfig(normalized);
+        } else {
+          const initialShifts: ShiftItem[] = [];
+          for (let i = 1; i <= numShifts; i++) {
+            const defaultSet = availableSetLetters[(i - 1) % availableSetLetters.length] || "A";
+            initialShifts.push({
+              shiftNumber: i,
+              name: `Shift ${i}`,
+              set: defaultSet,
+              sets: [defaultSet],
+            });
+          }
+          setShiftsConfig(initialShifts);
+        }
+
         setIsInitialized(true);
       } catch (error) {
         console.error("Error parsing questions:", error);
         setIsInitialized(true);
       }
     }
-  }, [quiz.questionsJson, quiz.sets, isInitialized]);
+  }, [quiz.questionsJson, quiz.sets, quiz.shifts, quiz.shiftsJson, isInitialized]);
 
   const watchAudience = form.watch("targetAudience");
   const watchSets = form.watch("sets");
+  const watchShifts = form.watch("shifts") || 1;
   const watchTitle = form.watch("title");
   const watchDescription = form.watch("description");
   const watchDuration = form.watch("duration");
@@ -207,6 +260,46 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
       setCurrentSet("A");
     }
   }, [watchSets, isInitialized]);
+
+  const prevSetsRef = useRef(watchSets);
+
+  // Synchronize shiftsConfig whenever shifts count or sets count change
+  useEffect(() => {
+    if (isInitialized) {
+      const numSets = watchSets || 1;
+      const numShifts = watchShifts || 1;
+      const availableSetLetters = Array.from({ length: numSets }, (_, i) => String.fromCharCode(65 + i));
+      const setsCountChanged = prevSetsRef.current !== watchSets;
+      prevSetsRef.current = watchSets;
+
+      setShiftsConfig((prev) => {
+        const next: ShiftItem[] = [];
+        for (let i = 1; i <= numShifts; i++) {
+          const existing = prev.find((p) => p.shiftNumber === i);
+          
+          let assignedSets: string[] = [];
+          if (setsCountChanged || !existing) {
+            // When sets dropdown changes or new shift is added, auto-assign all available sets
+            assignedSets = [...availableSetLetters];
+          } else if (existing?.sets && Array.isArray(existing.sets)) {
+            assignedSets = existing.sets.filter((s) => availableSetLetters.includes(s));
+            if (assignedSets.length === 0) assignedSets = [...availableSetLetters];
+          } else {
+            assignedSets = [...availableSetLetters];
+          }
+
+          next.push({
+            shiftNumber: i,
+            name: existing?.name || `Shift ${i}`,
+            set: assignedSets[0] || "A",
+            sets: assignedSets,
+            status: existing?.status,
+          });
+        }
+        return next;
+      });
+    }
+  }, [watchShifts, watchSets, isInitialized]);
 
   const validateAndUpdateSet = (jsonString: string, setLetter: string) => {
     if (!jsonString.trim()) {
@@ -275,11 +368,16 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
 
     setIsLoading(true);
     const questionsJson = combineAllSets();
+    const numShifts = data.shifts || shiftsConfig.length || 1;
+    const shiftsJson = JSON.stringify(shiftsConfig);
     
     const result = await updateQuiz(quiz.id, {
       title: data.title,
       description: data.description,
       sets: data.sets,
+      shifts: numShifts,
+      shiftsJson,
+      activeShift: quiz.activeShift || 1,
       duration: data.duration,
       pointsPerQuestion: data.pointsPerQuestion,
       cutoffMarks: data.cutoffMarks,
@@ -308,33 +406,6 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        {/* Audience display banner */}
-        <div className="flex items-center justify-between gap-4 p-4 border rounded-xl bg-muted/40">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
-              {watchAudience === "EXTERNAL" ? <Globe className="h-5 w-5" /> : <Users className="h-5 w-5" />}
-            </div>
-            <div>
-              <div className="font-semibold text-base flex items-center gap-2">
-                <span>{watchAudience === "EXTERNAL" ? "External / Venue Kiosk Quiz" : "Internal Club Members Quiz"}</span>
-                <Badge variant="outline" className="text-[10px]">Selected</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {watchAudience === "EXTERNAL" ? "6-digit access code + venue kiosk student assignment" : "Standard quiz for registered CodeBreakers club members"}
-              </p>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsPreviewOpen(true)}
-            className="cursor-pointer shrink-0"
-          >
-            <Eye className="h-4 w-4 mr-1.5" />
-            Preview Quiz
-          </Button>
-        </div>
 
         {/* External Quiz System Details (If Audience is EXTERNAL) */}
         {watchAudience === "EXTERNAL" && (
@@ -496,14 +567,14 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
           )}
         />
 
-        {/* Configurations: Sets, Duration, Points */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 p-5 border border-border/60 rounded-2xl bg-card/30">
+        {/* Configurations: Sets, Shifts, Duration, Points */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-5 border border-border/60 rounded-2xl bg-card/30">
           <FormField
             control={form.control}
             name="sets"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="font-semibold">Number of Question Sets</FormLabel>
+                <FormLabel className="font-semibold">Question Sets</FormLabel>
                 <Select
                   onValueChange={(value) => field.onChange(parseInt(value))}
                   defaultValue={field.value?.toString() || "1"}
@@ -516,7 +587,35 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                   <SelectContent>
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
                       <SelectItem key={num} value={num.toString()}>
-                        {num} {num === 1 ? "Set" : "Sets"}
+                        {num} {num === 1 ? "Set" : "Sets"} (A{num > 1 ? `-${String.fromCharCode(64 + num)}` : ""})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="shifts"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-semibold">Number of Shifts</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(parseInt(value))}
+                  defaultValue={field.value?.toString() || "1"}
+                >
+                  <FormControl>
+                    <SelectTrigger className="bg-background/80">
+                      <SelectValue placeholder="Select shifts" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                      <SelectItem key={num} value={num.toString()}>
+                        {num} {num === 1 ? "Shift" : "Shifts"}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -567,6 +666,125 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
             )}
           />
         </div>
+
+        {/* Dynamic Shift & Question Set Configuration Card */}
+        <Card className="border-border/60 bg-card/40">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span>Multi-Shift & Question Set Configuration</span>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Select which question sets are available in each shift. You can assign single or multiple question sets per shift.
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="text-xs font-mono">
+                {shiftsConfig.length} Shift{shiftsConfig.length > 1 ? "s" : ""}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {shiftsConfig.map((shift) => {
+                const availableSetLetters = Array.from({ length: watchSets }, (_, i) => String.fromCharCode(65 + i));
+                const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+
+                const toggleSet = (letter: string) => {
+                  setShiftsConfig((prev) =>
+                    prev.map((s) => {
+                      if (s.shiftNumber !== shift.shiftNumber) return s;
+                      let updatedSets = s.sets ? [...s.sets] : [s.set || "A"];
+                      if (updatedSets.includes(letter)) {
+                        if (updatedSets.length > 1) {
+                          updatedSets = updatedSets.filter((l) => l !== letter);
+                        }
+                      } else {
+                        updatedSets.push(letter);
+                        updatedSets.sort();
+                      }
+                      return {
+                        ...s,
+                        sets: updatedSets,
+                        set: updatedSets[0] || "A",
+                      };
+                    })
+                  );
+                };
+
+                const selectAllSets = () => {
+                  setShiftsConfig((prev) =>
+                    prev.map((s) =>
+                      s.shiftNumber === shift.shiftNumber
+                        ? { ...s, sets: [...availableSetLetters], set: availableSetLetters[0] || "A" }
+                        : s
+                    )
+                  );
+                };
+
+                return (
+                  <div key={shift.shiftNumber} className="p-3.5 border border-border/60 rounded-xl bg-background/50 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">Shift {shift.shiftNumber}</span>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={shift.status === "COMPLETED" ? "secondary" : "default"} className="text-[10px]">
+                          {shift.status === "COMPLETED" ? "Completed" : "Active / Pending"}
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px] font-mono">
+                          {currentShiftSets.length} Set{currentShiftSets.length > 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-xs text-muted-foreground">Available Question Sets</Label>
+                        {watchSets > 1 && (
+                          <button
+                            type="button"
+                            onClick={selectAllSets}
+                            className="text-[10px] text-primary hover:underline font-medium"
+                          >
+                            Select All
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Interactive Set Selection Badges */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {availableSetLetters.map((letter) => {
+                          const isSelected = currentShiftSets.includes(letter);
+                          return (
+                            <button
+                              key={letter}
+                              type="button"
+                              onClick={() => toggleSet(letter)}
+                              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                                  : "bg-background text-muted-foreground border-border/80 hover:border-primary/50 hover:bg-muted"
+                              }`}
+                            >
+                              {isSelected ? `✓ Set ${letter}` : `Set ${letter}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground leading-tight pt-1 border-t border-border/40">
+                      Candidates in Shift {shift.shiftNumber} will receive:{" "}
+                      <strong>
+                        {currentShiftSets.map((s) => `Set ${s}`).join(", ")}
+                      </strong>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Passing / Qualification Criteria Card */}
         <Card className="border-border bg-card">

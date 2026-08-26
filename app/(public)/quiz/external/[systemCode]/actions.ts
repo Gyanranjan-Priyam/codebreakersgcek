@@ -135,10 +135,22 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
       },
     });
 
+    const shiftNumber = system.assignedShift || 1;
+    const shiftName = system.assignedShiftName || `Shift ${shiftNumber}`;
+
     if (existingAttempt) {
       await prisma.quizAttempt.update({
         where: { id: existingAttempt.id },
-        data: { score, totalQuestions, correctAnswers, pointsEarned, completedAt: new Date(), answersJson },
+        data: {
+          score,
+          totalQuestions,
+          correctAnswers,
+          pointsEarned,
+          shiftNumber,
+          shiftName,
+          completedAt: new Date(),
+          answersJson,
+        },
       });
     } else {
       await prisma.quizAttempt.create({
@@ -146,6 +158,8 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
           quizId: data.quizDbId,
           userId: `ext_${system.id}`,
           setNumber,
+          shiftNumber,
+          shiftName,
           score,
           totalQuestions,
           correctAnswers,

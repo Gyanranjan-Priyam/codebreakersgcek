@@ -65,6 +65,8 @@ export default async function ExternalExamRoomPage({
   const isAttempting = system.status === "ATTEMPTING" || system.status === "IN_PROGRESS";
 
   const assignedSet = system.assignedSet || "A";
+  const shiftNumber = system.assignedShift || system.quiz.activeShift || 1;
+  const shiftName = system.assignedShiftName || `Shift ${shiftNumber}`;
 
   const quiz = {
     id: system.quiz.id,
@@ -75,6 +77,8 @@ export default async function ExternalExamRoomPage({
     duration: system.quiz.duration,
     pointsPerQuestion: system.quiz.pointsPerQuestion,
     questionsJson: system.quiz.questionsJson,
+    shift: shiftNumber,
+    shiftName: shiftName,
     startDateTime: system.quiz.startDateTime?.toISOString() ?? null,
     endDateTime: system.quiz.endDateTime?.toISOString() ?? null,
     feedbackFormId: system.quiz.feedbackFormId,
@@ -86,7 +90,7 @@ export default async function ExternalExamRoomPage({
     id: userId,
     name: system.assignedStudentName || "Participant",
     email: system.assignedStudentEmail || "",
-    registration: system.systemNumber,
+    registration: `${system.systemNumber} · ${shiftName}`,
     username: system.systemCode,
     mobile: null,
     branch: null,

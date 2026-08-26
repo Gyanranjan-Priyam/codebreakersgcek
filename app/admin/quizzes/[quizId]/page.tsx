@@ -8,7 +8,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Edit, Clock, Calendar, CheckCircle2, Globe, Users, Monitor, BarChart3 } from "lucide-react";
+import { ArrowLeft, Edit, Clock, Calendar, CheckCircle2, Globe, Users, Monitor, BarChart3, BookOpen, Layers, HelpCircle, Award } from "lucide-react";
 import Link from "next/link";
 import { getQuizByQuizId } from "../actions";
 import { notFound } from "next/navigation";
@@ -74,8 +74,30 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
     }
   }
 
+  let shiftsData: Array<{ shiftNumber: number; name: string; set?: string; sets?: string[]; status?: string }> = [];
+  try {
+    if (quiz.shiftsJson) {
+      shiftsData = JSON.parse(quiz.shiftsJson);
+    }
+  } catch (e) {
+    console.error("Error parsing shiftsJson:", e);
+  }
+  if (shiftsData.length === 0) {
+    const totalShifts = quiz.shifts || 1;
+    for (let i = 1; i <= totalShifts; i++) {
+      const defaultSet = String.fromCharCode(65 + ((i - 1) % (quiz.sets || 1)));
+      shiftsData.push({
+        shiftNumber: i,
+        name: `Shift ${i}`,
+        set: defaultSet,
+        sets: [defaultSet],
+        status: i < (quiz.activeShift || 1) ? "COMPLETED" : i === (quiz.activeShift || 1) ? "ACTIVE" : "PENDING",
+      });
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-8xl mx-auto w-full">
       {/* Page header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
@@ -93,34 +115,34 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
               Results
             </Link>
           </Button>
-          {quiz.targetAudience === "EXTERNAL" && quiz.accessCode && (
-            <CopyCodeButton code={quiz.accessCode} />
-          )}
-          {quiz.targetAudience === "EXTERNAL" && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/admin/quizzes/${quiz.quizId}/systems`}>
-                <Monitor className="h-4 w-4 mr-2" />
-                System Registration
-              </Link>
-            </Button>
-          )}
-          <Button size="sm" asChild>
-            <Link href={`/admin/quizzes/edit/${quiz.quizId}`}>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/quizzes/edit/${quiz.id}`}>
               <Edit className="h-4 w-4 mr-2" />
               Edit Quiz
+            </Link>
+          </Button>
+          <Button size="sm" asChild>
+            <Link href={`/admin/quizzes/${quiz.quizId}/systems`}>
+              <Monitor className="h-4 w-4 mr-2" />
+              Manage Systems
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Quiz Overview Card */}
+      {/* Quiz Details Card */}
       <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <CardTitle className="text-lg">{quiz.title}</CardTitle>
-              <CardDescription className="font-mono text-xs mt-1">ID: {quiz.quizId}</CardDescription>
-            </div>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div className="space-y-1">
+            <CardTitle className="text-xl font-bold flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              {quiz.title}
+            </CardTitle>
+            <CardDescription className="font-mono text-xs">
+              Quiz ID: {quiz.quizId}
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant={quiz.targetAudience === "EXTERNAL" ? "secondary" : "outline"}>
                 {quiz.targetAudience === "EXTERNAL" ? (
@@ -129,9 +151,6 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
                   <span className="flex items-center gap-1"><Users className="h-3 w-3" /> Internal</span>
                 )}
               </Badge>
-              {quiz.targetAudience === "EXTERNAL" && quiz.accessCode && (
-                <Badge variant="outline" className="font-mono text-xs">{quiz.accessCode}</Badge>
-              )}
               <Badge variant={quiz.isActive ? "default" : "secondary"}>
                 {quiz.isActive ? "Active" : "Inactive"}
               </Badge>
@@ -140,21 +159,26 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
         </CardHeader>
         <CardContent className="space-y-5">
           {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
               <div>
-                <p className="text-xs text-muted-foreground">Questions</p>
+                <p className="text-xs text-muted-foreground">Question Sets</p>
+                <p className="text-xl font-bold">{quiz.sets}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <HelpCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Total Questions</p>
                 <p className="text-xl font-bold">{totalQuestions}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-              <div className="h-4 w-4 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-muted-foreground">S</span>
-              </div>
+              <Award className="h-4 w-4 text-muted-foreground shrink-0" />
               <div>
-                <p className="text-xs text-muted-foreground">Sets</p>
-                <p className="text-xl font-bold">{quiz.sets}</p>
+                <p className="text-xs text-muted-foreground">Points / Question</p>
+                <p className="text-xl font-bold">{quiz.pointsPerQuestion}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
@@ -173,6 +197,47 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
             </div>
           </div>
 
+          {/* Shifts and Question Sets Mapping pills */}
+          {shiftsData.length > 0 && quiz.targetAudience === "EXTERNAL" && (
+            <div className="p-3.5 border rounded-lg bg-muted/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Multi-Shift Setup ({shiftsData.length} Shifts · Active: Shift {quiz.activeShift || 1})
+                </span>
+                <Badge variant="outline" className="text-xs font-mono">
+                  Current Active: Shift {quiz.activeShift || 1}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                {shiftsData.map((shift) => {
+                  const isActive = (quiz.activeShift || 1) === shift.shiftNumber;
+                  const isCompleted = shift.status === "COMPLETED";
+                  const shiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                  return (
+                    <div
+                      key={shift.shiftNumber}
+                      className={`p-2.5 rounded-lg border text-center transition-all ${
+                        isActive
+                          ? "border-primary bg-primary/5 text-primary font-semibold shadow-xs"
+                          : isCompleted
+                          ? "border-green-600/40 bg-green-500/5 text-green-700 dark:text-green-400"
+                          : "border-border/60 bg-card text-muted-foreground"
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{shift.name || `Shift ${shift.shiftNumber}`}</div>
+                      <div className="text-[11px] font-mono mt-0.5">
+                        {shiftSets.length > 1 ? `Sets: ${shiftSets.join(", ")}` : `Set ${shiftSets[0]}`}
+                      </div>
+                      <div className="text-[10px] mt-1 opacity-80">
+                        {isCompleted ? "✓ Done" : isActive ? "● Active" : "Pending"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <Separator />
 
           {/* Description */}
@@ -183,12 +248,15 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
         </CardContent>
       </Card>
 
-            {/* External Real-Time System Panel */}
+      {/* External Real-Time System Panel */}
       {quiz.targetAudience === "EXTERNAL" && (
         <ExternalSystemPanel
           quizId={quiz.id}
           accessCode={quiz.accessCode}
           sets={quiz.sets}
+          shifts={quiz.shifts || 1}
+          shiftsJson={quiz.shiftsJson || null}
+          activeShift={quiz.activeShift || 1}
           formId={quiz.formId}
           formResponses={formResponses}
         />

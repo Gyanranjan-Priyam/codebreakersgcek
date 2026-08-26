@@ -41,6 +41,7 @@ import {
   deleteExternalSystem,
   clearAllExternalSystems,
   autoShuffleAndAssignSets,
+  completeQuizShift,
 } from "../../actions";
 import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 import {
@@ -61,6 +62,8 @@ import {
   Trash2,
   Shuffle,
   AlertTriangle,
+  Layers,
+  Flag,
 } from "lucide-react";
 
 interface FormResponseOption {
@@ -69,10 +72,21 @@ interface FormResponseOption {
   submittedByEmail?: string;
 }
 
+interface ShiftItem {
+  shiftNumber: number;
+  name: string;
+  set?: string;
+  sets?: string[];
+  status?: string;
+}
+
 interface ExternalSystemPanelProps {
   quizId: string;
   accessCode: string | null;
   sets: number;
+  shifts?: number;
+  shiftsJson?: string | null;
+  activeShift?: number;
   formId: string | null;
   formResponses?: FormResponseOption[];
 }
@@ -81,6 +95,9 @@ export function ExternalSystemPanel({
   quizId,
   accessCode,
   sets,
+  shifts = 1,
+  shiftsJson = null,
+  activeShift = 1,
   formId,
   formResponses = [],
 }: ExternalSystemPanelProps) {
@@ -90,6 +107,49 @@ export function ExternalSystemPanel({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isPending, startTransition] = useTransition();
+
+  // Multi-Shift states
+  const [activeShiftState, setActiveShiftState] = useState<number>(activeShift || 1);
+  const [shiftsConfig, setShiftsConfig] = useState<ShiftItem[]>([]);
+  const [selectedShiftForAssign, setSelectedShiftForAssign] = useState<number>(activeShift || 1);
+  const [completeShiftDialogOpen, setCompleteShiftDialogOpen] = useState(false);
+  const [isCompletingShift, setIsCompletingShift] = useState(false);
+
+  // Initialize shifts configuration
+  useEffect(() => {
+    let parsed: ShiftItem[] = [];
+    try {
+      if (shiftsJson) {
+        parsed = JSON.parse(shiftsJson);
+      }
+    } catch (e) {
+      console.error("Error parsing shiftsJson in panel:", e);
+    }
+
+    if (parsed.length > 0) {
+      const normalized = parsed.map((s: any) => ({
+        ...s,
+        sets: s.sets && Array.isArray(s.sets) && s.sets.length > 0 ? s.sets : [s.set || "A"],
+        set: s.set || (s.sets && s.sets[0]) || "A",
+      }));
+      setShiftsConfig(normalized);
+    } else {
+      const list: ShiftItem[] = [];
+      const numShifts = shifts || 1;
+      const numSets = sets || 1;
+      for (let i = 1; i <= numShifts; i++) {
+        const defaultSet = String.fromCharCode(65 + ((i - 1) % numSets));
+        list.push({
+          shiftNumber: i,
+          name: `Shift ${i}`,
+          set: defaultSet,
+          sets: [defaultSet],
+          status: i < (activeShift || 1) ? "COMPLETED" : i === (activeShift || 1) ? "ACTIVE" : "PENDING",
+        });
+      }
+      setShiftsConfig(list);
+    }
+  }, [shifts, shiftsJson, sets, activeShift]);
 
   // Blocked members right sidebar sheet state
   const [blockedSidebarOpen, setBlockedSidebarOpen] = useState(false);
@@ -107,6 +167,7 @@ export function ExternalSystemPanel({
   // Blocked member details modal state
   const [selectedBlockedMember, setSelectedBlockedMember] = useState<any>(null);
   const [isUnblocking, setIsUnblocking] = useState(false);
+
   // Fetch all monitor data from server
   const fetchMonitorData = async (showToast = false) => {
     setIsRefreshing(true);
@@ -114,6 +175,16 @@ export function ExternalSystemPanel({
     if (res.status === "success" && res.data) {
       setSystems(res.data.systems || []);
       setBlockedMembers(res.data.blockedMembers || []);
+      if (res.data.quiz) {
+        if (res.data.quiz.activeShift) {
+          setActiveShiftState(res.data.quiz.activeShift);
+        }
+        if (res.data.quiz.shiftsJson) {
+          try {
+            setShiftsConfig(JSON.parse(res.data.quiz.shiftsJson));
+          } catch (e) {}
+        }
+      }
       setLastUpdated(new Date());
       if (showToast) toast.success("Refreshed systems & blocked members data");
     }
@@ -218,15 +289,32 @@ export function ExternalSystemPanel({
     setIsFetchingResponse(false);
   };
 
+  const getAutoSetForPanelSystem = (sysId: string, shiftNum: number) => {
+    const sorted = [...systems].sort((a, b) =>
+      a.systemNumber.localeCompare(b.systemNumber, undefined, { numeric: true, sensitivity: "base" })
+    );
+    const sysIdx = sorted.findIndex((s) => s.id === sysId);
+    const matched = shiftsConfig.find((s) => s.shiftNumber === shiftNum);
+    const allowed = matched?.sets && matched.sets.length > 0 ? matched.sets : [matched?.set || "A"];
+    if (allowed.length <= 1) return allowed[0] || "A";
+    const safeIdx = sysIdx >= 0 ? sysIdx : 0;
+    return allowed[safeIdx % allowed.length];
+  };
+
   const handleOpenAssignModal = (sys: any) => {
     setSelectedSystem(sys);
     setSelectedResponseId("");
     setCustomName(sys.assignedStudentName || "");
     setCustomEmail(sys.assignedStudentEmail || "");
-    const sysIndex = systems.findIndex((s) => s.id === sys.id);
-    const numSets = sets || 1;
-    const alternatingSet = String.fromCharCode(65 + (Math.max(0, sysIndex) % numSets));
-    setAssignedSet(sys.assignedSet || alternatingSet);
+    
+    // Default shift for assignment to current active shift
+    const shiftForAssign = sys.assignedShift || activeShiftState || 1;
+    setSelectedShiftForAssign(shiftForAssign);
+    
+    // Auto-resolve question set so consecutive systems alternate sets
+    const autoSet = getAutoSetForPanelSystem(sys.id, shiftForAssign);
+    setAssignedSet(sys.assignedSet || autoSet);
+
     setAssignDialogOpen(true);
   };
 
@@ -255,15 +343,30 @@ export function ExternalSystemPanel({
       studentName: finalName,
       studentEmail: finalEmail,
       assignedSet,
+      assignedShift: selectedShiftForAssign,
+      assignedShiftName: `Shift ${selectedShiftForAssign}`,
     });
 
     if (res.status === "success") {
-      toast.success(`Assigned ${finalName} to ${selectedSystem.systemNumber}`);
+      toast.success(`Assigned ${finalName} to ${selectedSystem.systemNumber} for Shift ${selectedShiftForAssign} (Set ${assignedSet})`);
       setAssignDialogOpen(false);
       fetchMonitorData();
     } else {
       toast.error(res.message || "Failed to assign student");
     }
+  };
+
+  const handleCompleteShift = async () => {
+    setIsCompletingShift(true);
+    const res = await completeQuizShift(quizId, activeShiftState);
+    if (res.status === "success") {
+      toast.success(res.message);
+      setCompleteShiftDialogOpen(false);
+      fetchMonitorData();
+    } else {
+      toast.error(res.message || "Failed to complete shift");
+    }
+    setIsCompletingShift(false);
   };
 
   const handleUnassign = async (sysId: string) => {
@@ -446,6 +549,72 @@ export function ExternalSystemPanel({
           </div>
         </div>
 
+        {/* Multi-Shift Operations & Quick Shift Completer Banner */}
+        {shiftsConfig.length > 0 && (
+          <div className="p-4 rounded-xl border border-border/80 bg-muted/20 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <Layers className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm">Shift Operations & Control</span>
+                    <Badge variant="default" className="text-xs bg-primary">
+                      Active: Shift {activeShiftState}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Managing {shiftsConfig.length} shifts under this quiz. All shifts share a unified leaderboard.
+                  </p>
+                </div>
+              </div>
+
+              {/* Complete Current Shift Action Button */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setCompleteShiftDialogOpen(true)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-xs"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                  Shift {activeShiftState} Completed
+                </Button>
+              </div>
+            </div>
+
+            {/* Shift List Pills */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2 pt-1">
+              {shiftsConfig.map((s) => {
+                const isActive = s.shiftNumber === activeShiftState;
+                const isDone = s.status === "COMPLETED" || s.shiftNumber < activeShiftState;
+                const shiftSets = s.sets && s.sets.length > 0 ? s.sets : [s.set || "A"];
+                return (
+                  <div
+                    key={s.shiftNumber}
+                    className={`p-2 rounded-lg border text-center text-xs transition-all ${
+                      isActive
+                        ? "border-primary bg-primary/10 text-primary font-bold shadow-xs"
+                        : isDone
+                        ? "border-green-600/30 bg-green-500/5 text-green-700 dark:text-green-400 font-medium"
+                        : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    <div className="font-semibold">{s.name || `Shift ${s.shiftNumber}`}</div>
+                    <div className="text-[11px] font-mono mt-0.5">
+                      {shiftSets.length > 1 ? `Sets: ${shiftSets.join(", ")}` : `Set ${shiftSets[0]}`}
+                    </div>
+                    <div className="text-[10px] mt-1 opacity-80">
+                      {isDone ? "✓ Completed" : isActive ? "● Active Now" : "Upcoming"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Action Controls Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -526,7 +695,8 @@ export function ExternalSystemPanel({
                 <TableHead className="font-semibold text-foreground">System Number</TableHead>
                 <TableHead className="font-semibold text-foreground">Session Code</TableHead>
                 <TableHead className="font-semibold text-foreground">Assigned Student</TableHead>
-                <TableHead className="font-semibold text-foreground">Assigned Set</TableHead>
+                <TableHead className="font-semibold text-foreground">Shift</TableHead>
+                <TableHead className="font-semibold text-foreground">Set</TableHead>
                 <TableHead className="font-semibold text-foreground">Status</TableHead>
                 <TableHead className="text-right font-semibold text-foreground">Actions</TableHead>
               </TableRow>
@@ -534,7 +704,7 @@ export function ExternalSystemPanel({
             <TableBody>
               {systems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                     <Monitor className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No external systems registered yet.
                     <p className="text-xs text-muted-foreground mt-1">
@@ -564,6 +734,11 @@ export function ExternalSystemPanel({
                       ) : (
                         <span className="text-xs italic text-muted-foreground">Unassigned</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs font-mono">
+                        {sys.assignedShiftName || `Shift ${sys.assignedShift || activeShiftState || 1}`}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {sys.assignedSet ? (
@@ -686,10 +861,10 @@ export function ExternalSystemPanel({
             </SheetHeader>
           </div>
 
-          {/* Scrollable Blocked List Container with Lenis Prevent */}
+          {/* Scrollable Blocked List Container with Lenis Prevent (Scrollbar Hidden) */}
           <div 
             data-lenis-prevent 
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3"
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             onWheel={(e) => e.stopPropagation()}
             onTouchMoveCapture={(e) => e.stopPropagation()}
           >
@@ -870,25 +1045,68 @@ export function ExternalSystemPanel({
               />
             </div>
 
-            {/* Set Selection */}
-            {sets > 1 && (
+            {/* Shift Selection */}
+            {shiftsConfig.length > 0 && (
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold">Assigned Question Set</label>
-                <Select value={assignedSet} onValueChange={setAssignedSet}>
+                <label className="text-xs font-semibold">Assigned Shift</label>
+                <Select
+                  value={selectedShiftForAssign.toString()}
+                  onValueChange={(val) => {
+                    const shiftNum = parseInt(val);
+                    setSelectedShiftForAssign(shiftNum);
+                    if (selectedSystem) {
+                      const auto = getAutoSetForPanelSystem(selectedSystem.id, shiftNum);
+                      setAssignedSet(auto);
+                    }
+                  }}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select Set" />
+                    <SelectValue placeholder="Select Shift" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: sets }, (_, i) => {
-                      const setLetter = String.fromCharCode(65 + i);
+                    {shiftsConfig.map((s) => {
+                      const sSets = s.sets && s.sets.length > 0 ? s.sets : [s.set || "A"];
                       return (
-                        <SelectItem key={setLetter} value={setLetter}>
-                          Set {setLetter}
+                        <SelectItem key={s.shiftNumber} value={s.shiftNumber.toString()}>
+                          {s.name || `Shift ${s.shiftNumber}`} (Available: Sets {sSets.join(", ")})
                         </SelectItem>
                       );
                     })}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {/* Set Selection */}
+            {sets > 1 && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Assigned Question Set</label>
+                {(() => {
+                  const matchedShift = shiftsConfig.find((s) => s.shiftNumber === selectedShiftForAssign);
+                  const allowedForShift = matchedShift?.sets && matchedShift.sets.length > 0
+                    ? matchedShift.sets
+                    : Array.from({ length: sets }, (_, i) => String.fromCharCode(65 + i));
+
+                  return (
+                    <>
+                      <Select value={assignedSet} onValueChange={setAssignedSet}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allowedForShift.map((setLetter) => (
+                            <SelectItem key={setLetter} value={setLetter}>
+                              Question Set {setLetter}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Shift {selectedShiftForAssign} allows: <strong>Sets {allowedForShift.join(", ")}</strong>.
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
             )}
 
@@ -900,6 +1118,69 @@ export function ExternalSystemPanel({
                 Assign & Sync
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog for Shift Completion */}
+      <Dialog open={completeShiftDialogOpen} onOpenChange={setCompleteShiftDialogOpen}>
+        <DialogContent className="max-w-md rounded-xl border bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+              Mark Shift {activeShiftState} as Completed?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Please review the consequences of completing the current shift.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-sm">
+            <div className="p-3.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs leading-relaxed">
+              <p className="font-semibold mb-1">Notice on Shift Completion:</p>
+              Confirming this will clear all currently assigned students from the active registration system for Shift {activeShiftState}.
+              The quiz configuration, question sets, completed results, and overall rankings will remain completely intact. Connected kiosks will remain registered and ready for the next shift.
+            </div>
+
+            <div className="text-xs space-y-1.5 text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Current Shift:</span>
+                <span className="font-semibold text-foreground">Shift {activeShiftState}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Active Systems Assigned:</span>
+                <span className="font-semibold text-foreground">{assignedCount + attemptingCount} Systems</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Next Shift:</span>
+                <span className="font-semibold text-foreground">Shift {Math.min((shiftsConfig.length || 1), activeShiftState + 1)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setCompleteShiftDialogOpen(false)}
+              disabled={isCompletingShift}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleCompleteShift}
+              disabled={isCompletingShift}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+            >
+              {isCompletingShift ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Completing Shift...
+                </>
+              ) : (
+                `Yes, Complete Shift ${activeShiftState}`
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -147,16 +147,25 @@ export default function QuizProctorInterface({
         toast.success("You have been unblocked by admin! Resuming your exam...");
       };
 
-      handleStatusChanged = (data: { status?: string }) => {
+      handleStatusChanged = (data: { status?: string; shiftCompleted?: number }) => {
         if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
           handleUnblock!();
         } else if (data?.status === "BLOCKED") {
           setIsBlocked(true);
+        } else if (data?.status === "REGISTERED" || data?.shiftCompleted) {
+          toast.info("Shift has completed. Auto-submitting your attempted questions...");
+          handleSubmitQuiz(true);
         }
+      };
+
+      const handleShiftCompleted = () => {
+        toast.info("Shift has completed. Auto-submitting your attempted questions...");
+        handleSubmitQuiz(true);
       };
 
       socket.on("unblocked", handleUnblock);
       socket.on("status-changed", handleStatusChanged);
+      socket.on("shift-completed", handleShiftCompleted);
     });
 
     return () => {
@@ -165,9 +174,10 @@ export default function QuizProctorInterface({
       if (socket) {
         if (handleUnblock) socket.off("unblocked", handleUnblock);
         if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
+        socket.off("shift-completed");
       }
     };
-  }, [systemCode]);
+  }, [systemCode, currentStep]);
 
   // Set system to ATTEMPTING status in database & real-time when quiz starts
   useEffect(() => {
