@@ -28,6 +28,7 @@ import {
 } from "../actions";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2,
   UserPlus,
@@ -41,15 +42,35 @@ import {
   CheckCircle2,
   Hash,
   Search,
+  UserCheck,
+  Target,
 } from "lucide-react";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
+import {
+  ASSIGNABLE_ROLES,
+  MAX_MEMBER_ROLES,
+  getRoleBadgeClasses,
+  type AssignableRole,
+} from "@/lib/member-roles";
+import {
+  PREDEFINED_DOMAINS,
+  parseSpecializedDomains,
+  serializeSpecializedDomains,
+} from "@/lib/specialized-domains";
 
 interface AddMemberSidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const branchOptions = ["CSE", "EE", "ME", "CE", "ECE"];
+const branchOptions = [
+  "Computer Science & Engineering",
+  "Mechanical Engineering",
+  "Electrical Engineering",
+  "Civil Engineering",
+  "Basic Science & Humanities",
+  "Other",
+];
 
 export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarProps) {
   const router = useRouter();
@@ -62,7 +83,9 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
   const [sameNumber, setSameNumber] = useState(true);
   const [branch, setBranch] = useState("");
   const [batchId, setBatchId] = useState<string>("none");
+  const [specializedDomain, setSpecializedDomain] = useState<string>("");
   const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(["Member"]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Response ID Auto-fill States
@@ -75,6 +98,24 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
       getActiveBatchesList().then((list) => setBatchesList(list));
     }
   }, [isOpen]);
+
+  const handleToggleRole = (role: AssignableRole) => {
+    if (role === "Member") {
+      setSelectedRoles(["Member"]);
+      return;
+    }
+    const withoutMember = selectedRoles.filter((r) => r !== "Member");
+    if (withoutMember.includes(role)) {
+      const next = withoutMember.filter((r) => r !== role);
+      setSelectedRoles(next.length === 0 ? ["Member"] : next);
+    } else {
+      if (withoutMember.length >= MAX_MEMBER_ROLES) {
+        toast.error(`A member can have a maximum of ${MAX_MEMBER_ROLES} roles.`);
+        return;
+      }
+      setSelectedRoles([...withoutMember, role]);
+    }
+  };
 
   const applyCandidateData = (cand: FormCandidateItem & { formTitle?: string }) => {
     setFirstName(cand.firstName || cand.name);
@@ -141,6 +182,8 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
     setSameNumber(true);
     setBranch("");
     setBatchId("none");
+    setSpecializedDomain("");
+    setSelectedRoles(["Member"]);
     setResponseIdInput("");
     setAutoFilledFrom(null);
   };
@@ -173,6 +216,8 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
         whatsappNumber: sameNumber ? mobileNumber : whatsappNumber,
         branch,
         batchId: batchId && batchId !== "none" ? batchId : null,
+        specializedDomain: specializedDomain.trim() || null,
+        roles: selectedRoles,
       });
 
       if (result.status === "success") {
@@ -191,9 +236,9 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col h-full">
-        <div className="sticky top-0 z-10 bg-background border-b">
+    <Sheet open={isOpen} onOpenChange={handleClose} modal>
+      <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex h-dvh max-h-screen flex-col overflow-hidden">
+        <div className="shrink-0 bg-background border-b">
           <SheetHeader className="px-6 pt-6 pb-4">
             <SheetTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
@@ -205,7 +250,12 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
           </SheetHeader>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div
+          data-lenis-prevent
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 no-scrollbar"
+          onWheel={(event) => event.stopPropagation()}
+          onTouchMoveCapture={(event) => event.stopPropagation()}
+        >
           <div className="space-y-5 pb-4">
             {/* Auto-Fill by Response ID Card */}
             <div className="p-3.5 rounded-lg border bg-muted/30 space-y-2.5">
@@ -223,50 +273,46 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
                     className="h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground gap-1"
                   >
                     <RotateCcw className="h-3 w-3" />
-                    Clear
+                    <span>Reset</span>
                   </Button>
                 )}
               </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-[11px] text-muted-foreground">
-                  Enter Response ID or Transaction ID
-                </Label>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Hash className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="e.g. #8B29FA1C, UUID, or Txn ID"
-                      value={responseIdInput}
-                      onChange={(e) => setResponseIdInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleFetchByResponseId();
-                        }
-                      }}
-                      disabled={isSubmitting || isFetchingResponseId}
-                      className="pl-9 h-8 text-xs font-mono"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleFetchByResponseId()}
-                    disabled={isSubmitting || isFetchingResponseId || !responseIdInput.trim()}
-                    className="h-8 text-xs px-3 gap-1 shrink-0"
-                  >
-                    {isFetchingResponseId ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Search className="h-3.5 w-3.5" />
-                        <span>Fetch</span>
-                      </>
-                    )}
-                  </Button>
+              <p className="text-[11px] text-muted-foreground">
+                Paste any Registration / Membership form response ID or Transaction ID to auto-fill student details instantly.
+              </p>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Hash className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="e.g. resp_abc123 or UPI Txn ID"
+                    value={responseIdInput}
+                    onChange={(e) => setResponseIdInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleFetchByResponseId();
+                      }
+                    }}
+                    disabled={isSubmitting || isFetchingResponseId}
+                    className="pl-9 h-8 text-xs font-mono"
+                  />
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleFetchByResponseId()}
+                  disabled={isSubmitting || isFetchingResponseId || !responseIdInput.trim()}
+                  className="h-8 text-xs px-3 gap-1 shrink-0"
+                >
+                  {isFetchingResponseId ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <Search className="h-3.5 w-3.5" />
+                      <span>Fetch</span>
+                    </>
+                  )}
+                </Button>
               </div>
 
               {autoFilledFrom && (
@@ -323,117 +369,223 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="memberEmail">
-                Email Address <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="memberEmail"
-                  type="email"
-                  placeholder="Enter email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isSubmitting}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <Label htmlFor="mobileNumber">
-                Mobile Number <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="mobileNumber"
-                  type="tel"
-                  placeholder="Enter mobile number"
-                  value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value)}
-                  disabled={isSubmitting}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="sameNumber"
-                checked={sameNumber}
-                onCheckedChange={setSameNumber}
-                disabled={isSubmitting}
-              />
-              <Label htmlFor="sameNumber" className="cursor-pointer text-sm font-normal">
-                WhatsApp number is same as mobile number
-              </Label>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="memberWhatsapp">
-                WhatsApp Number <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="memberWhatsapp"
-                  type="tel"
-                  placeholder="Enter WhatsApp number"
-                  value={whatsappNumber}
-                  onChange={(e) => setWhatsappNumber(e.target.value)}
-                  disabled={isSubmitting || sameNumber}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="branch">
-                  Branch <span className="text-destructive">*</span>
+                <Label htmlFor="email">
+                  Email Address <span className="text-destructive">*</span>
                 </Label>
                 <div className="relative">
-                  <GraduationCap className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                  <Select value={branch} onValueChange={setBranch} disabled={isSubmitting}>
-                    <SelectTrigger className="pl-10">
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branchOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="student@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    className="pl-10"
+                    required
+                  />
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="mobileNumber">
+                    Mobile Number <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="mobileNumber"
+                      placeholder="9876543210"
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                      disabled={isSubmitting}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="whatsappNumber">
+                    WhatsApp Number <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="whatsappNumber"
+                      placeholder="9876543210"
+                      value={whatsappNumber}
+                      onChange={(e) => setWhatsappNumber(e.target.value)}
+                      disabled={isSubmitting || sameNumber}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="sameNumber"
+                  checked={sameNumber}
+                  onCheckedChange={setSameNumber}
+                  disabled={isSubmitting}
+                />
+                <Label htmlFor="sameNumber" className="text-xs font-normal cursor-pointer">
+                  WhatsApp number is the same as mobile number
+                </Label>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="branch">
+                    Branch <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <GraduationCap className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Select value={branch} onValueChange={setBranch} disabled={isSubmitting}>
+                      <SelectTrigger className="pl-10">
+                        <SelectValue placeholder="Select branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branchOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="batch">Assign Batch</Label>
+                  <div className="relative">
+                    <Layers className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Select value={batchId} onValueChange={setBatchId} disabled={isSubmitting}>
+                      <SelectTrigger className="pl-10">
+                        <SelectValue placeholder="Select Batch (Optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Batch (Unassigned)</SelectItem>
+                        {batchesList.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name} ({b.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Specialized Domain (Admin Provided) */}
               <div className="space-y-2">
-                <Label htmlFor="batch">Assign Batch</Label>
-                <div className="relative">
-                  <Layers className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                  <Select value={batchId} onValueChange={setBatchId} disabled={isSubmitting}>
-                    <SelectTrigger className="pl-10">
-                      <SelectValue placeholder="Select Batch (Optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Batch (Unassigned)</SelectItem>
-                      {batchesList.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.name} ({b.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <Label htmlFor="specializedDomain" className="text-xs font-semibold flex items-center gap-1.5">
+                  <Target className="h-4 w-4 text-primary" />
+                  Specialized Domain (Admin Provided)
+                </Label>
+                <div className="space-y-2">
+                  <Input
+                    id="specializedDomain"
+                    placeholder="e.g. Web Development, AI & Machine Learning..."
+                    value={specializedDomain}
+                    onChange={(e) => setSpecializedDomain(e.target.value)}
+                    disabled={isSubmitting}
+                    className="text-xs h-9"
+                  />
+                  <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto p-1.5 border rounded-md bg-muted/20 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {PREDEFINED_DOMAINS.map((d) => {
+                      const currentDomains = parseSpecializedDomains(specializedDomain);
+                      const isSelected = currentDomains.some(
+                        (item) => item.toLowerCase() === d.toLowerCase()
+                      );
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => {
+                            let next: string[];
+                            if (isSelected) {
+                              next = currentDomains.filter(
+                                (item) => item.toLowerCase() !== d.toLowerCase()
+                              );
+                            } else {
+                              next = [...currentDomains, d];
+                            }
+                            setSpecializedDomain(serializeSpecializedDomains(next) || "");
+                          }}
+                          className={`text-[10px] px-2 py-0.5 rounded border transition-all cursor-pointer select-none ${
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                              : "bg-background text-muted-foreground hover:text-foreground border-border"
+                          }`}
+                        >
+                          {isSelected ? `✓ ${d}` : `+ ${d}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Assign Roles */}
+              <div className="space-y-2.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold flex items-center gap-1.5">
+                    <UserCheck className="h-4 w-4 text-primary" />
+                    Member Roles (Max {MAX_MEMBER_ROLES})
+                  </Label>
+                  <span className="text-[11px] text-muted-foreground">
+                    {selectedRoles.filter((r) => r !== "Member").length === 0
+                      ? "Member"
+                      : `${selectedRoles.filter((r) => r !== "Member").length} / ${MAX_MEMBER_ROLES} selected`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {ASSIGNABLE_ROLES.map((role) => {
+                    const isSelected = selectedRoles.includes(role);
+                    const isMemberRole = role === "Member";
+                    const isMemberActive =
+                      isMemberRole &&
+                      (selectedRoles.length === 0 ||
+                        selectedRoles.includes("Member"));
+                    const isMaxReached =
+                      selectedRoles.filter((r) => r !== "Member").length >= MAX_MEMBER_ROLES;
+                    const disabled = !isSelected && !isMemberRole && isMaxReached;
+                    const { badgeClass } = getRoleBadgeClasses(role);
+
+                    return (
+                      <label
+                        key={role}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs transition-all cursor-pointer select-none ${
+                          isSelected || isMemberActive
+                            ? "border-primary/50 bg-primary/5 shadow-xs"
+                            : disabled
+                            ? "opacity-50 cursor-not-allowed border-border/40 bg-muted/20"
+                            : "border-border/60 hover:border-border hover:bg-muted/40"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isSelected || isMemberActive}
+                          disabled={disabled || isSubmitting}
+                          onCheckedChange={() => !disabled && handleToggleRole(role)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span className="flex-1 truncate">
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] py-0 px-1.5 font-normal ${badgeClass}`}
+                          >
+                            {role}
+                          </Badge>
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>

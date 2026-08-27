@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 // Validation schema for profile updates
 const profileUpdateSchema = z.object({
@@ -114,6 +115,9 @@ export async function getCurrentUserProfile() {
         state: true,
         district: true,
         githubUsername: true,
+        profileComplete: true,
+        socialLinks: true,
+        customLinks: true,
       },
     });
 
@@ -133,6 +137,55 @@ export async function getCurrentUserProfile() {
     return {
       status: "error" as const,
       message: "Failed to fetch profile",
+    };
+  }
+}
+
+export async function updateAdminSocialAndCustomLinks(data: {
+  socialLinks: {
+    linkedin?: string;
+    twitter?: string;
+    instagram?: string;
+    leetcode?: string;
+    codeforces?: string;
+    portfolio?: string;
+  };
+  customLinks: Array<{ id: string; title: string; url: string }>;
+}) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        status: "error" as const,
+        message: "Authentication required",
+      };
+    }
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        socialLinks: data.socialLinks,
+        customLinks: data.customLinks,
+        updatedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/members");
+    revalidatePath("/member");
+
+    return {
+      status: "success" as const,
+      message: "Social and custom links updated successfully",
+    };
+  } catch (error) {
+    console.error("Error updating admin social links:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update social links",
     };
   }
 }
@@ -432,7 +485,7 @@ export async function updateRegistrationSetting(enabled: boolean) {
       select: { role: true },
     });
 
-    if (user?.role !== "admin") {
+    if (!isSystemAdminRole(user?.role)) {
       return {
         status: "error" as const,
         message: "Admin access required",
@@ -495,7 +548,7 @@ export async function updateGitHubOrgSetting(organizationName: string) {
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== 'admin') {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return {
         status: 'error' as const,
         message: 'Unauthorized: Admin access required',

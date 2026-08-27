@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export async function GET() {
     const session = await auth.api.getSession({
@@ -92,7 +93,7 @@ export async function GET() {
     }
 
     // If user is admin, redirect to admin dashboard
-    if (session.user.role === "admin") {
+    if (isSystemAdminRole(session.user.role)) {
         return redirect("/admin");
     }
 

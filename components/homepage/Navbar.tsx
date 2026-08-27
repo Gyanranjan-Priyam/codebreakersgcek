@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 interface NavbarProps {
   user?: {
@@ -43,7 +44,7 @@ const Navbar = ({ user }: NavbarProps) => {
   };
 
   const handleDashboard = () => {
-    if (user?.role === "admin") {
+    if (isSystemAdminRole(user?.role)) {
       router.push("/admin");
     } else {
       router.push("/dashboard");

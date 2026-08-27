@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== "admin") {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 401 }
@@ -67,7 +68,7 @@ export async function DELETE(req: NextRequest) {
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== "admin") {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 401 }

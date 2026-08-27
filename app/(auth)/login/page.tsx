@@ -4,6 +4,7 @@ import { LoginForm } from "./_components/LoginForm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export const metadata: Metadata = {
   title: "Login",
@@ -27,7 +28,7 @@ export default async function LoginPage() {
         }
 
         // If user is admin, redirect to admin dashboard
-        if (dbUser.role === "admin") {
+        if (isSystemAdminRole(dbUser.role)) {
             return redirect("/admin");
         }
 

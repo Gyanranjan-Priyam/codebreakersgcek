@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserProfileImageUpload } from "./user-profile-image-upload";
 import { UserProfileForm } from "./user-profile-form";
 import { LinkedAccountsSection } from "./linked-accounts-section";
+import { UserSocialLinksForm } from "./user-social-links-form";
 import { Separator } from "@/components/ui/separator";
 import {
   User,
@@ -15,10 +16,11 @@ import {
   MessageSquare,
   Phone,
   Info,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Tab = "profile" | "security" | "notifications";
+type Tab = "profile" | "social" | "security" | "notifications";
 
 interface UserSettingsShellProps {
   userData: {
@@ -49,11 +51,17 @@ interface UserSettingsShellProps {
     block: string | null;
     pinCode: string | null;
     githubUsername: string | null;
+    profileComplete?: boolean;
+    specializedDomain?: string | null;
+    socialLinks?: any;
+    customLinks?: any;
+    batch?: { id: string; name: string; code: string } | null;
   };
 }
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
+  { id: "social", label: "Social & Links", icon: Globe },
   { id: "security", label: "Account Security", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
@@ -164,6 +172,18 @@ export function UserSettingsShell({ userData }: UserSettingsShellProps) {
                 Your profile information is automatically synced across all your event registrations, certificates, and team rosters. Updates made here take effect immediately.
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Tab: Social & Links */}
+        {activeTab === "social" && (
+          <div className="space-y-6 max-w-3xl">
+            <UserSocialLinksForm
+              initialSocialLinks={userData.socialLinks as any}
+              initialCustomLinks={userData.customLinks as any}
+              githubUsername={userData.githubUsername}
+              profileComplete={userData.profileComplete}
+            />
           </div>
         )}
 

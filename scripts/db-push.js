@@ -43,7 +43,21 @@ function pushToDatabase(name, envVars) {
   console.log(`\n========================================`);
   console.log(`[db-push] Syncing ${name.toUpperCase()} database...`);
   console.log(`========================================`);
-  console.log(`[✓] ${name.toUpperCase()} database synced successfully.`);
+  try {
+    const isLocal = name.toLowerCase() === 'local';
+    const cmd = isLocal 
+      ? 'npx prisma db push --accept-data-loss' 
+      : 'npx prisma db push';
+
+    execSync(cmd, {
+      cwd: projectRoot,
+      stdio: 'inherit',
+      env: { ...process.env, ...envVars },
+    });
+    console.log(`[✓] ${name.toUpperCase()} database synced successfully.`);
+  } catch (error) {
+    console.error(`[!] Failed to sync ${name.toUpperCase()} database:`, error.message);
+  }
 }
 
 console.log('Project root:', projectRoot);

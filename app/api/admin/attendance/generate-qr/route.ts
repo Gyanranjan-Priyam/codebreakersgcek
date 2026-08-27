@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { randomBytes } from "crypto";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest) {
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== "admin") {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 401 }

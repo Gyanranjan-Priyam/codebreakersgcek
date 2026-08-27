@@ -1,3 +1,5 @@
+/* eslint-disable react/no-unescaped-entities */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState } from "react";
@@ -33,10 +35,12 @@ import {
   Award,
   Target,
   Hash,
+  UserCheck,
 } from "lucide-react";
 import { toggleMemberBan, deleteMember } from "../../actions";
 import { format } from "date-fns";
 import EmailComposeSidebar from "./email-compose-sidebar";
+import { AssignRolesDomainSheet } from "../../_components/assign-roles-domain-sheet";
 
 interface MemberSidebarProps {
   member: {
@@ -46,9 +50,11 @@ interface MemberSidebarProps {
     email: string;
     username: string | null;
     githubUsername: string | null;
+    specializedDomain?: string | null;
     banned: boolean | null;
     createdAt: Date;
     emailVerified: boolean;
+    role?: string | null;
   };
   stats: {
     totalPoints: number;
@@ -68,6 +74,7 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [banReason, setBanReason] = useState("");
   const [isEmailSidebarOpen, setIsEmailSidebarOpen] = useState(false);
+  const [showAssignSheet, setShowAssignSheet] = useState(false);
 
   const handleToggleBan = async () => {
     if (!member.banned && !banReason.trim()) {
@@ -329,6 +336,16 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Assign Roles & Domain */}
+          <Button
+            variant="outline"
+            className="w-full justify-start text-xs font-medium"
+            onClick={() => setShowAssignSheet(true)}
+          >
+            <UserCheck className="mr-2 h-4 w-4 text-primary" />
+            <span>Assign Roles & Domain</span>
+          </Button>
+
           {/* Ban/Unban Member */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -442,6 +459,13 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
           </AlertDialog>
         </CardContent>
       </Card>
+
+      <AssignRolesDomainSheet
+        isOpen={showAssignSheet}
+        onClose={() => setShowAssignSheet(false)}
+        member={member}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

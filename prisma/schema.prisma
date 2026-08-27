@@ -59,6 +59,13 @@ model User {
   // Batch Assignment
   batchId         String?
   batch           Batch?          @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  // Specialized Domain (assigned by admin)
+  specializedDomain String?
+
+  // Social & Custom Links
+  socialLinks     Json?
+  customLinks     Json?
   
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @default(now()) @updatedAt

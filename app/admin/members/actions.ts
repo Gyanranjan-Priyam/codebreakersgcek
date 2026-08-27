@@ -9,6 +9,12 @@ import {
 } from "@/lib/mailer";
 import { env } from "@/lib/env";
 import { z } from "zod";
+import {
+  serializeMemberRoles,
+  parseMemberRoles,
+  isSystemAdminRole,
+  MAX_MEMBER_ROLES,
+} from "@/lib/member-roles";
 
 const CB_USER_ID_PREFIX = "GCEK-CB-";
 
@@ -90,6 +96,8 @@ const createMemberSchema = z.object({
   whatsappNumber: z.string().min(10, "WhatsApp number is required"),
   branch: z.string().min(1, "Branch is required"),
   batchId: z.string().optional().nullable(),
+  specializedDomain: z.string().optional().nullable(),
+  roles: z.array(z.string()).optional().nullable(),
 });
 
 export async function getAllMembers() {
@@ -120,6 +128,7 @@ export async function getAllMembers() {
             code: true,
           },
         },
+        profileImageKey: true,
         mobileNumber: true,
         whatsappNumber: true,
         collegeName: true,
@@ -130,10 +139,9 @@ export async function getAllMembers() {
         banned: true,
         profileComplete: true,
         role: true,
+        specializedDomain: true,
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: "desc" },
     });
 
     return {
@@ -145,6 +153,7 @@ export async function getAllMembers() {
     return {
       status: "error" as const,
       message: "Failed to fetch members",
+      data: [],
     };
   }
 }
@@ -158,6 +167,8 @@ export async function createMember(input: {
   whatsappNumber: string;
   branch: string;
   batchId?: string | null;
+  specializedDomain?: string | null;
+  roles?: string[] | null;
 }) {
   await requireAdmin();
 
@@ -189,6 +200,10 @@ export async function createMember(input: {
       };
     }
 
+    const assignedRoles = data.roles && data.roles.length > 0
+      ? serializeMemberRoles(data.roles)
+      : "Member";
+
     let member;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const cbUserId = await generateCbUserId();
@@ -207,7 +222,8 @@ export async function createMember(input: {
             whatsappNumber: data.whatsappNumber.trim(),
             branch: data.branch,
             batchId: data.batchId || null,
-            role: "member",
+            specializedDomain: data.specializedDomain?.trim() || null,
+            role: assignedRoles,
             emailVerified: false,
             profileComplete: false,
           },
@@ -1124,4 +1140,102 @@ export async function getFormCandidateByResponseId(identifier: string): Promise<
     };
   }
 }
+
+export async function updateMemberBatch(
+  userId: string,
+  batchId: string | null
+) {
+  await requireAdmin();
+
+  try {
+    const cleanBatchId = batchId && batchId !== "none" ? batchId : null;
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        batchId: cleanBatchId,
+        updatedAt: new Date(),
+      },
+      include: {
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    revalidatePath("/admin/members");
+    revalidatePath(`/admin/members/${userId}`);
+    revalidatePath("/member");
+
+    return {
+      status: "success" as const,
+      message: updated.batch
+        ? `Assigned to batch "${updated.batch.name}"`
+        : "Batch assignment cleared",
+      data: updated.batch,
+    };
+  } catch (error) {
+    console.error("Error updating member batch:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update batch assignment",
+    };
+  }
+}
+
+export async function updateMemberRolesAndDomain(
+  userId: string,
+  roles: string[],
+  specializedDomain: string | null
+) {
+  await requireAdmin();
+
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, cbUserId: true },
+    });
+
+    if (!existing) {
+      return {
+        status: "error" as const,
+        message: "Member not found",
+      };
+    }
+
+    const isSystemAdmin = isSystemAdminRole(existing.role);
+    const serializedRoles = serializeMemberRoles(roles, isSystemAdmin);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: serializedRoles,
+        specializedDomain: specializedDomain || null,
+        updatedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/admin/members");
+    revalidatePath(`/admin/members/${userId}`);
+    revalidatePath("/member");
+    if (existing.cbUserId) {
+      revalidatePath(`/member/${existing.cbUserId}`);
+    }
+
+    return {
+      status: "success" as const,
+      message: "Member roles and specialized domains updated successfully.",
+    };
+  } catch (error) {
+    console.error("Error updating member roles and domain:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update member roles and domains.",
+    };
+  }
+}
+
 

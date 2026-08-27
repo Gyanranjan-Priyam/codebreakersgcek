@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { auth } from "@/lib/auth";
@@ -103,6 +104,17 @@ export async function getCurrentUserProfileData() {
         block: true,
         pinCode: true,
         githubUsername: true,
+        profileComplete: true,
+        specializedDomain: true,
+        socialLinks: true,
+        customLinks: true,
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
       },
     });
 
@@ -339,6 +351,76 @@ export async function removeUserProfileImage() {
     return {
       status: "error" as const,
       message: "Failed to remove profile image. Please try again.",
+    };
+  }
+}
+
+export async function updateUserSocialAndCustomLinks(data: {
+  socialLinks?: {
+    linkedin?: string;
+    twitter?: string;
+    instagram?: string;
+    leetcode?: string;
+    codeforces?: string;
+    portfolio?: string;
+  };
+  customLinks?: Array<{
+    id: string;
+    title: string;
+    url: string;
+  }>;
+}) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        status: "error" as const,
+        message: "Authentication required",
+      };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, cbUserId: true },
+    });
+
+    if (!user) {
+      return {
+        status: "error" as const,
+        message: "User not found",
+      };
+    }
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        socialLinks: (data.socialLinks || {}) as any,
+        customLinks: (data.customLinks || []) as any,
+        updatedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/members");
+    revalidatePath("/member");
+    if (user.cbUserId) {
+      revalidatePath(`/member/${user.cbUserId}`);
+    }
+    revalidatePath(`/member/${session.user.id}`);
+
+    return {
+      status: "success" as const,
+      message: "Social and custom links updated successfully",
+    };
+  } catch (error) {
+    console.error("Error updating user social links:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update social links",
     };
   }
 }

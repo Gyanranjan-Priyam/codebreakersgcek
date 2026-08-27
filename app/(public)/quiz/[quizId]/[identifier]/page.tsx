@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/app/data/admin/get-current-user";
 import { prisma } from "@/lib/db";
+import { isSystemAdminRole } from "@/lib/member-roles";
 import QuizProctorInterface from "./_components/quiz-proctor-interface";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
@@ -67,7 +68,7 @@ export default async function QuizProctorPage({
       select: { batchId: true, role: true },
     });
 
-    if (dbUser?.role !== "admin") {
+    if (!isSystemAdminRole(dbUser?.role)) {
       if (!dbUser?.batchId || !quiz.targetBatchIds.includes(dbUser.batchId)) {
         return (
           <div className="min-h-screen flex items-center justify-center p-4">

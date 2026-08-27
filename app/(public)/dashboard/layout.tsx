@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Ensure user is authenticated
@@ -20,7 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   // If user is admin, redirect them to admin dashboard
-  if (session.user.role === "admin") {
+  if (isSystemAdminRole(session.user.role)) {
     return redirect("/admin");
   }
 

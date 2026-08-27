@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export async function blockUserFromQuiz(
   userId: string,
@@ -15,7 +16,7 @@ export async function blockUserFromQuiz(
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== "admin") {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return {
         status: "error" as const,
         message: "Unauthorized access",
@@ -61,7 +62,7 @@ export async function unblockUserFromQuiz(userId: string) {
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== "admin") {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return {
         status: "error" as const,
         message: "Unauthorized access",
@@ -107,7 +108,7 @@ export async function unblockUserFromSpecificQuiz(userId: string, quizId: string
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== "admin") {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return {
         status: "error" as const,
         message: "Unauthorized access",
@@ -165,7 +166,7 @@ export async function getQuizzesWithBlockedMembers() {
       headers: await headers(),
     });
 
-    if (!session?.user || session.user.role !== "admin") {
+    if (!session?.user || !isSystemAdminRole(session.user.role)) {
       return {
         status: "error" as const,
         message: "Unauthorized access",

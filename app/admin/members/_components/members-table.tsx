@@ -61,6 +61,8 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  UserCheck,
+  Target,
 } from "lucide-react";
 import {
   MemberData,
@@ -71,6 +73,8 @@ import {
   assignMemberBatch,
   bulkAssignMembersBatch,
 } from "../actions";
+import { parseMemberRoles, getRoleBadgeClasses } from "@/lib/member-roles";
+import { AssignRolesDomainSheet } from "./assign-roles-domain-sheet";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -107,6 +111,8 @@ export default function MembersTable({ members }: MembersTableProps) {
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [qrMember, setQrMember] = useState<MemberData | null>(null);
+  const [showAssignRolesDomainSheet, setShowAssignRolesDomainSheet] = useState(false);
+  const [rolesDomainMember, setRolesDomainMember] = useState<MemberData | null>(null);
 
   useEffect(() => {
     getActiveBatchesList().then((list) => setBatchesList(list));
@@ -481,11 +487,20 @@ export default function MembersTable({ members }: MembersTableProps) {
                       )}
                     </TableCell>
                     <TableCell>
-                      {member.role === "admin" ? (
-                        <Badge className="bg-purple-600 hover:bg-purple-700 text-white border-none text-[10px]">Admin</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground text-[10px]">Member</Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1 max-w-[160px]">
+                        {parseMemberRoles(member.role).map((role, idx) => {
+                          const { badgeClass } = getRoleBadgeClasses(role);
+                          return (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className={`text-[10px] py-0 px-1.5 font-normal ${badgeClass}`}
+                            >
+                              {role}
+                            </Badge>
+                          );
+                        })}
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs font-mono">{member.email}</TableCell>
                     <TableCell className="text-xs">
@@ -527,6 +542,16 @@ export default function MembersTable({ members }: MembersTableProps) {
                           >
                             <Eye className="mr-2 h-3.5 w-3.5" />
                             View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setRolesDomainMember(member);
+                              setShowAssignRolesDomainSheet(true);
+                            }}
+                          >
+                            <UserCheck className="mr-2 h-3.5 w-3.5 text-primary" />
+                            Assign Roles & Domain
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="cursor-pointer"
@@ -857,6 +882,16 @@ export default function MembersTable({ members }: MembersTableProps) {
           member={qrMember}
         />
       )}
+
+      <AssignRolesDomainSheet
+        isOpen={showAssignRolesDomainSheet}
+        onClose={() => {
+          setShowAssignRolesDomainSheet(false);
+          setRolesDomainMember(null);
+        }}
+        member={rolesDomainMember}
+        onSuccess={() => router.refresh()}
+      />
     </Card>
   );
 }

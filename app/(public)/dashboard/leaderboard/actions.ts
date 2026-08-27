@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export interface LeaderboardEntry {
   userId: string;
@@ -49,7 +50,7 @@ export async function getOverallLeaderboard(targetBatchId?: string | null) {
 
       // If user is a student/member (non-admin) with a batch assigned,
       // STRICTLY lock the leaderboard to their batch only (batch X students only)
-      if (currentUser?.role !== "admin") {
+      if (!isSystemAdminRole(currentUser?.role)) {
         if (currentUser?.batchId) {
           effectiveBatchId = currentUser.batchId;
           studentBatchInfo = currentUser.batch;
@@ -241,7 +242,7 @@ export async function getMonthlyLeaderboard(
 
       // If user is a student/member (non-admin) with a batch assigned,
       // STRICTLY lock the leaderboard to their batch only (batch X students only)
-      if (currentUser?.role !== "admin") {
+      if (!isSystemAdminRole(currentUser?.role)) {
         if (currentUser?.batchId) {
           effectiveBatchId = currentUser.batchId;
           studentBatchInfo = currentUser.batch;

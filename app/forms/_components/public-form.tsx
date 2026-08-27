@@ -386,6 +386,151 @@ const FORM_CSS = `
     margin-top: 4px;
   }
 
+  /* ─── Light Mode Calendar & Dropdown Overrides ─── */
+  .mf-light-popover,
+  [data-slot="popover-content"].mf-light-popover,
+  .mf-light-select,
+  [data-slot="select-content"].mf-light-select {
+    background-color: #FFFFFF !important;
+    background: #FFFFFF !important;
+    color: #1C1B1F !important;
+    border: 1px solid #D2D0CA !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .mf-light-select [data-slot="select-item"] {
+    color: #1C1B1F !important;
+  }
+  .mf-light-select [data-slot="select-item"]:hover,
+  .mf-light-select [data-slot="select-item"]:focus,
+  .mf-light-select [data-slot="select-item"][data-highlighted] {
+    background-color: #F3F2F1 !important;
+    color: #1C1B1F !important;
+  }
+
+  .mf-light-calendar,
+  .mf-light-calendar * {
+    color: #1C1B1F !important;
+  }
+  .mf-light-calendar [data-slot="calendar"] {
+    background-color: #FFFFFF !important;
+    background: #FFFFFF !important;
+  }
+  .mf-light-calendar .rdp-month_caption {
+    color: #1C1B1F !important;
+    font-weight: 600 !important;
+  }
+  .mf-light-calendar .rdp-weekday {
+    color: #605E5C !important;
+  }
+  .mf-light-calendar [data-slot="button"] {
+    color: #1C1B1F !important;
+  }
+  .mf-light-calendar [data-slot="button"]:hover {
+    background-color: #F3F2F1 !important;
+  }
+  .mf-light-calendar [data-selected-single="true"] {
+    background-color: #0078D4 !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+  }
+  .mf-light-calendar [data-slot="button"][data-selected-single="true"] {
+    background-color: #0078D4 !important;
+    color: #FFFFFF !important;
+  }
+  .mf-light-calendar .rdp-dropdowns,
+  .mf-light-calendar [class*="dropdowns"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+  }
+  .mf-light-calendar .rdp-dropdown_root,
+  .mf-light-calendar [class*="dropdown_root"] {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: 1px solid #D2D0CA !important;
+    border-radius: 6px !important;
+    background-color: #FFFFFF !important;
+    padding: 2px 6px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+  }
+  .mf-light-calendar .rdp-dropdown_root:hover,
+  .mf-light-calendar [class*="dropdown_root"]:hover {
+    background-color: #F3F2F1 !important;
+    border-color: #0078D4 !important;
+  }
+  .mf-light-calendar select,
+  .mf-light-calendar .rdp-dropdown,
+  .mf-light-calendar [class*="dropdown"] {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0 !important;
+    cursor: pointer !important;
+    background-color: #FFFFFF !important;
+    color: #1C1B1F !important;
+    font-size: 13px !important;
+    z-index: 10 !important;
+  }
+  .mf-light-calendar select option {
+    background-color: #FFFFFF !important;
+    color: #1C1B1F !important;
+    padding: 4px 8px !important;
+  }
+  .mf-light-calendar .rdp-caption_label,
+  .mf-light-calendar [class*="caption_label"] {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #1C1B1F !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+  }
+  .mf-light-calendar .rdp-nav,
+  .mf-light-calendar [class*="nav"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    position: absolute !important;
+    top: 0px !important;
+    left: 0px !important;
+    right: 0px !important;
+    padding: 0 4px !important;
+    height: 32px !important;
+    pointer-events: none !important;
+    z-index: 10 !important;
+  }
+  .mf-light-calendar .rdp-button_previous,
+  .mf-light-calendar .rdp-button_next,
+  .mf-light-calendar [class*="button_previous"],
+  .mf-light-calendar [class*="button_next"] {
+    pointer-events: auto !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid #D2D0CA !important;
+    border-radius: 6px !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #1C1B1F !important;
+    cursor: pointer !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.15s ease !important;
+    z-index: 20 !important;
+  }
+  .mf-light-calendar .rdp-button_previous:hover,
+  .mf-light-calendar .rdp-button_next:hover,
+  .mf-light-calendar [class*="button_previous"]:hover,
+  .mf-light-calendar [class*="button_next"]:hover {
+    background-color: #F3F2F1 !important;
+    border-color: #0078D4 !important;
+  }
+
   /* ─── Closed State ─── */
   .mf-closed-card {
     background: #FFFFFF;
@@ -1573,16 +1718,16 @@ export default function PublicForm({ form }: PublicFormProps) {
               onValueChange={(val) => updateAnswer(field.id, val)}
             >
               <SelectTrigger
-                className={`w-full h-11 bg-white border-[1.5px] ${fieldError ? "border-[#D13438]" : "border-[#D2D0CA]"} rounded text-sm text-[#1C1B1F] focus:border-[#0078D4]`}
+                className={`w-auto min-w-[220px] h-11 !bg-white border-[1.5px] ${fieldError ? "!border-[#D13438]" : "!border-[#D2D0CA]"} rounded text-sm !text-[#1C1B1F] focus:!border-[#0078D4] focus:!ring-0 shadow-none`}
               >
                 <SelectValue placeholder="Choose an option..." />
               </SelectTrigger>
-              <SelectContent className="rounded border border-[#D2D0CA] shadow-lg">
+              <SelectContent className="mf-light-select rounded-lg border border-[#D2D0CA] !bg-white !text-[#1C1B1F] shadow-xl z-50 p-1">
                 {(field.options || []).map((opt) => (
                   <SelectItem
                     key={opt}
                     value={opt}
-                    className="text-sm py-2 cursor-pointer"
+                    className="text-sm py-2 px-3 cursor-pointer !text-[#1C1B1F] hover:!bg-[#F3F2F1] focus:!bg-[#F3F2F1] focus:!text-[#1C1B1F] rounded-md transition-colors"
                   >
                     {opt}
                   </SelectItem>
@@ -1616,11 +1761,19 @@ export default function PublicForm({ form }: PublicFormProps) {
                 </button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-auto p-0 rounded-lg shadow-lg"
+                className="mf-light-popover w-auto p-0 rounded-xl shadow-xl !bg-white !text-[#1C1B1F] border border-[#D2D0CA] z-50 overflow-hidden"
                 align="start"
               >
                 <Calendar
                   mode="single"
+                  captionLayout="dropdown"
+                  startMonth={new Date(1920, 0)}
+                  endMonth={new Date(new Date().getFullYear() + 20, 11)}
+                  defaultMonth={
+                    answers[field.id]
+                      ? new Date(answers[field.id] as string)
+                      : new Date()
+                  }
                   selected={
                     answers[field.id]
                       ? new Date(answers[field.id] as string)
@@ -1629,6 +1782,24 @@ export default function PublicForm({ form }: PublicFormProps) {
                   onSelect={(day) => {
                     if (day)
                       updateAnswer(field.id, day.toISOString().split("T")[0]);
+                  }}
+                  className="mf-light-calendar !bg-white !text-[#1C1B1F] p-3"
+                  classNames={{
+                    months: "flex flex-col sm:flex-row gap-2 relative",
+                    month_caption: "flex items-center justify-center h-8 w-full text-sm font-semibold !text-[#1C1B1F] px-10 mb-1",
+                    dropdowns: "flex items-center justify-center gap-1.5",
+                    dropdown_root: "relative inline-flex items-center border border-[#D2D0CA] rounded-md bg-white px-2 py-1 cursor-pointer hover:border-[#0078D4] hover:bg-[#F3F2F1]",
+                    dropdown: "absolute inset-0 opacity-0 cursor-pointer w-full h-full bg-white text-[#1C1B1F] z-10",
+                    caption_label: "text-xs font-semibold !text-[#1C1B1F] flex items-center gap-1",
+                    nav: "flex items-center justify-between w-full absolute top-0 inset-x-0 px-1 h-8 pointer-events-none z-10",
+                    button_previous: "!bg-white hover:!bg-[#F3F2F1] !text-[#1C1B1F] border border-[#D2D0CA] rounded-lg h-7 w-7 p-0 flex items-center justify-center shrink-0 pointer-events-auto shadow-xs transition-colors",
+                    button_next: "!bg-white hover:!bg-[#F3F2F1] !text-[#1C1B1F] border border-[#D2D0CA] rounded-lg h-7 w-7 p-0 flex items-center justify-center shrink-0 pointer-events-auto shadow-xs transition-colors",
+                    weekdays: "flex border-b border-[#F3F2F1] pb-1",
+                    weekday: "!text-[#605E5C] text-xs font-medium w-9 text-center",
+                    day: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                    today: "!bg-[#F3F2F1] !text-[#0078D4] font-bold rounded-lg",
+                    outside: "!text-[#A19F9D] opacity-40",
+                    disabled: "!text-[#C8C6C4] opacity-30",
                   }}
                   initialFocus
                 />

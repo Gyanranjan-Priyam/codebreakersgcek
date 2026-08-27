@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { prisma } from "@/lib/db";
@@ -6,14 +7,14 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_ROADMAPS } from "@/lib/roadmaps/data/default-tracks";
 import { parseMermaidToRoadmap } from "@/lib/roadmaps/mermaid-parser";
-import type { RoadmapData } from "@/lib/roadmaps/types";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
-  if (!session?.user || (session.user as any).role !== "admin") {
+  if (!session?.user || !isSystemAdminRole((session.user as any).role)) {
     throw new Error("Unauthorized: Admin privileges required");
   }
 

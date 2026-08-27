@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 interface User {
   id: string;
@@ -31,7 +32,7 @@ export function useIsAdmin() {
       });
   }, []);
   
-  const isAdmin = session?.user?.role === 'admin';
+  const isAdmin = isSystemAdminRole(session?.user?.role);
   
   return {
     isAdmin,

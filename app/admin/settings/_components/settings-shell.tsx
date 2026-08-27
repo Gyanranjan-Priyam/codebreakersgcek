@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -7,6 +8,7 @@ import { LinkedAccountsSection } from "./linked-accounts-section";
 import { RegistrationToggle } from "./registration-toggle";
 import { GitHubOrgSettings } from "./github-org-settings";
 import { DataCleanup } from "./data-cleanup";
+import { UserSocialLinksForm } from "@/app/(public)/dashboard/settings/_components/user-social-links-form";
 import { Separator } from "@/components/ui/separator";
 
 import {
@@ -19,10 +21,11 @@ import {
   Mail,
   MessageSquare,
   Phone,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Tab = "profile" | "security" | "notifications" | "system";
+type Tab = "profile" | "social" | "security" | "notifications" | "system";
 
 interface SettingsShellProps {
   userProfile: {
@@ -53,6 +56,9 @@ interface SettingsShellProps {
     pinCode?: string | null;
     state?: string | null;
     district?: string | null;
+    profileComplete?: boolean;
+    socialLinks?: any;
+    customLinks?: any;
   };
   isRegistrationEnabled: boolean;
   githubOrgName: string;
@@ -60,6 +66,7 @@ interface SettingsShellProps {
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
+  { id: "social", label: "Social & Links", icon: Globe },
   { id: "security", label: "Account Security", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "system", label: "System Settings", icon: Settings2 },
@@ -130,6 +137,18 @@ export function SettingsShell({
             <div className="space-y-6">
               <ProfileForm initialData={userProfile} />
             </div>
+          </div>
+        )}
+
+        {/* Tab: Social & Links */}
+        {activeTab === "social" && (
+          <div className="space-y-6 max-w-3xl">
+            <UserSocialLinksForm
+              initialSocialLinks={userProfile.socialLinks}
+              initialCustomLinks={userProfile.customLinks}
+              githubUsername={userProfile.githubUsername}
+              profileComplete={userProfile.profileComplete ?? true}
+            />
           </div>
         )}
 

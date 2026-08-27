@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export function extractStudentIdentifier(qrContent: string): string {
   if (!qrContent) return "";
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
       headers: await headers(),
     });
 
-    if (!authSession?.user || authSession.user.role !== "admin") {
+    if (!authSession?.user || !isSystemAdminRole(authSession.user.role)) {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 401 }

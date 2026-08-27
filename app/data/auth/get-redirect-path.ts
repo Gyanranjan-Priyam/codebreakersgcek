@@ -2,6 +2,7 @@ import "server-only";
 
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 export async function getRedirectPath() {
     const session = await auth.api.getSession({
@@ -13,7 +14,7 @@ export async function getRedirectPath() {
     }
 
     // If user is admin, redirect to admin dashboard
-    if (session.user.role === "admin") {
+    if (isSystemAdminRole(session.user.role)) {
         return "/admin";
     }
 

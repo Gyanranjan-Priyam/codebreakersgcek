@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/static-components */
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,13 +11,22 @@ import {
   Phone, 
   MapPin, 
   School, 
-  Hash,
-  User,
-  AlertCircle,
-  BookOpen,
-  Home,
+  Hash, 
+  User, 
+  AlertCircle, 
+  BookOpen, 
+  Home, 
   IdCard,
+  Target,
+  Layers,
 } from "lucide-react";
+import { parseMemberRoles, getRoleBadgeClasses } from "@/lib/member-roles";
+import { parseSpecializedDomains, getDomainBadgeClasses } from "@/lib/specialized-domains";
+import GitHubContributionCalendar from "@/components/member/github-contribution-calendar";
+import MemberSocialLinksCard, {
+  SocialLinksData,
+  CustomLinkItem,
+} from "@/components/member/member-social-links-card";
 
 interface MemberDetailsProps {
   member: {
@@ -44,8 +55,18 @@ interface MemberDetailsProps {
     block: string | null;
     pinCode: string | null;
     aadhaarNumber: string | null;
+    githubUsername?: string | null;
+    specializedDomain?: string | null;
+    socialLinks?: any;
+    customLinks?: any;
+    batch?: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
     banned: boolean | null;
     banReason: string | null;
+    role?: string | null;
   };
 }
 
@@ -57,7 +78,7 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
   }: { 
     icon: any; 
     label: string; 
-    value: string | null | undefined;
+    value: string | null | undefined; 
   }) => (
     <div className="flex items-start gap-3">
       <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -82,13 +103,14 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
 
   // Get profile image URL
   const getImageUrl = (imageKey: string) => {
-    // Use the correct S3 URL format - codebreakers.t3.storage.dev
     return `https://codebreakers.t3.storage.dev/${imageKey}`;
   };
 
   const profileImageUrl = member.profileImageKey 
     ? getImageUrl(member.profileImageKey)
     : null;
+
+  const domains = parseSpecializedDomains(member.specializedDomain);
 
   return (
     <div className="space-y-6">
@@ -104,21 +126,32 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
                 {getInitials(member.name)}
               </AvatarFallback>
             </Avatar>
-            <div className="text-center space-y-1">
+            <div className="text-center space-y-1 max-w-lg">
               <h2 className="text-2xl font-bold">{member.name}</h2>
               {member.username && (
                 <p className="text-sm text-muted-foreground">@{member.username}</p>
               )}
-              {member.cbUserId && (
-                <Badge variant="secondary" className="mt-2 mr-2">
-                  {member.cbUserId}
-                </Badge>
-              )}
-              {member.registration && (
-                <Badge variant="outline" className="mt-2">
-                  {member.registration}
-                </Badge>
-              )}
+
+              {/* Top-to-bottom: 1. ID, 2. Role, 3. Role (if any) */}
+              <div className="flex flex-col items-center justify-center gap-1.5 pt-2">
+                {member.cbUserId && (
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {member.cbUserId}
+                  </Badge>
+                )}
+                {parseMemberRoles(member.role).map((role, idx) => {
+                  const { badgeClass } = getRoleBadgeClasses(role);
+                  return (
+                    <Badge
+                      key={idx}
+                      variant="outline"
+                      className={`text-xs font-normal ${badgeClass}`}
+                    >
+                      {role}
+                    </Badge>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -157,6 +190,22 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
         </CardContent>
       </Card>
 
+      {/* Social Media & Custom Links (Placed Below Contact Info) */}
+      <MemberSocialLinksCard
+        socialLinks={member.socialLinks as SocialLinksData}
+        customLinks={member.customLinks as CustomLinkItem[]}
+        githubUsername={member.githubUsername}
+        memberName={member.name}
+        username={member.username}
+      />
+
+      {/* GitHub Live Contribution Graph */}
+      {member.githubUsername && (
+        <GitHubContributionCalendar
+          username={member.githubUsername}
+        />
+      )}
+
       {/* Academic Information */}
       <Card>
         <CardHeader>
@@ -164,7 +213,7 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
             <BookOpen className="h-5 w-5" />
             Academic Information
           </CardTitle>
-          <CardDescription>Educational and registration details</CardDescription>
+          <CardDescription>Educational, batch, and domain details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -172,6 +221,20 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
             <InfoItem icon={Hash} label="Roll Number" value={member.rollNumber} />
             <InfoItem icon={School} label="Branch/Department" value={member.branch} />
             <InfoItem icon={School} label="Admission Year" value={member.admissionYear} />
+            {member.batch && (
+              <InfoItem
+                icon={Layers}
+                label="Assigned Batch"
+                value={`${member.batch.name} (${member.batch.code})`}
+              />
+            )}
+            {domains.length > 0 && (
+              <InfoItem
+                icon={Target}
+                label={domains.length > 1 ? "Specialized Domains" : "Specialized Domain"}
+                value={domains.join(", ")}
+              />
+            )}
           </div>
           <Separator />
           <div className="space-y-4">
