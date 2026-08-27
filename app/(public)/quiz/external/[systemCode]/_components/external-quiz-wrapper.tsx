@@ -82,18 +82,22 @@ export default function ExternalQuizWrapper({
     }
   }, [isAttempting, liveIsBlocked, isCompleted]);
 
-  // Socket.IO real-time unblock listener + fast polling when blocked
+  // Socket.IO real-time unblock listener + fast polling when blocked / shift completed
   useEffect(() => {
     if (!systemCode) return;
 
-    let leaveRoomFn: (() => void) | null = null;
+    const leaveRoomFns: Array<() => void> = [];
     let handleUnblocked: (() => void) | null = null;
     let handleStatusChanged: ((data: { status?: string; shiftCompleted?: number; nextActiveShift?: number }) => void) | null = null;
-    let handleShiftCompleted: ((data: { shiftCompleted?: number; nextActiveShift?: number }) => void) | null = null;
+    let handleShiftCompleted: ((data?: { shiftCompleted?: number; nextActiveShift?: number }) => void) | null = null;
+    let handleShiftChanged: ((data?: any) => void) | null = null;
     let handleConnect: (() => void) | null = null;
 
     const cleanupAndRedirect = () => {
       try {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
         localStorage.removeItem(`cb_answers_${systemCode}`);
         localStorage.removeItem(`cb_qidx_${systemCode}`);
       } catch (e) {}
@@ -103,12 +107,14 @@ export default function ExternalQuizWrapper({
     initSocket().then((socket) => {
       if (!socket) return;
 
-      leaveRoomFn = joinRoom(`system-${systemCode}`);
+      leaveRoomFns.push(joinRoom(`system-${systemCode}`));
+      if (quiz.id) leaveRoomFns.push(joinRoom(`quiz-${quiz.id}`));
+      if (quiz.quizId) leaveRoomFns.push(joinRoom(`quiz-${quiz.quizId}`));
 
       handleConnect = async () => {
         const res = await getSystemState(systemCode);
         if (res.status === "success" && res.data) {
-          if (res.data.status === "REGISTERED") {
+          if (res.data.status === "REGISTERED" || res.data.status === "ASSIGNED") {
             cleanupAndRedirect();
           } else if (res.data.status === "BLOCKED") {
             setLiveIsBlocked(true);
@@ -124,7 +130,9 @@ export default function ExternalQuizWrapper({
       };
 
       handleStatusChanged = (data) => {
-        if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
+        if (data?.status === "REGISTERED" || data?.status === "ASSIGNED" || data?.shiftCompleted) {
+          cleanupAndRedirect();
+        } else if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
           setLiveIsBlocked(false);
         } else if (data?.status === "BLOCKED") {
           setLiveIsBlocked(true);
@@ -132,20 +140,28 @@ export default function ExternalQuizWrapper({
       };
 
       handleShiftCompleted = (data) => {
-        toast.info(`Shift ${data?.shiftCompleted || ""} completed. Auto-submitting answers...`);
+        toast.info(`Shift ${data?.shiftCompleted || ""} completed. Resetting for next shift...`);
+        cleanupAndRedirect();
+      };
+
+      handleShiftChanged = () => {
+        cleanupAndRedirect();
       };
 
       socket.on("connect", handleConnect);
       socket.on("unblocked", handleUnblocked);
       socket.on("status-changed", handleStatusChanged);
       socket.on("shift-completed", handleShiftCompleted);
+      socket.on("shift-changed", handleShiftChanged);
     });
 
     // Active 2s polling heartbeat to guarantee instant unblock and shift end detection in production
     const pollTimer = setInterval(async () => {
       const res = await getSystemState(systemCode);
       if (res.status === "success" && res.data) {
-        if (res.data.status === "ATTEMPTING" || res.data.status === "IN_PROGRESS") {
+        if (res.data.status === "REGISTERED" || res.data.status === "ASSIGNED") {
+          cleanupAndRedirect();
+        } else if (res.data.status === "ATTEMPTING" || res.data.status === "IN_PROGRESS") {
           setLiveIsBlocked(false);
         } else if (res.data.status === "BLOCKED") {
           setLiveIsBlocked(true);
@@ -154,17 +170,18 @@ export default function ExternalQuizWrapper({
     }, 2000);
 
     return () => {
-      if (leaveRoomFn) leaveRoomFn();
+      leaveRoomFns.forEach((fn) => fn());
       const socket = getSocket();
       if (socket) {
         if (handleConnect) socket.off("connect", handleConnect);
         if (handleUnblocked) socket.off("unblocked", handleUnblocked);
         if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
         if (handleShiftCompleted) socket.off("shift-completed", handleShiftCompleted);
+        if (handleShiftChanged) socket.off("shift-changed", handleShiftChanged);
       }
       clearInterval(pollTimer);
     };
-  }, [systemCode, liveIsBlocked]);
+  }, [systemCode, quiz.id, quiz.quizId, liveIsBlocked]);
 
   // If candidate is blocked — show blocked error screen
   if (liveIsBlocked) {

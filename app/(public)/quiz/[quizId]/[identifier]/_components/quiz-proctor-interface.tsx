@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, Phone, IdCard, Building2, BookOpen, Award, Timer, CheckCircle2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { submitQuizAttempt } from "../actions";
 import { blockUserFromQuizAction } from "../block-actions";
 import { setSystemAttemptingAction, getSystemState } from "@/app/admin/quizzes/actions";
@@ -54,7 +64,7 @@ interface Question {
 interface QuizProctorInterfaceProps {
   quiz: Quiz;
   user: User;
-  hasExistingAttempt: boolean;
+  hasExistingAttempt?: boolean;
   assignedSet: string;
   /** Optional custom submit handler — when provided, internal submitQuizAttempt is NOT called */
   onSubmit?: (data: {
@@ -70,7 +80,7 @@ interface QuizProctorInterfaceProps {
   /** Optional systemCode for external kiosk candidate sessions */
   systemCode?: string;
   /** Optional initial step for active or unblocked attempts */
-  initialStep?: 'user-info' | 'quiz-details' | 'quiz-started' | 'quiz-submitted';
+  initialStep?: QuizStep;
 }
 
 type QuizStep = 'user-info' | 'quiz-details' | 'quiz-started' | 'quiz-submitted';
@@ -102,6 +112,7 @@ export default function QuizProctorInterface({
   const answersRef = useRef<Record<number, number>>({});
   const handleSubmitRef = useRef<((isAutoSubmit?: boolean, customAnswers?: Record<number, number>) => Promise<void>) | null>(null);
   const [showTimeOverModal, setShowTimeOverModal] = useState(false);
+  const [showSubmitConfirmDialog, setShowSubmitConfirmDialog] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   // Keep answersRef in sync with answers state at all times
@@ -139,7 +150,7 @@ export default function QuizProctorInterface({
 
   // Active shift sync heartbeat during exam attempt to guarantee instant shift end in production
   useEffect(() => {
-    if (!systemCode || currentStep !== 'quiz-started') return;
+    if (!systemCode) return;
 
     const currentShift = quiz.shift || 1;
     const interval = setInterval(async () => {
@@ -150,11 +161,24 @@ export default function QuizProctorInterface({
           const assignedShift = sys.assignedShift || 1;
           const activeShift = sys.quiz?.activeShift || 1;
           
-          // If shift completed, status changed to REGISTERED, or shift moved to next shift
-          if (sys.status === "REGISTERED" || sys.status === "COMPLETED" || assignedShift > currentShift || activeShift > currentShift) {
-            toast.info("Shift time has completed. Automatically submitting your attempted questions...");
-            if (handleSubmitRef.current) {
-              handleSubmitRef.current(true);
+          // If shift completed, status changed to REGISTERED / ASSIGNED, or shift moved to next shift
+          if (sys.status === "REGISTERED" || sys.status === "ASSIGNED" || assignedShift > currentShift || activeShift > currentShift) {
+            if (currentStep === 'quiz-submitted') {
+              try {
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+                localStorage.removeItem(`cb_answers_${systemCode}`);
+                localStorage.removeItem(`cb_qidx_${systemCode}`);
+              } catch (e) {}
+              window.location.replace("/quiz/system-register");
+            } else if (currentStep === 'quiz-started') {
+              toast.info("Shift time has completed. Automatically submitting your attempted questions...");
+              if (handleSubmitRef.current) {
+                handleSubmitRef.current(true);
+              }
+            } else {
+              window.location.replace("/quiz/system-register");
             }
           }
         }
@@ -168,7 +192,7 @@ export default function QuizProctorInterface({
 
   // Real-time Socket.IO unblock & shift completed listener inside QuizProctorInterface
   useEffect(() => {
-    let roomsToLeave: Array<() => void> = [];
+    const roomsToLeave: Array<() => void> = [];
     let handleUnblock: (() => void) | null = null;
     let handleStatusChanged: ((data: { status?: string; shiftCompleted?: number }) => void) | null = null;
     let handleShiftCompleted: ((data?: any) => void) | null = null;
@@ -198,7 +222,18 @@ export default function QuizProctorInterface({
           handleUnblock!();
         } else if (data?.status === "BLOCKED") {
           setIsBlocked(true);
-        } else if (data?.status === "REGISTERED" || data?.shiftCompleted) {
+        } else if (data?.status === "REGISTERED" || data?.status === "ASSIGNED" || data?.shiftCompleted) {
+          if (systemCode) {
+            try {
+              if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+              }
+              localStorage.removeItem(`cb_answers_${systemCode}`);
+              localStorage.removeItem(`cb_qidx_${systemCode}`);
+            } catch (e) {}
+            window.location.replace("/quiz/system-register");
+            return;
+          }
           toast.info("Shift has completed. Auto-submitting your attempted questions...");
           if (handleSubmitRef.current) {
             handleSubmitRef.current(true);
@@ -207,6 +242,17 @@ export default function QuizProctorInterface({
       };
 
       handleShiftCompleted = () => {
+        if (systemCode) {
+          try {
+            if (document.fullscreenElement) {
+              document.exitFullscreen().catch(() => {});
+            }
+            localStorage.removeItem(`cb_answers_${systemCode}`);
+            localStorage.removeItem(`cb_qidx_${systemCode}`);
+          } catch (e) {}
+          window.location.replace("/quiz/system-register");
+          return;
+        }
         toast.info("Shift has completed. Auto-submitting your attempted questions...");
         if (handleSubmitRef.current) {
           handleSubmitRef.current(true);
@@ -378,23 +424,16 @@ export default function QuizProctorInterface({
     });
   };
 
+  const handleInitiateSubmit = () => {
+    setShowSubmitConfirmDialog(true);
+  };
+
   const handleSubmitQuiz = async (isAutoSubmit = false, customAnswers?: Record<number, number>) => {
     if (isSubmitting) return;
 
     // Use customAnswers or answersRef or answers state
     const currentAnswersToSubmit = customAnswers || answersRef.current || answers;
 
-    // If manual submit and questions are unanswered, ask confirmation
-    if (!isAutoSubmit) {
-      const answeredCount = Object.keys(currentAnswersToSubmit).length;
-      if (answeredCount < questions.length) {
-        const confirmPartial = window.confirm(
-          `You have answered ${answeredCount} of ${questions.length} questions. Do you want to submit your quiz now?`
-        );
-        if (!confirmPartial) return;
-      }
-    }
-    
     setIsSubmitting(true);
     
     try {
@@ -444,7 +483,7 @@ export default function QuizProctorInterface({
           }
           setCurrentStep('quiz-submitted');
         } else {
-          alert(result.message || "Failed to submit quiz. Please try again.");
+          toast.error(result.message || "Failed to submit quiz. Please try again.");
         }
       }
     } catch (error) {
@@ -452,7 +491,7 @@ export default function QuizProctorInterface({
       if (isAutoSubmit) {
         setCurrentStep('quiz-submitted');
       } else {
-        alert("An error occurred while submitting the quiz. Please try again.");
+        toast.error("An error occurred while submitting the quiz. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -1505,7 +1544,7 @@ export default function QuizProctorInterface({
 
                     {currentQuestionIndex === questions.length - 1 ? (
                       <Button
-                        onClick={() => handleSubmitQuiz(false)}
+                        onClick={handleInitiateSubmit}
                         disabled={isSubmitting}
                         size="lg"
                         className="bg-green-600 hover:bg-green-700 cursor-pointer"
@@ -1577,7 +1616,7 @@ export default function QuizProctorInterface({
 
                   <div className="mt-4 pt-4 border-t">
                     <Button
-                      onClick={() => handleSubmitQuiz(false)}
+                      onClick={handleInitiateSubmit}
                       disabled={isSubmitting}
                       className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
                       size="sm"
@@ -1596,6 +1635,69 @@ export default function QuizProctorInterface({
           </div>
         )}
       </div>
+
+      {/* Submit Confirmation Modal (Shadcn AlertDialog) */}
+      <AlertDialog open={showSubmitConfirmDialog} onOpenChange={setShowSubmitConfirmDialog}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 text-primary font-semibold">
+              <BookOpen className="h-5 w-5" />
+              <span>Confirm Quiz Submission</span>
+            </div>
+            <AlertDialogTitle className="text-lg">
+              {Object.keys(answers).length < questions.length
+                ? "Unanswered Questions Remaining"
+                : "Ready to Submit Your Quiz?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2 text-sm text-foreground/80">
+                <div className="grid grid-cols-2 gap-2 p-3 bg-muted rounded-lg text-center font-medium">
+                  <div className="p-2 bg-background rounded-md">
+                    <span className="text-xs text-muted-foreground block">Answered</span>
+                    <span className="text-lg font-bold text-green-600">
+                      {Object.keys(answers).length}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-background rounded-md">
+                    <span className="text-xs text-muted-foreground block">Unanswered</span>
+                    <span className={`text-lg font-bold ${questions.length - Object.keys(answers).length > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
+                      {Math.max(0, questions.length - Object.keys(answers).length)}
+                    </span>
+                  </div>
+                </div>
+
+                {Object.keys(answers).length < questions.length ? (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                      You have attempted <strong>{Object.keys(answers).length}</strong> out of <strong>{questions.length}</strong> questions. Are you sure you want to submit now?
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    You have answered all {questions.length} questions. You cannot modify your answers once submitted.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel disabled={isSubmitting} className="cursor-pointer">
+              Continue Quiz
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowSubmitConfirmDialog(false);
+                handleSubmitQuiz(false);
+              }}
+              disabled={isSubmitting}
+              className="bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+            >
+              {isSubmitting ? "Submitting..." : "Yes, Submit Quiz"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

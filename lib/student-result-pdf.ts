@@ -285,7 +285,9 @@ export async function generateStudentScorecardPDF(
   pdf.setFontSize(14);
   setTextColor(BLACK);
   const titleLines = wrapText(data.quizTitle || "Examination Assessment", CONTENT_WIDTH, 14, "bold");
-  pdf.text(titleLines, LEFT, y);
+  titleLines.forEach((tLine, lIdx) => {
+    pdf.text(tLine, LEFT, y + lIdx * 5.8);
+  });
   y += titleLines.length * 5.8;
 
   pdf.setFont("helvetica", "normal");
@@ -492,7 +494,9 @@ export async function generateStudentScorecardPDF(
   setTextColor(GRAY);
   const authNote = "This document is an electronically generated scorecard issued by the CodeBreakers Examination Proctor System. Authenticity and metrics can be verified in the examination portal archive.";
   const authLines = wrapText(authNote, CONTENT_WIDTH - 8, 6.5);
-  pdf.text(authLines, LEFT + 4, y + 9.5, { lineHeightFactor: 1.3 });
+  authLines.forEach((aLine, lIdx) => {
+    pdf.text(aLine, LEFT + 4, y + 9.5 + lIdx * 3.2);
+  });
 
   // =========================================================
   // PAGE 2 ONWARDS: QUESTION-BY-QUESTION REVIEW
@@ -521,7 +525,7 @@ export async function generateStudentScorecardPDF(
       const questionText = normalizeText(question.questionText);
       const questionWidth = CONTENT_WIDTH - 28;
 
-      const questionLines = wrapText(questionText, questionWidth, 9.5, "bold");
+      const questionLines = wrapText(questionText, questionWidth, 9, "bold");
 
       const attempted = question.userAnswerIndex !== -1;
       const status = !attempted ? "UNATTEMPTED" : question.isCorrect ? "CORRECT" : "INCORRECT";
@@ -542,30 +546,29 @@ export async function generateStudentScorecardPDF(
         }
 
         const text = `${letter}.  ${normalizeText(option)}${marker}`;
-        const style = isUser || isCorrectOpt ? "bold" : "normal";
+        const style = (isUser || isCorrectOpt ? "bold" : "normal") as "normal" | "bold";
 
         let color: readonly [number, number, number] = MID;
         if (isUser && isCorrectOpt) color = GREEN;
         else if (isUser && !isCorrectOpt) color = RED;
         else if (isCorrectOpt) color = GREEN;
 
-        return { text, style: style as "normal" | "bold", color };
+        const lines = wrapText(text, CONTENT_WIDTH - 16, 8, style);
+        return { text, lines, style, color };
       });
 
       // Calculate required height for this question card
-      let questionHeight = 10;
-      questionHeight += questionLines.length * 4.4;
-      questionHeight += 2;
-
-      options.forEach((option) => {
-        const lines = wrapText(option.text, CONTENT_WIDTH - 16, 8, option.style);
-        questionHeight += lines.length * 3.8;
-        questionHeight += 1.5;
+      const promptLineHeight = 4.4;
+      const optionLineHeight = 3.8;
+      const promptHeight = questionLines.length * promptLineHeight;
+      let optionsTotalHeight = 0;
+      options.forEach((opt) => {
+        optionsTotalHeight += opt.lines.length * optionLineHeight + 1.5;
       });
 
-      questionHeight += 8;
+      const questionCardHeight = 6 + promptHeight + 2 + optionsTotalHeight + 3;
 
-      if (y + questionHeight > CONTENT_BOTTOM) {
+      if (y + questionCardHeight > CONTENT_BOTTOM) {
         newPage();
       }
 
@@ -574,10 +577,10 @@ export async function generateStudentScorecardPDF(
       const cardBorder = !attempted ? LIGHT_GRAY : question.isCorrect ? GREEN_BORDER : RED_BORDER;
 
       pdf.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
-      pdf.rect(LEFT, y, CONTENT_WIDTH, questionHeight - 2, "F");
+      pdf.rect(LEFT, y, CONTENT_WIDTH, questionCardHeight, "F");
       setDrawColor(cardBorder);
       pdf.setLineWidth(0.25);
-      pdf.rect(LEFT, y, CONTENT_WIDTH, questionHeight - 2, "S");
+      pdf.rect(LEFT, y, CONTENT_WIDTH, questionCardHeight, "S");
 
       // Question Number Tag
       pdf.setFont("helvetica", "bold");
@@ -591,25 +594,28 @@ export async function generateStudentScorecardPDF(
       setTextColor(statusColor);
       pdf.text(status, PAGE_WIDTH - RIGHT - 4, y + 5, { align: "right" });
 
-      // Question Prompt
+      // Question Prompt (Render line by line with explicit spacing)
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(9);
       setTextColor(BLACK);
-      pdf.text(questionLines, LEFT + 12, y + 5, { lineHeightFactor: 4.4 / 9 });
+      questionLines.forEach((lineText, lIdx) => {
+        pdf.text(lineText, LEFT + 12, y + 5 + lIdx * promptLineHeight);
+      });
 
-      let optionY = y + 5 + questionLines.length * 4.4 + 2;
+      let currentOptionY = y + 5 + promptHeight + 2;
 
-      // Options List
+      // Options List (Render line by line with explicit spacing)
       options.forEach((option) => {
-        const lines = wrapText(option.text, CONTENT_WIDTH - 16, 8, option.style);
         pdf.setFont("helvetica", option.style);
         pdf.setFontSize(8);
         setTextColor(option.color);
-        pdf.text(lines, LEFT + 12, optionY, { lineHeightFactor: 3.8 / 8 });
-        optionY += lines.length * 3.8 + 1.5;
+        option.lines.forEach((lineText, lIdx) => {
+          pdf.text(lineText, LEFT + 12, currentOptionY + lIdx * optionLineHeight);
+        });
+        currentOptionY += option.lines.length * optionLineHeight + 1.5;
       });
 
-      y += questionHeight + 2;
+      y += questionCardHeight + 3;
     });
   }
 

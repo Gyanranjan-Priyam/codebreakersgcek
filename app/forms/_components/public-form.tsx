@@ -110,10 +110,38 @@ const FORM_CSS = `
   .mf-description {
     font-family: 'Inter', sans-serif;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 400;
     color: #333;
     line-height: 1.6;
     margin: 0 0 16px;
+  }
+  .mf-description p {
+    margin: 0 0 12px;
+    line-height: 1.6;
+  }
+  .mf-description p:last-child {
+    margin-bottom: 0;
+  }
+  .mf-description strong, .mf-description b {
+    font-weight: 700;
+    color: #111;
+  }
+  .mf-description em, .mf-description i {
+    font-style: italic;
+  }
+  .mf-description ul {
+    list-style-type: disc;
+    padding-left: 22px;
+    margin: 8px 0 12px;
+  }
+  .mf-description ol {
+    list-style-type: decimal;
+    padding-left: 22px;
+    margin: 8px 0 12px;
+  }
+  .mf-description li {
+    margin: 4px 0;
+    line-height: 1.5;
   }
   .mf-disclaimer {
     font-family: 'Inter', sans-serif;
@@ -158,9 +186,37 @@ const FORM_CSS = `
   .mf-question-desc {
     font-family: 'Inter', sans-serif;
     font-size: 13px;
+    font-weight: 400;
     color: #666;
     margin: -6px 0 12px;
     line-height: 1.5;
+  }
+  .mf-question-desc p {
+    margin: 0 0 6px;
+    line-height: 1.5;
+  }
+  .mf-question-desc p:last-child {
+    margin-bottom: 0;
+  }
+  .mf-question-desc strong, .mf-question-desc b {
+    font-weight: 700;
+    color: #333;
+  }
+  .mf-question-desc em, .mf-question-desc i {
+    font-style: italic;
+  }
+  .mf-question-desc ul {
+    list-style-type: disc;
+    padding-left: 20px;
+    margin: 4px 0 8px;
+  }
+  .mf-question-desc ol {
+    list-style-type: decimal;
+    padding-left: 20px;
+    margin: 4px 0 8px;
+  }
+  .mf-question-desc li {
+    margin: 2px 0;
   }
 
   /* ─── Inputs ─── */
@@ -547,21 +603,9 @@ function renderRichText(value: string | null | undefined, className?: string) {
   try {
     const json = JSON.parse(value);
     if (json && typeof json === "object" && (json.type || json.content)) {
-      if (!hasListNodes(json)) {
-        const text = extractPlainTextFromJson(json);
-        if (text) {
-          const formattedHtml = autoFormatDescriptionText(text);
-          return (
-            <div className={`mf-rich-text tiptap-content ${className || ""}`}>
-              {parse(formattedHtml)}
-            </div>
-          );
-        }
-      }
-
       const html = generateHTML(json, tiptapExtensions);
       return (
-        <div className={`mf-rich-text tiptap-content ${className || ""}`}>
+        <div className={`mf-rich-text ${className || ""}`}>
           {parse(html)}
         </div>
       );
@@ -571,7 +615,7 @@ function renderRichText(value: string | null | undefined, className?: string) {
   }
   const fallbackHtml = autoFormatDescriptionText(value);
   return (
-    <div className={`mf-rich-text tiptap-content ${className || ""}`}>
+    <div className={`mf-rich-text ${className || ""}`}>
       {parse(fallbackHtml)}
     </div>
   );
@@ -1755,14 +1799,32 @@ export default function PublicForm({ form }: PublicFormProps) {
                   })()}
 
                 {/* ─── Section Fields ─── */}
-                {form.definition.sections.map((section) => (
-                  <div key={section.id}>
-                    {section.fields.map((field) => {
-                      questionNum++;
-                      return renderField(field, questionNum);
-                    })}
-                  </div>
-                ))}
+                {form.definition.sections.map((section, sIdx) => {
+                  const showSectionHeader =
+                    form.definition.sections.length > 1 ||
+                    (section.title && section.title !== "Section 1") ||
+                    !!section.description;
+
+                  return (
+                    <div key={section.id}>
+                      {showSectionHeader && (
+                        <div style={{ marginTop: 24, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #eee" }}>
+                          {section.title && (
+                            <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px", color: "#1C1B1F" }}>
+                              {section.title}
+                            </h2>
+                          )}
+                          {section.description &&
+                            renderRichText(section.description, "mf-description")}
+                        </div>
+                      )}
+                      {section.fields.map((field) => {
+                        questionNum++;
+                        return renderField(field, questionNum);
+                      })}
+                    </div>
+                  );
+                })}
 
                 {/* ─── Submit Button ─── */}
                 <div style={{ paddingTop: 16 }}>

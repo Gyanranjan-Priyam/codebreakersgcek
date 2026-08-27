@@ -42,28 +42,40 @@ export function getQuestionsForShiftAndSet(
   const shiftKey = `shift_${shiftNumber}`;
 
   // 1. Check nested shift object: data.shift_1["A"]
-  if (data[shiftKey] && typeof data[shiftKey] === "object" && !Array.isArray(data[shiftKey])) {
-    if (Array.isArray(data[shiftKey][cleanSet])) {
-      return data[shiftKey][cleanSet];
+  const matchingShiftKey = Object.keys(data).find(
+    (k) => k.toLowerCase() === shiftKey.toLowerCase() || k === String(shiftNumber)
+  );
+  if (matchingShiftKey && typeof data[matchingShiftKey] === "object" && !Array.isArray(data[matchingShiftKey])) {
+    const shiftObj = data[matchingShiftKey];
+    const matchingSetKey = Object.keys(shiftObj).find(
+      (k) => k.toUpperCase() === cleanSet
+    );
+    if (matchingSetKey && Array.isArray(shiftObj[matchingSetKey])) {
+      return shiftObj[matchingSetKey];
     }
     // Fallback to first available set in that shift
-    const firstSet = Object.keys(data[shiftKey])[0];
-    if (firstSet && Array.isArray(data[shiftKey][firstSet])) {
-      return data[shiftKey][firstSet];
+    const firstSet = Object.keys(shiftObj)[0];
+    if (firstSet && Array.isArray(shiftObj[firstSet])) {
+      return shiftObj[firstSet];
     }
   }
 
   // 2. Check flat composite keys: "shift_1_A" or "1_A"
-  if (Array.isArray(data[`shift_${shiftNumber}_${cleanSet}`])) {
-    return data[`shift_${shiftNumber}_${cleanSet}`];
-  }
-  if (Array.isArray(data[`${shiftNumber}_${cleanSet}`])) {
-    return data[`${shiftNumber}_${cleanSet}`];
+  for (const k of Object.keys(data)) {
+    const match = k.match(/^(?:shift_)?(\d+)_([A-Za-z])$/i);
+    if (match) {
+      const sNum = parseInt(match[1], 10);
+      const letter = match[2].toUpperCase();
+      if (sNum === shiftNumber && letter === cleanSet && Array.isArray(data[k])) {
+        return data[k];
+      }
+    }
   }
 
   // 3. Fallback to top-level set key: data["A"]
-  if (Array.isArray(data[cleanSet])) {
-    return data[cleanSet];
+  const matchingTopSet = Object.keys(data).find((k) => k.toUpperCase() === cleanSet);
+  if (matchingTopSet && Array.isArray(data[matchingTopSet])) {
+    return data[matchingTopSet];
   }
 
   // 4. Fallback to default "A" or first array found
@@ -84,27 +96,34 @@ export function getQuestionsForShiftAndSet(
  * Parse questionsJson into a nested shift map: { [shiftNumber]: { [setLetter]: Question[] } }
  */
 export function parseQuestionsByShiftAndSet(
-  questionsJson: string,
+  questionsJson: string | any,
   totalShifts: number = 1,
   totalSets: number = 1
 ): Record<number, Record<string, any[]>> {
   const result: Record<number, Record<string, any[]>> = {};
 
+  const maxShifts = Math.max(totalShifts || 1, 1);
+  const maxSets = Math.max(totalSets || 1, 1);
+
   // Initialize empty shifts
-  for (let s = 1; s <= Math.max(totalShifts, 1); s++) {
+  for (let s = 1; s <= maxShifts; s++) {
     result[s] = {};
-    for (let setIdx = 0; setIdx < Math.max(totalSets, 1); setIdx++) {
+    for (let setIdx = 0; setIdx < maxSets; setIdx++) {
       const letter = String.fromCharCode(65 + setIdx);
       result[s][letter] = [];
     }
   }
 
-  if (!questionsJson || !questionsJson.trim()) {
+  if (!questionsJson) {
     return result;
   }
 
   try {
-    const parsed = JSON.parse(questionsJson);
+    let parsed = questionsJson;
+    if (typeof questionsJson === "string") {
+      if (!questionsJson.trim()) return result;
+      parsed = JSON.parse(questionsJson);
+    }
 
     if (Array.isArray(parsed)) {
       if (!result[1]) result[1] = {};
@@ -113,31 +132,41 @@ export function parseQuestionsByShiftAndSet(
     }
 
     if (typeof parsed === "object" && parsed !== null) {
-      // Check if nested shift_X structure exists
       let hasNestedShifts = false;
+
+      // 1. Nested shift_X structure: { "shift_1": { "A": [...], "B": [...] } }
       Object.keys(parsed).forEach((key) => {
-        const match = key.match(/^shift_(\d+)$/);
-        if (match) {
+        const match = key.match(/^(?:shift_)?(\d+)$/i);
+        if (match && typeof parsed[key] === "object" && parsed[key] !== null && !Array.isArray(parsed[key])) {
           hasNestedShifts = true;
           const sNum = parseInt(match[1], 10);
           if (!result[sNum]) result[sNum] = {};
           const shiftObj = parsed[key];
-          if (typeof shiftObj === "object" && shiftObj !== null) {
-            Object.entries(shiftObj).forEach(([letter, list]) => {
-              if (Array.isArray(list)) {
-                result[sNum][letter.toUpperCase()] = list;
-              }
-            });
-          }
+          Object.entries(shiftObj).forEach(([letter, list]) => {
+            if (Array.isArray(list)) {
+              result[sNum][letter.toUpperCase()] = list;
+            }
+          });
         }
       });
 
+      // 2. Flat composite keys: { "shift_1_A": [...], "1_A": [...] }
+      Object.keys(parsed).forEach((key) => {
+        const match = key.match(/^(?:shift_)?(\d+)_([A-Za-z])$/i);
+        if (match && Array.isArray(parsed[key])) {
+          const sNum = parseInt(match[1], 10);
+          const letter = match[2].toUpperCase();
+          if (!result[sNum]) result[sNum] = {};
+          result[sNum][letter] = parsed[key];
+        }
+      });
+
+      // 3. Top-level set keys: { "A": [...], "B": [...] }
       if (!hasNestedShifts) {
-        // Legacy flat format: { "A": [...], "B": [...] }
         Object.entries(parsed).forEach(([key, list]) => {
-          if (Array.isArray(list) && key.length === 1 && key >= "A" && key <= "Z") {
+          if (Array.isArray(list) && key.length === 1 && key.toUpperCase() >= "A" && key.toUpperCase() <= "Z") {
             if (!result[1]) result[1] = {};
-            result[1][key] = list;
+            result[1][key.toUpperCase()] = list;
           }
         });
       }

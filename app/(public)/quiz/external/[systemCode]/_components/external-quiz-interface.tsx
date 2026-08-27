@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -8,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, IdCard, BookOpen, Award, Timer, CheckCircle2, FileText } from "lucide-react";
 import { submitExternalQuizAttempt } from "@/app/admin/quizzes/actions";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { getQuestionsForShiftAndSet } from "@/app/admin/quizzes/utils";
 
@@ -177,11 +179,11 @@ export default function ExternalQuizInterface({
         });
         setCurrentStep("quiz-submitted");
       } else {
-        alert(res.message || "Failed to submit quiz. Please try again.");
+        toast.error(res.message || "Failed to submit quiz. Please try again.");
       }
     } catch (error) {
       console.error("Error submitting quiz:", error);
-      alert("An error occurred while submitting the quiz. Please try again.");
+      toast.error("An error occurred while submitting the quiz. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

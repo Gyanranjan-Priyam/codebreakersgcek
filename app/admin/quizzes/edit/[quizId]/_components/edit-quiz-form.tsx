@@ -998,8 +998,14 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
 
                 {/* Tab Content for Each Shift */}
                 {shiftsConfig.map((shift) => {
-                  const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
-                  const shiftTotalQ = currentShiftSets.reduce(
+                  const availableLetters = Array.from({ length: watchSets || 1 }, (_, i) => String.fromCharCode(65 + i));
+                  const assignedSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                  const existingQuestionsSets = Object.keys(shiftQuestions[shift.shiftNumber] || {}).filter(
+                    (k) => (shiftQuestions[shift.shiftNumber]?.[k]?.length || 0) > 0
+                  );
+                  const displaySets = Array.from(new Set([...assignedSets, ...existingQuestionsSets])).sort();
+
+                  const shiftTotalQ = displaySets.reduce(
                     (sum, sLetter) => sum + (shiftQuestions[shift.shiftNumber]?.[sLetter]?.length || 0),
                     0
                   );
@@ -1014,16 +1020,19 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                       <div className="flex items-center justify-between p-3.5 rounded-xl border bg-muted/20 flex-wrap gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm">Shift {shift.shiftNumber} Question Sets</span>
-                          <div className="flex items-center gap-1">
-                            {currentShiftSets.map((sLetter) => (
-                              <Badge
-                                key={sLetter}
-                                variant="outline"
-                                className="text-[10px] bg-primary/5 text-primary border-primary/20"
-                              >
-                                Set {sLetter}
-                              </Badge>
-                            ))}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {displaySets.map((sLetter) => {
+                              const qCount = shiftQuestions[shift.shiftNumber]?.[sLetter]?.length || 0;
+                              return (
+                                <Badge
+                                  key={sLetter}
+                                  variant="outline"
+                                  className="text-[10px] bg-primary/5 text-primary border-primary/20"
+                                >
+                                  Set {sLetter} ({qCount} Qs)
+                                </Badge>
+                              );
+                            })}
                           </div>
                           <Badge variant="secondary" className="text-[10px]">
                             {shiftTotalQ} Total Questions
@@ -1045,10 +1054,10 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                       {/* Sets in Accordion */}
                       <Accordion
                         type="multiple"
-                        defaultValue={currentShiftSets.map((s) => `set-${s}`)}
+                        defaultValue={displaySets.map((s) => `set-${s}`)}
                         className="w-full space-y-2.5"
                       >
-                        {currentShiftSets.map((sLetter) => {
+                        {displaySets.map((sLetter) => {
                           const list = shiftQuestions[shift.shiftNumber]?.[sLetter] || [];
                           return (
                             <AccordionItem
@@ -1062,7 +1071,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                                     <span className="font-bold text-xs text-foreground">
                                       Question Set {sLetter}
                                     </span>
-                                    <Badge variant="outline" className="text-[10px]">
+                                    <Badge variant={list.length > 0 ? "default" : "outline"} className="text-[10px]">
                                       {list.length} Question{list.length !== 1 ? "s" : ""}
                                     </Badge>
                                   </div>
@@ -1080,7 +1089,7 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                                   </Button>
                                 </div>
                               </AccordionTrigger>
-                              <AccordionContent className="px-4 pb-4 pt-3 space-y-2.5">
+                              <AccordionContent className="px-4 pb-4 pt-3 space-y-3">
                                 {list.length === 0 ? (
                                   <div className="p-4 text-center border border-dashed rounded-lg bg-muted/20 text-xs text-muted-foreground">
                                     <span>No questions added for Shift {shift.shiftNumber} · Set {sLetter} yet. </span>
@@ -1093,43 +1102,61 @@ export default function EditQuizForm({ quiz, forms = [] }: EditQuizFormProps) {
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="space-y-2.5 max-h-80 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-1">
-                                    {list.map((qItem: any, qIdx: number) => (
-                                      <div key={qIdx} className="p-3 border rounded-lg bg-muted/20 space-y-2 text-xs">
-                                        <p className="font-semibold text-xs text-foreground">
-                                          Q{qIdx + 1}. {qItem.question}
-                                        </p>
-                                        {Array.isArray(qItem.options) && (
-                                          <div className="space-y-1 pl-1">
-                                            {qItem.options.map((opt: string, optIdx: number) => {
-                                              const isCorrect =
-                                                qItem.answer === optIdx ||
-                                                qItem.answer === String.fromCharCode(65 + optIdx) ||
-                                                qItem.answer === opt;
-                                              return (
-                                                <div
-                                                  key={optIdx}
-                                                  className={`p-1.5 px-2.5 rounded border text-[11px] flex items-center justify-between ${
-                                                    isCorrect
-                                                      ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
-                                                      : "border-border/60 bg-background text-muted-foreground"
-                                                  }`}
-                                                >
-                                                  <span>
-                                                    <strong>{String.fromCharCode(65 + optIdx)}.</strong> {opt}
-                                                  </span>
-                                                  {isCorrect && (
-                                                    <Badge variant="outline" className="text-[9px] border-green-600 text-green-600 py-0">
-                                                      Correct Answer
-                                                    </Badge>
-                                                  )}
-                                                </div>
-                                              );
-                                            })}
+                                  <div className="space-y-3">
+                                    {list.map((qItem: any, qIdx: number) => {
+                                      const questionText =
+                                        qItem.question || qItem.title || qItem.text || qItem.questionText || `Question ${qIdx + 1}`;
+                                      return (
+                                        <div key={qIdx} className="p-3.5 border rounded-xl bg-muted/20 space-y-2.5 text-xs">
+                                          <div className="flex items-start gap-2">
+                                            <Badge variant="outline" className="text-[10px] shrink-0 font-mono mt-0.5">
+                                              Q{qItem.id !== undefined ? qItem.id : qIdx + 1}
+                                            </Badge>
+                                            <p className="font-semibold text-xs text-foreground flex-1 leading-relaxed">
+                                              {questionText}
+                                            </p>
                                           </div>
-                                        )}
-                                      </div>
-                                    ))}
+                                          {Array.isArray(qItem.options) && qItem.options.length > 0 && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pl-6">
+                                              {qItem.options.map((opt: string, optIdx: number) => {
+                                                const isCorrect =
+                                                  qItem.answer === optIdx ||
+                                                  String(qItem.answer) === String(optIdx) ||
+                                                  (typeof qItem.answer === "string" &&
+                                                    qItem.answer.toUpperCase() === String.fromCharCode(65 + optIdx)) ||
+                                                  qItem.answer === opt ||
+                                                  String(qItem.answer).trim().toLowerCase() === String(opt).trim().toLowerCase();
+                                                return (
+                                                  <div
+                                                    key={optIdx}
+                                                    className={`p-2 rounded-lg border text-[11px] flex items-center justify-between gap-2 ${
+                                                      isCorrect
+                                                        ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
+                                                        : "border-border/60 bg-background text-muted-foreground"
+                                                    }`}
+                                                  >
+                                                    <span className="flex-1">
+                                                      <strong>{String.fromCharCode(65 + optIdx)}.</strong> {opt}
+                                                    </span>
+                                                    {isCorrect && (
+                                                      <Badge variant="outline" className="text-[9px] border-green-600 text-green-600 py-0 shrink-0">
+                                                        ✓ Correct
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                          {qItem.explanation && (
+                                            <div className="text-[11px] text-muted-foreground bg-background/50 p-2 rounded border border-border/40 pl-6 mt-1">
+                                              <span className="font-semibold text-foreground">Explanation: </span>
+                                              {qItem.explanation}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </AccordionContent>

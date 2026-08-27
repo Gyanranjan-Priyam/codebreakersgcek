@@ -1,30 +1,27 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
-import { generateQuizPDF, downloadQuizPDF } from "@/lib/quiz-pdf-generator";
+import { Download, FileText } from "lucide-react";
+import { generateQuizPDF, downloadQuizPDF, QuizQuestion } from "@/lib/quiz-pdf-generator";
 import { useState } from "react";
 import { toast } from "sonner";
-
-interface QuizQuestion {
-  id: number;
-  question: string;
-  options: string[];
-  answer: string;
-}
 
 interface ExportQuizPDFProps {
   quizTitle: string;
   quizId: string;
   description: string;
   duration: number;
+  pointsPerQuestion?: number;
+  targetAudience?: string;
   setNumber?: string;
-  questions: QuizQuestion[];
+  questions?: QuizQuestion[];
   questionsBySet?: Record<string, QuizQuestion[]>;
-  variant?: "default" | "outline" | "ghost";
+  shiftsMap?: Record<number, Record<string, any[]>>;
+  variant?: "default" | "outline" | "ghost" | "secondary";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
   stopPropagation?: boolean;
+  buttonText?: string;
 }
 
 export function ExportQuizPDF({
@@ -32,13 +29,17 @@ export function ExportQuizPDF({
   quizId,
   description,
   duration,
+  pointsPerQuestion,
+  targetAudience,
   setNumber,
-  questions,
+  questions = [],
   questionsBySet,
+  shiftsMap,
   variant = "outline",
   size = "sm",
   className,
-  stopPropagation = false
+  stopPropagation = false,
+  buttonText,
 }: ExportQuizPDFProps) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -46,26 +47,29 @@ export function ExportQuizPDF({
     if (stopPropagation) {
       e.stopPropagation();
     }
-    
+
     try {
       setIsExporting(true);
-      
+
       const pdfBlob = await generateQuizPDF({
         title: quizTitle,
         quizId,
         description,
         duration,
+        pointsPerQuestion,
+        targetAudience,
         setNumber,
         questions,
         questionsBySet,
+        shiftsMap,
       });
-      
-      const filename = setNumber 
-        ? `${quizId}_Set_${setNumber}.pdf`
-        : `${quizId}_Quiz.pdf`;
-      
+
+      const filename = setNumber
+        ? `${quizId}_Set_${setNumber}_Exam.pdf`
+        : `${quizId}_Exam_Question_Paper.pdf`;
+
       downloadQuizPDF(pdfBlob, filename);
-      toast.success("PDF exported successfully!");
+      toast.success("Exam PDF exported successfully!");
     } catch (error) {
       console.error("Error exporting PDF:", error);
       toast.error("Failed to export PDF");
@@ -82,8 +86,12 @@ export function ExportQuizPDF({
       disabled={isExporting}
       className={className}
     >
-      <Download className="h-4 w-4 mr-2" />
-      {isExporting ? "Exporting..." : "Export PDF"}
+      {isExporting ? (
+        <FileText className="h-4 w-4 mr-2 animate-pulse text-primary" />
+      ) : (
+        <Download className="h-4 w-4 mr-2" />
+      )}
+      {isExporting ? "Generating PDF..." : buttonText || "Export Exam PDF"}
     </Button>
   );
 }

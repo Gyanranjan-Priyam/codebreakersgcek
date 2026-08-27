@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -172,16 +173,13 @@ export function MiniRichEditor({ value, onChange, placeholder = "Add a descripti
       if (!value) return "";
       try {
         const json = JSON.parse(value);
-        if (json && typeof json === "object" && !hasListNodes(json)) {
-          const text = extractPlainTextFromJson(json);
-          if (text) {
-            return autoFormatDescriptionText(text);
-          }
+        if (json && typeof json === "object" && (json.type || json.content)) {
+          return json;
         }
-        return json;
       } catch {
-        return autoFormatDescriptionText(value);
+        // Not JSON, handle as plain text
       }
+      return autoFormatDescriptionText(value);
     })(),
     immediatelyRender: false,
   });

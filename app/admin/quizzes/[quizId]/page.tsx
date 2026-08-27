@@ -115,7 +115,7 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
             </Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/admin/quizzes/edit/${quiz.id}`}>
+            <Link href={`/admin/quizzes/edit/${quiz.quizId}`}>
               <Edit className="h-4 w-4 mr-2" />
               Edit Quiz
             </Link>
@@ -274,8 +274,10 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
                 quizId={quiz.quizId}
                 description={quiz.description}
                 duration={quiz.duration}
+                pointsPerQuestion={quiz.pointsPerQuestion}
+                targetAudience={quiz.targetAudience}
+                shiftsMap={shiftMap}
                 questions={Object.values(shiftMap).flatMap((m) => Object.values(m).flat()) as any[]}
-                questionsBySet={shiftMap[1] || {}}
               />
             </div>
           </CardHeader>
@@ -311,7 +313,11 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
                 const sNum = parseInt(sNumStr, 10);
                 return (
                   <TabsContent key={sNum} value={`shift-${sNum}`} className="space-y-3 focus-visible:outline-none">
-                    <Accordion type="single" collapsible className="w-full space-y-2">
+                    <Accordion
+                      type="multiple"
+                      defaultValue={Object.keys(setsObj).map((k) => `set-${k}`)}
+                      className="w-full space-y-2"
+                    >
                       {Object.keys(setsObj).sort().map((setKey) => {
                         const qList = setsObj[setKey] || [];
                         return (
@@ -320,7 +326,7 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
                               <div className="flex items-center justify-between w-full pr-4">
                                 <div className="flex items-center gap-3">
                                   <span className="font-semibold text-xs text-foreground">Shift {sNum} · Question Set {setKey}</span>
-                                  <Badge variant="outline" className="text-[10px]">
+                                  <Badge variant={qList.length > 0 ? "default" : "outline"} className="text-[10px]">
                                     {qList.length} question{qList.length !== 1 ? "s" : ""}
                                   </Badge>
                                 </div>
@@ -331,41 +337,53 @@ export default async function QuizDetailsPage({ params }: { params: Promise<{ qu
                                 <p className="text-xs text-muted-foreground italic">No questions in this set.</p>
                               ) : (
                                 <div className="space-y-3">
-                                  {qList.map((question: any, index: number) => (
-                                    <Card key={index} className="bg-muted/30 border">
-                                      <CardContent className="p-3.5 space-y-2.5 text-xs">
-                                        <div className="flex items-start gap-2.5">
-                                          <Badge variant="outline" className="mt-0.5 shrink-0 text-[10px]">Q{question.id || index + 1}</Badge>
-                                          <p className="font-medium flex-1 text-xs text-foreground">{question.question}</p>
-                                        </div>
-                                        {Array.isArray(question.options) && (
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-7">
-                                            {question.options.map((opt: string, i: number) => {
-                                              const isCorrect = opt === question.answer || question.answer === i || question.answer === String.fromCharCode(65 + i);
-                                              return (
-                                                <div
-                                                  key={i}
-                                                  className={`p-2 rounded-lg border text-xs ${
-                                                    isCorrect
-                                                      ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
-                                                      : "border-border bg-background text-muted-foreground"
-                                                  }`}
-                                                >
-                                                  <div className="flex items-center gap-2">
-                                                    <Badge variant={isCorrect ? "default" : "outline"} className="text-[10px] h-4 px-1.5">
-                                                      {String.fromCharCode(65 + i)}
-                                                    </Badge>
-                                                    <span className="flex-1">{opt}</span>
-                                                    {isCorrect && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />}
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
+                                  {qList.map((question: any, index: number) => {
+                                    const questionText =
+                                      question.question || question.title || question.text || question.questionText || `Question ${index + 1}`;
+                                    return (
+                                      <Card key={index} className="bg-muted/30 border">
+                                        <CardContent className="p-3.5 space-y-2.5 text-xs">
+                                          <div className="flex items-start gap-2.5">
+                                            <Badge variant="outline" className="mt-0.5 shrink-0 text-[10px] font-mono">
+                                              Q{question.id !== undefined ? question.id : index + 1}
+                                            </Badge>
+                                            <p className="font-medium flex-1 text-xs text-foreground leading-relaxed">{questionText}</p>
                                           </div>
-                                        )}
-                                      </CardContent>
-                                    </Card>
-                                  ))}
+                                          {Array.isArray(question.options) && question.options.length > 0 && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-7">
+                                              {question.options.map((opt: string, i: number) => {
+                                                const isCorrect =
+                                                  question.answer === i ||
+                                                  String(question.answer) === String(i) ||
+                                                  (typeof question.answer === "string" &&
+                                                    question.answer.toUpperCase() === String.fromCharCode(65 + i)) ||
+                                                  question.answer === opt ||
+                                                  String(question.answer).trim().toLowerCase() === String(opt).trim().toLowerCase();
+                                                return (
+                                                  <div
+                                                    key={i}
+                                                    className={`p-2 rounded-lg border text-xs ${
+                                                      isCorrect
+                                                        ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
+                                                        : "border-border bg-background text-muted-foreground"
+                                                    }`}
+                                                  >
+                                                    <div className="flex items-center gap-2">
+                                                      <Badge variant={isCorrect ? "default" : "outline"} className="text-[10px] h-4 px-1.5">
+                                                        {String.fromCharCode(65 + i)}
+                                                      </Badge>
+                                                      <span className="flex-1">{opt}</span>
+                                                      {isCorrect && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </CardContent>
+                                      </Card>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </AccordionContent>

@@ -1,256 +1,704 @@
-import jsPDF from 'jspdf';
+import jsPDF from "jspdf";
 
-interface QuizQuestion {
-  id: number;
-  question: string;
+export interface QuizQuestion {
+  id?: number | string;
+  question?: string;
+  title?: string;
+  text?: string;
+  questionText?: string;
   options: string[];
-  answer: string;
+  answer: string | number;
+  explanation?: string;
+  points?: number;
 }
 
-interface QuizPDFData {
+export interface QuizPDFData {
   title: string;
   quizId: string;
-  description: string;
+  description?: string;
   duration: number;
+  pointsPerQuestion?: number;
+  totalMarks?: number;
+  targetAudience?: string;
   setNumber?: string;
-  questions: QuizQuestion[];
+  questions?: QuizQuestion[];
   questionsBySet?: Record<string, QuizQuestion[]>;
+  shiftsMap?: Record<number, Record<string, QuizQuestion[]>>;
+  showAnswerKey?: boolean;
 }
 
 async function loadImageAsBase64(imagePath: string): Promise<string> {
   try {
+    if (typeof window === "undefined") return "";
     const response = await fetch(imagePath);
+    if (!response.ok) return "";
     const blob = await response.blob();
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
+      reader.onerror = () => resolve("");
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    console.error(`Error loading image: ${imagePath}`, error);
-    return '';
+    console.warn(`Could not load logo from ${imagePath}:`, error);
+    return "";
   }
 }
 
-async function addHeader(pdf: jsPDF, pageWidth: number, yPosition: number): Promise<number> {
-  const logoHeight = 15;
-  const logoWidth = 15;
-  const margin = 20;
+/**
+ * Accurately measures text wrapping and line height in millimeters for jsPDF
+ */
+function measureText(
+  pdf: jsPDF,
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  lineHeightFactor: number = 1.35
+): { lines: string[]; height: number; lineHeight: number } {
+  pdf.setFontSize(fontSize);
+  const raw = String(text ?? "").replace(/\r\n/g, "\n");
+  const segments = raw.split("\n");
+  const lines: string[] = [];
 
-  try {
-    // Load both logos
-    const gcekLogo = await loadImageAsBase64('/assets/gcek_logo.png');
-    const cbLogo = await loadImageAsBase64('/assets/logo.png');
-
-    // Add GCEK logo on the left
-    if (gcekLogo) {
-      pdf.addImage(gcekLogo, 'PNG', margin, yPosition, logoWidth, logoHeight);
+  for (const seg of segments) {
+    if (seg.trim().length === 0) {
+      lines.push("");
+    } else {
+      const wrapped = pdf.splitTextToSize(seg, maxWidth) as string[];
+      lines.push(...wrapped);
     }
-
-    // Add CodeBreakers heading in the center
-    pdf.setFontSize(20);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CodeBreakers', pageWidth / 2, yPosition + 10, { align: 'center' });
-
-    // Add CodeBreakers logo on the right
-    if (cbLogo) {
-      pdf.addImage(cbLogo, 'PNG', pageWidth - margin - logoWidth, yPosition, logoWidth, logoHeight);
-    }
-
-    return yPosition + logoHeight + 10;
-  } catch (error) {
-    console.error('Error adding header:', error);
-    // Return position with just text header if images fail
-    pdf.setFontSize(20);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CodeBreakers', pageWidth / 2, yPosition + 10, { align: 'center' });
-    return yPosition + 20;
   }
+
+  // 1 pt = 0.352778 mm
+  const lineHeight = fontSize * 0.3528 * lineHeightFactor;
+  const height = Math.max(lines.length, 1) * lineHeight;
+  return { lines, height, lineHeight };
+}
+
+/**
+ * Prints wrapped text line by line to strictly prevent any overlapping
+ */
+function printWrappedLines(
+  pdf: jsPDF,
+  lines: string[],
+  x: number,
+  startY: number,
+  lineHeight: number
+): number {
+  let curY = startY;
+  for (const line of lines) {
+    if (line.trim().length > 0) {
+      pdf.text(line, x, curY);
+    }
+    curY += lineHeight;
+  }
+  return curY;
+}
+
+/**
+ * Formats correct answer display text
+ */
+function getAnswerDetails(
+  answer: string | number,
+  options: string[]
+): {
+  correctIndex: number;
+  correctLetter: string;
+  correctText: string;
+} {
+  let correctIndex = -1;
+  let correctLetter = "";
+  let correctText = "";
+
+  if (typeof answer === "number") {
+    correctIndex = answer;
+  } else if (typeof answer === "string") {
+    const trimmed = answer.trim();
+    if (/^\d+$/.test(trimmed)) {
+      correctIndex = parseInt(trimmed, 10);
+    } else if (/^[A-Za-z]$/.test(trimmed)) {
+      correctIndex = trimmed.toUpperCase().charCodeAt(0) - 65;
+    } else {
+      // Find matching option text
+      const foundIdx = options.findIndex(
+        (opt) =>
+          String(opt).trim().toLowerCase() === trimmed.toLowerCase() ||
+          String(opt).toLowerCase().startsWith(trimmed.toLowerCase())
+      );
+      if (foundIdx !== -1) {
+        correctIndex = foundIdx;
+      }
+    }
+  }
+
+  if (correctIndex >= 0 && correctIndex < options.length) {
+    correctLetter = String.fromCharCode(65 + correctIndex);
+    correctText = options[correctIndex] || "";
+  } else if (typeof answer === "string" && answer.trim()) {
+    correctLetter = "?";
+    correctText = answer.trim();
+  }
+
+  return { correctIndex, correctLetter, correctText };
 }
 
 export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
-  const pdf = new jsPDF();
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 20;
-  const contentWidth = pageWidth - (2 * margin);
-  let yPosition = 10;
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
 
-  // Add header with logos
-  yPosition = await addHeader(pdf, pageWidth, yPosition);
-  yPosition += 5;
+  const PAGE_WIDTH = 210;
+  const PAGE_HEIGHT = 297;
+  const MARGIN_LEFT = 14;
+  const MARGIN_RIGHT = 14;
+  const MARGIN_TOP = 14;
+  const MARGIN_BOTTOM = 14;
+  const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT; // 182mm
+  const MAX_USABLE_Y = PAGE_HEIGHT - MARGIN_BOTTOM - 6;
 
-  // Add horizontal line after header
-  pdf.setLineWidth(0.5);
-  pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 10;
+  // Colors
+  const COLOR_PRIMARY = [15, 23, 42] as const; // Slate 900
+  const COLOR_HEADER_BG = [241, 245, 249] as const; // Slate 100
+  const COLOR_BORDER = [203, 213, 225] as const; // Slate 300
+  const COLOR_DARK_TEXT = [30, 41, 59] as const; // Slate 800
+  const COLOR_MUTED_TEXT = [100, 116, 139] as const; // Slate 500
+  const COLOR_GREEN_TEXT = [22, 101, 52] as const; // Emerald 800
+  const COLOR_GREEN_BG = [240, 253, 244] as const; // Emerald 50
+  const COLOR_GREEN_BORDER = [187, 247, 208] as const; // Emerald 200
 
-  // Add title
-  pdf.setFontSize(16);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(data.title, pageWidth / 2, yPosition, { align: 'center' });
-  
-  yPosition += 8;
-  
-  // Add set number if available
-  if (data.setNumber) {
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`Set ${data.setNumber}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 6;
-  }
-  
-  // Add quiz ID and duration
-  pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text(`Quiz ID: ${data.quizId} | Duration: ${data.duration} minutes`, pageWidth / 2, yPosition, { align: 'center' });
-  
-  yPosition += 10;
-  
-  // Add horizontal line
-  pdf.setLineWidth(0.5);
-  pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-  
-  yPosition += 10;
-  
-  // Add description if available
-  if (data.description) {
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'italic');
-    const descLines = pdf.splitTextToSize(data.description, contentWidth);
-    pdf.text(descLines, margin, yPosition);
-    yPosition += (descLines.length * 6) + 10;
-  }
-  
-  // Function to render questions
-  const renderQuestions = (questions: QuizQuestion[], setLabel?: string) => {
-    // Add set header if this is a grouped export
-    if (setLabel) {
-      if (yPosition > pageHeight - 100) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      
-      pdf.setFontSize(14);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 0, 139); // Dark blue
-      pdf.text(setLabel, margin, yPosition);
-      pdf.setTextColor(0, 0, 0); // Reset to black
-      yPosition += 10;
-      
-      // Add separator line after set header
-      pdf.setLineWidth(0.3);
-      pdf.setDrawColor(0, 0, 139);
-      pdf.line(margin, yPosition - 3, pageWidth - margin, yPosition - 3);
-      pdf.setDrawColor(0, 0, 0);
-      yPosition += 5;
-    }
-    
-    questions.forEach((question, index) => {
-      // Check if we need a new page
-      if (yPosition > pageHeight - 80) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      
-      // Question number and text
-      pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`Q${question.id}.`, margin, yPosition);
-      
-      const questionText = pdf.splitTextToSize(question.question, contentWidth - 15);
-      pdf.text(questionText, margin + 10, yPosition);
-      yPosition += (questionText.length * 6) + 4;
-      
-      // Options
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      question.options.forEach((option, optIndex) => {
-        // Check if we need a new page
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        
-        const optionLabel = String.fromCharCode(65 + optIndex); // A, B, C, D
-        const isCorrectAnswer = option === question.answer;
-        
-        if (isCorrectAnswer) {
-          pdf.setFont('helvetica', 'bold');
-        }
-        
-        const optionText = pdf.splitTextToSize(`${optionLabel}. ${option}`, contentWidth - 20);
-        pdf.text(optionText, margin + 15, yPosition);
-        
-        if (isCorrectAnswer) {
-          // Add checkmark or indicator for correct answer
-          pdf.setTextColor(0, 128, 0); // Green color
-          pdf.text('✓', margin + 5, yPosition);
-          pdf.setTextColor(0, 0, 0); // Reset to black
-          pdf.setFont('helvetica', 'normal');
-        }
-        
-        yPosition += (optionText.length * 5) + 3;
-      });
-      
-      // Add correct answer text
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 128, 0);
-      pdf.text(`Correct Answer: ${question.answer}`, margin + 15, yPosition);
-      pdf.setTextColor(0, 0, 0);
-      
-      yPosition += 12;
-      
-      // Add separator line between questions
-      if (index < questions.length - 1) {
-        pdf.setLineWidth(0.2);
-        pdf.setDrawColor(200, 200, 200);
-        pdf.line(margin + 10, yPosition - 5, pageWidth - margin - 10, yPosition - 5);
-      }
-    });
-    
-    // Add extra space after set
-    if (setLabel) {
-      yPosition += 10;
-    }
+  let y = MARGIN_TOP;
+
+  // Load logos
+  const [gcekLogo, cbLogo] = await Promise.all([
+    loadImageAsBase64("/assets/gcek_logo.png"),
+    loadImageAsBase64("/assets/logo.png"),
+  ]);
+
+  // Running Header Helper for page 2+
+  const drawRunningHeader = (pageNum: number) => {
+    if (pageNum <= 1) return;
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+    pdf.text(
+      `CodeBreakers Examination System · ${data.title}`,
+      MARGIN_LEFT,
+      10
+    );
+    pdf.text(
+      `Quiz ID: ${data.quizId}`,
+      PAGE_WIDTH - MARGIN_RIGHT,
+      10,
+      { align: "right" }
+    );
+    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+    pdf.setLineWidth(0.3);
+    pdf.line(MARGIN_LEFT, 12, PAGE_WIDTH - MARGIN_RIGHT, 12);
   };
 
-  // Render questions - either grouped by set or as a single list
-  if (data.questionsBySet) {
-    // Export with sets grouped
+  // Helper for adding a new page safely
+  const checkOrAddPage = (neededHeight: number) => {
+    if (y + neededHeight > MAX_USABLE_Y) {
+      pdf.addPage();
+      const currentPages = (pdf.internal as any).getNumberOfPages();
+      drawRunningHeader(currentPages);
+      y = 18;
+      return true;
+    }
+    return false;
+  };
+
+  // -------------------------------------------------------------
+  // 1. INSTITUTIONAL & EXAM HEADER (Page 1)
+  // -------------------------------------------------------------
+  const logoSize = 14;
+  const headerTop = y;
+
+  if (gcekLogo) {
+    try {
+      pdf.addImage(gcekLogo, "PNG", MARGIN_LEFT, headerTop, logoSize, logoSize);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (cbLogo) {
+    try {
+      pdf.addImage(cbLogo, "PNG", PAGE_WIDTH - MARGIN_RIGHT - logoSize, headerTop, logoSize, logoSize);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Header Title Text
+  pdf.setFontSize(11);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+  pdf.text(
+    "GOVERNMENT COLLEGE OF ENGINEERING, KALAHANDI",
+    PAGE_WIDTH / 2,
+    headerTop + 4,
+    { align: "center" }
+  );
+
+  pdf.setFontSize(8.5);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+  pdf.text(
+    "Department of Computer Science & Engineering · CodeBreakers Club",
+    PAGE_WIDTH / 2,
+    headerTop + 9,
+    { align: "center" }
+  );
+
+  pdf.setFontSize(13);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+  pdf.text(
+    data.title.toUpperCase(),
+    PAGE_WIDTH / 2,
+    headerTop + 15,
+    { align: "center" }
+  );
+
+  y = headerTop + 19;
+
+  // Header Divider
+  pdf.setDrawColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+  pdf.setLineWidth(0.6);
+  pdf.line(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT, y);
+  y += 3;
+
+  // -------------------------------------------------------------
+  // 2. EXAM METADATA BOX (4-Column Key Info Grid)
+  // -------------------------------------------------------------
+  const metaBoxHeight = 13;
+  pdf.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
+  pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(MARGIN_LEFT, y, CONTENT_WIDTH, metaBoxHeight, 2, 2, "FD");
+
+  const colWidth = CONTENT_WIDTH / 4;
+  const colYLabel = y + 4.5;
+  const colYVal = y + 9.5;
+
+  // Col 1: Quiz ID
+  pdf.setFontSize(7);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+  pdf.text("QUIZ ID", MARGIN_LEFT + 4, colYLabel);
+  pdf.setFontSize(8.5);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+  pdf.text(data.quizId, MARGIN_LEFT + 4, colYVal);
+
+  // Col 2: Duration
+  pdf.setFontSize(7);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+  pdf.text("DURATION", MARGIN_LEFT + colWidth + 4, colYLabel);
+  pdf.setFontSize(8.5);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+  pdf.text(`${data.duration} Minutes`, MARGIN_LEFT + colWidth + 4, colYVal);
+
+  // Col 3: Points per Question
+  pdf.setFontSize(7);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+  pdf.text("POINTS / QUESTION", MARGIN_LEFT + colWidth * 2 + 4, colYLabel);
+  pdf.setFontSize(8.5);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+  pdf.text(`${data.pointsPerQuestion || 1} Mark(s)`, MARGIN_LEFT + colWidth * 2 + 4, colYVal);
+
+  // Col 4: Target Audience / Set
+  pdf.setFontSize(7);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+  pdf.text("AUDIENCE / SET", MARGIN_LEFT + colWidth * 3 + 4, colYLabel);
+  pdf.setFontSize(8.5);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+  pdf.text(
+    data.setNumber ? `Set ${data.setNumber}` : data.targetAudience === "EXTERNAL" ? "External Kiosk" : "Internal Quiz",
+    MARGIN_LEFT + colWidth * 3 + 4,
+    colYVal
+  );
+
+  y += metaBoxHeight + 3.5;
+
+  // -------------------------------------------------------------
+  // 3. CANDIDATE DETAILS & INSTRUCTIONS SECTION
+  // -------------------------------------------------------------
+  const candidateBoxHeight = 11;
+  pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+  pdf.setLineWidth(0.25);
+  pdf.roundedRect(MARGIN_LEFT, y, CONTENT_WIDTH, candidateBoxHeight, 1.5, 1.5, "D");
+
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+  pdf.text("Candidate Name: ____________________________", MARGIN_LEFT + 4, y + 7);
+  pdf.text("Roll No / Reg ID: __________________", MARGIN_LEFT + 95, y + 7);
+  pdf.text("Score / Sign: _________", MARGIN_LEFT + 150, y + 7);
+
+  y += candidateBoxHeight + 3.5;
+
+  // Description / Instructions if available
+  if (data.description && data.description.trim()) {
+    const descMeasure = measureText(pdf, data.description.trim(), CONTENT_WIDTH - 8, 8, 1.3);
+    const descBoxHeight = descMeasure.height + 6;
+
+    checkOrAddPage(descBoxHeight + 4);
+
+    pdf.setFillColor(250, 250, 250);
+    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+    pdf.setLineWidth(0.2);
+    pdf.roundedRect(MARGIN_LEFT, y, CONTENT_WIDTH, descBoxHeight, 1.5, 1.5, "FD");
+
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+    pdf.text("GENERAL INSTRUCTIONS & RULES:", MARGIN_LEFT + 4, y + 4.5);
+
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+    printWrappedLines(pdf, descMeasure.lines, MARGIN_LEFT + 4, y + 8, descMeasure.lineHeight);
+
+    y += descBoxHeight + 4;
+  }
+
+  // -------------------------------------------------------------
+  // 4. QUESTIONS RENDERING ENGINE
+  // -------------------------------------------------------------
+  const allQuestionsForAnswerKey: Array<{
+    qNum: number | string;
+    letter: string;
+    text: string;
+  }> = [];
+
+  const renderSingleQuestion = (question: QuizQuestion, index: number) => {
+    const qNum = question.id !== undefined && question.id !== null ? question.id : index + 1;
+    const questionPrompt =
+      question.question || question.title || question.text || question.questionText || `Question ${qNum}`;
+    const options = Array.isArray(question.options) ? question.options : [];
+    const { correctIndex, correctLetter, correctText } = getAnswerDetails(question.answer, options);
+
+    if (correctLetter) {
+      allQuestionsForAnswerKey.push({
+        qNum,
+        letter: correctLetter,
+        text: correctText,
+      });
+    }
+
+    // Step A: Measure Question Text
+    // Question number badge width: ~14mm
+    const qPromptWidth = CONTENT_WIDTH - 18;
+    const qPromptMeasure = measureText(pdf, questionPrompt, qPromptWidth, 9.5, 1.35);
+
+    // Step B: Measure All Options
+    const optLabelWidth = 10;
+    const optTextWidth = CONTENT_WIDTH - optLabelWidth - 14;
+    const optionsMeasures = options.map((opt, optIdx) => {
+      const optLetter = String.fromCharCode(65 + optIdx);
+      const isCorrect = optIdx === correctIndex;
+      const measure = measureText(pdf, opt, optTextWidth, 8.5, 1.3);
+      return { optLetter, text: opt, isCorrect, measure };
+    });
+
+    // Step C: Measure Answer / Explanation
+    const explanationText = question.explanation ? question.explanation.trim() : "";
+    const explanationMeasure = explanationText
+      ? measureText(pdf, `Explanation: ${explanationText}`, CONTENT_WIDTH - 12, 7.5, 1.3)
+      : null;
+
+    // Step D: Calculate Total Question Block Height
+    let totalBlockHeight = 4; // Top padding
+    totalBlockHeight += Math.max(qPromptMeasure.height, 5.5); // Question prompt
+    totalBlockHeight += 2.5; // Gap before options
+
+    // Options height
+    for (const optM of optionsMeasures) {
+      const rowH = Math.max(optM.measure.height + 2, 5.5);
+      totalBlockHeight += rowH + 1.5;
+    }
+
+    // Answer Strip height
+    totalBlockHeight += 6.5;
+
+    // Explanation height if present
+    if (explanationMeasure) {
+      totalBlockHeight += explanationMeasure.height + 3;
+    }
+
+    totalBlockHeight += 4; // Bottom padding & spacing
+
+    // Check if new page is needed
+    checkOrAddPage(totalBlockHeight);
+
+    const cardStartY = y;
+
+    // Card background & border
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+    pdf.setLineWidth(0.25);
+    pdf.roundedRect(MARGIN_LEFT, cardStartY, CONTENT_WIDTH, totalBlockHeight - 2, 2, 2, "FD");
+
+    // Question Number Badge
+    const badgeX = MARGIN_LEFT + 3.5;
+    const badgeY = cardStartY + 3.5;
+    pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+    pdf.roundedRect(badgeX, badgeY - 2.8, 11, 4.5, 1, 1, "F");
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(`Q.${qNum}`, badgeX + 5.5, badgeY + 0.5, { align: "center" });
+
+    // Question Prompt Text
+    pdf.setFontSize(9.5);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+    const promptStartY = cardStartY + 4.5;
+    printWrappedLines(pdf, qPromptMeasure.lines, MARGIN_LEFT + 16, promptStartY, qPromptMeasure.lineHeight);
+
+    let curY = promptStartY + qPromptMeasure.height + 2.5;
+
+    // Render Options
+    for (const optM of optionsMeasures) {
+      const optRowH = Math.max(optM.measure.height + 2, 5.5);
+      const isCorrect = optM.isCorrect;
+
+      // Option Row Background
+      if (isCorrect) {
+        pdf.setFillColor(COLOR_GREEN_BG[0], COLOR_GREEN_BG[1], COLOR_GREEN_BG[2]);
+        pdf.setDrawColor(COLOR_GREEN_BORDER[0], COLOR_GREEN_BORDER[1], COLOR_GREEN_BORDER[2]);
+        pdf.setLineWidth(0.3);
+      } else {
+        pdf.setFillColor(250, 250, 250);
+        pdf.setDrawColor(235, 238, 242);
+        pdf.setLineWidth(0.2);
+      }
+      pdf.roundedRect(MARGIN_LEFT + 6, curY, CONTENT_WIDTH - 12, optRowH, 1, 1, "FD");
+
+      // Option Letter Badge
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      if (isCorrect) {
+        pdf.setTextColor(COLOR_GREEN_TEXT[0], COLOR_GREEN_TEXT[1], COLOR_GREEN_TEXT[2]);
+      } else {
+        pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+      }
+      pdf.text(`(${optM.optLetter})`, MARGIN_LEFT + 9, curY + 3.8);
+
+      // Option Text
+      pdf.setFontSize(8.5);
+      pdf.setFont("helvetica", isCorrect ? "bold" : "normal");
+      if (isCorrect) {
+        pdf.setTextColor(COLOR_GREEN_TEXT[0], COLOR_GREEN_TEXT[1], COLOR_GREEN_TEXT[2]);
+      } else {
+        pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+      }
+      printWrappedLines(pdf, optM.measure.lines, MARGIN_LEFT + 18, curY + 3.8, optM.measure.lineHeight);
+
+      // Correct Badge on the right
+      if (isCorrect) {
+        pdf.setFontSize(7.5);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(COLOR_GREEN_TEXT[0], COLOR_GREEN_TEXT[1], COLOR_GREEN_TEXT[2]);
+        pdf.text("[ Correct Answer ]", PAGE_WIDTH - MARGIN_RIGHT - 8, curY + 3.8, { align: "right" });
+      }
+
+      curY += optRowH + 1.5;
+    }
+
+    // Answer Strip Box
+    pdf.setFillColor(COLOR_GREEN_BG[0], COLOR_GREEN_BG[1], COLOR_GREEN_BG[2]);
+    pdf.setDrawColor(COLOR_GREEN_BORDER[0], COLOR_GREEN_BORDER[1], COLOR_GREEN_BORDER[2]);
+    pdf.setLineWidth(0.2);
+    pdf.roundedRect(MARGIN_LEFT + 6, curY, CONTENT_WIDTH - 12, 5.5, 1, 1, "FD");
+
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(COLOR_GREEN_TEXT[0], COLOR_GREEN_TEXT[1], COLOR_GREEN_TEXT[2]);
+    const answerLabel = correctLetter
+      ? `Correct Answer: Option (${correctLetter}) ${correctText ? "· " + correctText : ""}`
+      : `Answer: ${question.answer || "N/A"}`;
+    pdf.text(answerLabel, MARGIN_LEFT + 9, curY + 3.8);
+
+    curY += 6.5;
+
+    // Explanation Box if present
+    if (explanationMeasure && explanationText) {
+      pdf.setFillColor(245, 247, 250);
+      pdf.setDrawColor(225, 230, 238);
+      pdf.setLineWidth(0.2);
+      pdf.roundedRect(MARGIN_LEFT + 6, curY, CONTENT_WIDTH - 12, explanationMeasure.height + 2, 1, 1, "FD");
+
+      pdf.setFontSize(7.5);
+      pdf.setFont("helvetica", "italic");
+      pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+      printWrappedLines(pdf, explanationMeasure.lines, MARGIN_LEFT + 9, curY + 3.5, explanationMeasure.lineHeight);
+
+      curY += explanationMeasure.height + 3;
+    }
+
+    y = cardStartY + totalBlockHeight;
+  };
+
+  const renderSectionHeader = (title: string, subInfo?: string) => {
+    checkOrAddPage(14);
+    pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+    pdf.roundedRect(MARGIN_LEFT, y, CONTENT_WIDTH, 7.5, 1.5, 1.5, "F");
+
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(title.toUpperCase(), MARGIN_LEFT + 5, y + 5);
+
+    if (subInfo) {
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(subInfo, PAGE_WIDTH - MARGIN_RIGHT - 5, y + 5, { align: "right" });
+    }
+
+    y += 10.5;
+  };
+
+  // -------------------------------------------------------------
+  // 5. PROCESS SHIFTS & SETS
+  // -------------------------------------------------------------
+  if (data.shiftsMap && Object.keys(data.shiftsMap).length > 0) {
+    Object.entries(data.shiftsMap).forEach(([sNumStr, setsObj]) => {
+      const sNum = parseInt(sNumStr, 10);
+      const totalShiftQ = Object.values(setsObj).reduce((sum, list) => sum + (list?.length || 0), 0);
+      if (totalShiftQ === 0) return;
+
+      renderSectionHeader(
+        `SHIFT ${sNum} — EXAMINATION QUESTION SETS`,
+        `${totalShiftQ} Questions Total`
+      );
+
+      Object.entries(setsObj).forEach(([setLetter, qList]) => {
+        if (!qList || qList.length === 0) return;
+
+        checkOrAddPage(10);
+        pdf.setFontSize(9.5);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+        pdf.text(`Question Set ${setLetter.toUpperCase()} (${qList.length} Questions)`, MARGIN_LEFT + 2, y + 4);
+        pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+        pdf.setLineWidth(0.3);
+        pdf.line(MARGIN_LEFT, y + 6, PAGE_WIDTH - MARGIN_RIGHT, y + 6);
+        y += 9;
+
+        qList.forEach((q, idx) => renderSingleQuestion(q, idx));
+      });
+    });
+  } else if (data.questionsBySet && Object.keys(data.questionsBySet).length > 0) {
     const sortedSets = Object.keys(data.questionsBySet).sort();
     sortedSets.forEach((setKey) => {
-      renderQuestions(data.questionsBySet![setKey], `Set ${setKey}`);
+      const qList = data.questionsBySet![setKey];
+      if (!qList || qList.length === 0) return;
+
+      renderSectionHeader(
+        `QUESTION SET ${setKey.toUpperCase()}`,
+        `${qList.length} Question(s)`
+      );
+
+      qList.forEach((q, idx) => renderSingleQuestion(q, idx));
     });
-  } else {
-    // Export single set or flat list
-    renderQuestions(data.questions);
-  }
-  
-  // Add footer on all pages
-  const totalPages = (pdf.internal as any).getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    pdf.setPage(i);
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(128, 128, 128);
-    pdf.text(
-      `Page ${i} of ${totalPages}`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: 'center' }
+  } else if (data.questions && data.questions.length > 0) {
+    renderSectionHeader(
+      data.setNumber ? `QUESTION SET ${data.setNumber.toUpperCase()}` : "EXAMINATION QUESTIONS",
+      `${data.questions.length} Question(s)`
     );
-    pdf.setTextColor(0, 0, 0);
+
+    data.questions.forEach((q, idx) => renderSingleQuestion(q, idx));
   }
-  
-  return pdf.output('blob');
+
+  // -------------------------------------------------------------
+  // 6. ANSWER KEY SUMMARY TABLE (End of Document)
+  // -------------------------------------------------------------
+  if (allQuestionsForAnswerKey.length > 0) {
+    const cols = 5;
+    const numRows = Math.ceil(allQuestionsForAnswerKey.length / cols);
+    const tableHeight = numRows * 5.5 + 16;
+
+    checkOrAddPage(tableHeight);
+
+    renderSectionHeader("ANSWER KEY SUMMARY TABLE", `${allQuestionsForAnswerKey.length} Total Questions`);
+
+    const cellWidth = (CONTENT_WIDTH - 8) / cols;
+    let tableY = y;
+
+    for (let r = 0; r < numRows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const itemIdx = r * cols + c;
+        if (itemIdx >= allQuestionsForAnswerKey.length) break;
+
+        const item = allQuestionsForAnswerKey[itemIdx];
+        const cellX = MARGIN_LEFT + 4 + c * cellWidth;
+
+        pdf.setFillColor(r % 2 === 0 ? 245 : 255, r % 2 === 0 ? 247 : 255, r % 2 === 0 ? 250 : 255);
+        pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+        pdf.setLineWidth(0.2);
+        pdf.roundedRect(cellX, tableY, cellWidth - 2, 5, 0.5, 0.5, "FD");
+
+        pdf.setFontSize(7.5);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
+        pdf.text(`Q.${item.qNum}:`, cellX + 2, tableY + 3.5);
+
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(COLOR_GREEN_TEXT[0], COLOR_GREEN_TEXT[1], COLOR_GREEN_TEXT[2]);
+        pdf.text(`(${item.letter})`, cellX + cellWidth - 7, tableY + 3.5);
+      }
+      tableY += 5.5;
+    }
+
+    y = tableY + 4;
+  }
+
+  // -------------------------------------------------------------
+  // 7. RUNNING FOOTER ON ALL PAGES
+  // -------------------------------------------------------------
+  const totalPages = (pdf.internal as any).getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    pdf.setPage(p);
+
+    pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+    pdf.setLineWidth(0.25);
+    pdf.line(MARGIN_LEFT, PAGE_HEIGHT - 10, PAGE_WIDTH - MARGIN_RIGHT, PAGE_HEIGHT - 10);
+
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
+    pdf.text(
+      "CodeBreakers Examination System · Confidential & Official Evaluation Document",
+      MARGIN_LEFT,
+      PAGE_HEIGHT - 6.5
+    );
+
+    pdf.text(
+      `Page ${p} of ${totalPages}`,
+      PAGE_WIDTH - MARGIN_RIGHT,
+      PAGE_HEIGHT - 6.5,
+      { align: "right" }
+    );
+  }
+
+  return pdf.output("blob");
 }
 
 export function downloadQuizPDF(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   document.body.appendChild(link);

@@ -314,8 +314,9 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
         shiftsJson,
         activeShift: 1,
         createdBy: userId,
-        formId: data.targetAudience === "EXTERNAL" ? (data.formId === "none" ? null : data.formId) : null,
-        feedbackFormId: data.targetAudience === "EXTERNAL" ? (data.feedbackFormId === "none" ? null : data.feedbackFormId) : null,
+        accessCode: data.targetAudience === "EXTERNAL" ? data.accessCode || null : null,
+        formId: data.targetAudience === "EXTERNAL" ? (data.formId === "none" || !data.formId ? null : data.formId) : null,
+        feedbackFormId: data.targetAudience === "EXTERNAL" ? (data.feedbackFormId === "none" || !data.feedbackFormId ? null : data.feedbackFormId) : null,
       });
 
       if (result.status === "success") {
@@ -368,21 +369,21 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-4 border rounded-xl bg-muted/20">
           <FormField
             control={form.control}
             name="targetAudience"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Target Audience *</FormLabel>
+                <FormLabel className="font-semibold">Target Audience *</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select audience" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="INTERNAL">Internal Members</SelectItem>
+                    <SelectItem value="INTERNAL">Internal Members (Club Quiz)</SelectItem>
                     <SelectItem value="EXTERNAL">External / Non-members (Kiosk Quiz)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -390,35 +391,106 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
               </FormItem>
             )}
           />
-
-          {watchAudience === "EXTERNAL" && (
-            <FormField
-              control={form.control}
-              name="accessCode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center justify-between">
-                    <span>6-Digit Access Code</span>
-                    <button
-                      type="button"
-                      onClick={() => form.setValue("accessCode", generate6DigitCode())}
-                      className="text-xs text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <RefreshCw className="h-3 w-3" /> Regenerate
-                    </button>
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. 123456" maxLength={6} className="font-mono text-center tracking-widest font-bold" {...field} />
-                  </FormControl>
-                  <FormDescription className="text-xs">
-                    Students will enter this code on their external devices to connect to this quiz.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
         </div>
+
+        {watchAudience === "EXTERNAL" && (
+          <div className="p-4 border border-blue-500/20 bg-blue-500/5 rounded-xl space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400">
+              <Key className="h-4 w-4" />
+              <span>External Kiosk Settings</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="accessCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Access Code</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input
+                          {...field}
+                          className="font-mono text-center tracking-widest text-lg font-bold bg-background"
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => form.setValue("accessCode", generate6DigitCode())}
+                        title="Regenerate code"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <FormDescription className="text-xs">Required to connect kiosk laptops</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="formId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Link Registration Form</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Select a form" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None (Direct Registration)</SelectItem>
+                        {forms.map((f) => (
+                          <SelectItem key={f.id} value={f.formId}>
+                            {f.title} ({f.formId})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">Link candidate details</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="feedbackFormId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Feedback Form (Optional)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Optional" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {forms.map((f) => (
+                          <SelectItem key={f.id} value={f.formId}>
+                            {f.title} ({f.formId})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">Shown after submission</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField
@@ -704,8 +776,14 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
 
                 {/* Tab Content for Each Shift */}
                 {shiftsConfig.map((shift) => {
-                  const currentShiftSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
-                  const shiftTotalQ = currentShiftSets.reduce(
+                  const availableLetters = Array.from({ length: watchSets || 1 }, (_, i) => String.fromCharCode(65 + i));
+                  const assignedSets = shift.sets && shift.sets.length > 0 ? shift.sets : [shift.set || "A"];
+                  const existingQuestionsSets = Object.keys(shiftQuestions[shift.shiftNumber] || {}).filter(
+                    (k) => (shiftQuestions[shift.shiftNumber]?.[k]?.length || 0) > 0
+                  );
+                  const displaySets = Array.from(new Set([...assignedSets, ...existingQuestionsSets])).sort();
+
+                  const shiftTotalQ = displaySets.reduce(
                     (sum, sLetter) => sum + (shiftQuestions[shift.shiftNumber]?.[sLetter]?.length || 0),
                     0
                   );
@@ -720,16 +798,19 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                       <div className="flex items-center justify-between p-3.5 rounded-xl border bg-muted/20 flex-wrap gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm">Shift {shift.shiftNumber} Question Sets</span>
-                          <div className="flex items-center gap-1">
-                            {currentShiftSets.map((sLetter) => (
-                              <Badge
-                                key={sLetter}
-                                variant="outline"
-                                className="text-[10px] bg-primary/5 text-primary border-primary/20"
-                              >
-                                Set {sLetter}
-                              </Badge>
-                            ))}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {displaySets.map((sLetter) => {
+                              const qCount = shiftQuestions[shift.shiftNumber]?.[sLetter]?.length || 0;
+                              return (
+                                <Badge
+                                  key={sLetter}
+                                  variant="outline"
+                                  className="text-[10px] bg-primary/5 text-primary border-primary/20"
+                                >
+                                  Set {sLetter} ({qCount} Qs)
+                                </Badge>
+                              );
+                            })}
                           </div>
                           <Badge variant="secondary" className="text-[10px]">
                             {shiftTotalQ} Total Questions
@@ -751,10 +832,10 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                       {/* Sets in Accordion */}
                       <Accordion
                         type="multiple"
-                        defaultValue={currentShiftSets.map((s) => `set-${s}`)}
+                        defaultValue={displaySets.map((s) => `set-${s}`)}
                         className="w-full space-y-2.5"
                       >
-                        {currentShiftSets.map((sLetter) => {
+                        {displaySets.map((sLetter) => {
                           const list = shiftQuestions[shift.shiftNumber]?.[sLetter] || [];
                           return (
                             <AccordionItem
@@ -768,7 +849,7 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                                     <span className="font-bold text-xs text-foreground">
                                       Question Set {sLetter}
                                     </span>
-                                    <Badge variant="outline" className="text-[10px]">
+                                    <Badge variant={list.length > 0 ? "default" : "outline"} className="text-[10px]">
                                       {list.length} Question{list.length !== 1 ? "s" : ""}
                                     </Badge>
                                   </div>
@@ -786,7 +867,7 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                                   </Button>
                                 </div>
                               </AccordionTrigger>
-                              <AccordionContent className="px-4 pb-4 pt-3 space-y-2.5">
+                              <AccordionContent className="px-4 pb-4 pt-3 space-y-3">
                                 {list.length === 0 ? (
                                   <div className="p-4 text-center border border-dashed rounded-lg bg-muted/20 text-xs text-muted-foreground">
                                     <span>No questions added for Shift {shift.shiftNumber} · Set {sLetter} yet. </span>
@@ -799,43 +880,61 @@ export default function CreateQuizForm({ userId, forms = [], initialAudience = "
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="space-y-2.5 max-h-80 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-1">
-                                    {list.map((qItem: any, qIdx: number) => (
-                                      <div key={qIdx} className="p-3 border rounded-lg bg-muted/20 space-y-2 text-xs">
-                                        <p className="font-semibold text-xs text-foreground">
-                                          Q{qIdx + 1}. {qItem.question}
-                                        </p>
-                                        {Array.isArray(qItem.options) && (
-                                          <div className="space-y-1 pl-1">
-                                            {qItem.options.map((opt: string, optIdx: number) => {
-                                              const isCorrect =
-                                                qItem.answer === optIdx ||
-                                                qItem.answer === String.fromCharCode(65 + optIdx) ||
-                                                qItem.answer === opt;
-                                              return (
-                                                <div
-                                                  key={optIdx}
-                                                  className={`p-1.5 px-2.5 rounded border text-[11px] flex items-center justify-between ${
-                                                    isCorrect
-                                                      ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
-                                                      : "border-border/60 bg-background text-muted-foreground"
-                                                  }`}
-                                                >
-                                                  <span>
-                                                    <strong>{String.fromCharCode(65 + optIdx)}.</strong> {opt}
-                                                  </span>
-                                                  {isCorrect && (
-                                                    <Badge variant="outline" className="text-[9px] border-green-600 text-green-600 py-0">
-                                                      Correct Answer
-                                                    </Badge>
-                                                  )}
-                                                </div>
-                                              );
-                                            })}
+                                  <div className="space-y-3">
+                                    {list.map((qItem: any, qIdx: number) => {
+                                      const questionText =
+                                        qItem.question || qItem.title || qItem.text || qItem.questionText || `Question ${qIdx + 1}`;
+                                      return (
+                                        <div key={qIdx} className="p-3.5 border rounded-xl bg-muted/20 space-y-2.5 text-xs">
+                                          <div className="flex items-start gap-2">
+                                            <Badge variant="outline" className="text-[10px] shrink-0 font-mono mt-0.5">
+                                              Q{qItem.id !== undefined ? qItem.id : qIdx + 1}
+                                            </Badge>
+                                            <p className="font-semibold text-xs text-foreground flex-1 leading-relaxed">
+                                              {questionText}
+                                            </p>
                                           </div>
-                                        )}
-                                      </div>
-                                    ))}
+                                          {Array.isArray(qItem.options) && qItem.options.length > 0 && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pl-6">
+                                              {qItem.options.map((opt: string, optIdx: number) => {
+                                                const isCorrect =
+                                                  qItem.answer === optIdx ||
+                                                  String(qItem.answer) === String(optIdx) ||
+                                                  (typeof qItem.answer === "string" &&
+                                                    qItem.answer.toUpperCase() === String.fromCharCode(65 + optIdx)) ||
+                                                  qItem.answer === opt ||
+                                                  String(qItem.answer).trim().toLowerCase() === String(opt).trim().toLowerCase();
+                                                return (
+                                                  <div
+                                                    key={optIdx}
+                                                    className={`p-2 rounded-lg border text-[11px] flex items-center justify-between gap-2 ${
+                                                      isCorrect
+                                                        ? "border-green-600/40 bg-green-500/10 text-green-700 dark:text-green-400 font-medium"
+                                                        : "border-border/60 bg-background text-muted-foreground"
+                                                    }`}
+                                                  >
+                                                    <span className="flex-1">
+                                                      <strong>{String.fromCharCode(65 + optIdx)}.</strong> {opt}
+                                                    </span>
+                                                    {isCorrect && (
+                                                      <Badge variant="outline" className="text-[9px] border-green-600 text-green-600 py-0 shrink-0">
+                                                        ✓ Correct
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                          {qItem.explanation && (
+                                            <div className="text-[11px] text-muted-foreground bg-background/50 p-2 rounded border border-border/40 pl-6 mt-1">
+                                              <span className="font-semibold text-foreground">Explanation: </span>
+                                              {qItem.explanation}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </AccordionContent>

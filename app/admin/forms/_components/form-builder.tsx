@@ -121,6 +121,28 @@ function getImageUrl(key?: string | null) {
   return `https://codebreakers.t3.storage.dev/${key}`;
 }
 
+function getFieldDescriptionText(desc: string | null | undefined): string {
+  if (!desc) return "";
+  try {
+    const parsed = JSON.parse(desc);
+    if (parsed && typeof parsed === "object" && (parsed.type || parsed.content)) {
+      const extractText = (node: any): string => {
+        if (!node) return "";
+        if (typeof node === "string") return node;
+        if (node.text) return node.text;
+        if (Array.isArray(node.content)) {
+          return node.content.map(extractText).filter(Boolean).join(" ");
+        }
+        return "";
+      };
+      return extractText(parsed);
+    }
+  } catch {
+    // Not JSON, plain text
+  }
+  return desc;
+}
+
 function getResponseName(answers: Record<string, unknown> | null | undefined): string {
   if (!answers) return "N/A";
   if (typeof answers.name === "string" && answers.name.trim()) return answers.name;
@@ -797,7 +819,11 @@ function QuestionCard({
           <div className="space-y-3">
             {field.imageKey && <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border/30"><Image src={getImageUrl(field.imageKey)} alt="" fill className="object-cover" /></div>}
             <p className="text-sm font-medium text-foreground">{field.label || "Untitled Question"}{field.required && <span className="text-destructive ml-1">*</span>}</p>
-            {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
+            {field.description && (
+              <p className="text-xs text-muted-foreground line-clamp-2">
+                {getFieldDescriptionText(field.description)}
+              </p>
+            )}
             <div className="pt-1">
               {field.type === "short_text" || field.type === "email" || field.type === "number" ? <Input disabled placeholder="Short answer text" className="max-w-xs bg-muted/10 border-dashed text-muted-foreground h-9 rounded-lg" />
                 : field.type === "long_text" ? <Textarea disabled placeholder="Long answer text" rows={2} className="bg-muted/10 border-dashed text-muted-foreground resize-none rounded-lg" />
