@@ -127,7 +127,7 @@ export default function MemberPublicProfile({ member }: MemberPublicProfileProps
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-2xl space-y-6">
+      <div className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
         {/* Profile Header Card */}
         <Card className="overflow-hidden border-border/80 shadow-sm">
           <CardContent className="pt-6 pb-6">
