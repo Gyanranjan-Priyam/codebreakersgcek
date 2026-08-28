@@ -83,6 +83,7 @@ export async function getCurrentUserProfileData() {
         mobileNumber: true,
         whatsappNumber: true,
         profileImageKey: true,
+        image: true,
         aadhaarNumber: true,
         state: true,
         district: true,

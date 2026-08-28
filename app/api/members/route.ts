@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
         mobileNumber: true,
         whatsappNumber: true,
         profileImageKey: true,
+        image: true,
         
         // Academic details
         registration: true,

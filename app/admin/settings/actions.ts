@@ -92,6 +92,7 @@ export async function getCurrentUserProfile() {
         mobileNumber: true,
         whatsappNumber: true,
         profileImageKey: true,
+        image: true,
         upiId: true,
         role: true,
         createdAt: true,

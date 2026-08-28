@@ -7,25 +7,29 @@ import { toast } from "sonner";
 import { Trash2, Loader2 } from "lucide-react";
 import { updateProfileImage, removeProfileImage } from "../actions";
 import { ProfileCropDialog } from "@/components/image-cropper/profile-crop-dialog";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 
 interface ProfileImageUploadProps {
   currentImageKey?: string | null;
+  currentOAuthImage?: string | null;
   userName: string;
 }
 
-export function ProfileImageUpload({ currentImageKey, userName }: ProfileImageUploadProps) {
+export function ProfileImageUpload({
+  currentImageKey,
+  currentOAuthImage,
+  userName,
+}: ProfileImageUploadProps) {
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getImageUrl = (imageKey: string | null | undefined) => {
-    if (!imageKey) return undefined;
-    const bucketName = process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES;
-    if (bucketName) return `https://codebreakers.t3.storage.dev/${imageKey}`;
-    return `/uploads/profiles/${imageKey}`;
-  };
+  const displayImageUrl = getUserProfileImageUrl({
+    profileImageKey: currentImageKey,
+    image: currentOAuthImage,
+  });
 
   const getInitials = (name: string) =>
     name
@@ -79,16 +83,24 @@ export function ProfileImageUpload({ currentImageKey, userName }: ProfileImageUp
       toast.error("Upload failed. Please try again.");
     } finally {
       setUploading(false);
+      setIsCropOpen(false);
       setRawImageSrc(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
     startTransition(async () => {
-      const r = await removeProfileImage();
-      if (r.status === "success") toast.success("Avatar removed");
-      else toast.error(r.message);
+      try {
+        const result = await removeProfileImage();
+        if (result.status === "success") {
+          toast.success("Profile picture removed");
+        } else {
+          toast.error(result.message || "Failed to remove image");
+        }
+      } catch {
+        toast.error("Failed to remove image");
+      }
     });
   };
 
@@ -96,14 +108,14 @@ export function ProfileImageUpload({ currentImageKey, userName }: ProfileImageUp
 
   return (
     <>
-      {/* Avatar block — matches reference: centered circle + text button + trash */}
+      {/* Avatar block — centered circle + text button + trash */}
       <div className="flex flex-col items-start gap-3">
         {/* Large circle avatar */}
         <div className="relative group">
           <Avatar className="w-20 h-20 border border-border">
-            {currentImageKey ? (
+            {displayImageUrl ? (
               <AvatarImage
-                src={getImageUrl(currentImageKey)}
+                src={displayImageUrl}
                 alt={userName}
                 className="object-cover"
               />

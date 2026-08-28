@@ -78,3 +78,37 @@ export const preloadCriticalImages = (imageUrls: string[]) => {
     document.head.appendChild(link);
   });
 };
+
+/**
+ * Resolves the display avatar URL for a user across the entire application.
+ * Priority:
+ * 1. Custom uploaded profileImageKey (from S3/T3 storage)
+ * 2. OAuth/Google avatar URL (user.image or user.avatar)
+ * 3. null / fallback
+ */
+export const getUserProfileImageUrl = (user?: {
+  profileImageKey?: string | null;
+  image?: string | null;
+  avatar?: string | null;
+} | null): string | null => {
+  if (!user) return null;
+  if (user.profileImageKey && user.profileImageKey.trim()) {
+    const key = user.profileImageKey.trim();
+    if (key.startsWith('http://') || key.startsWith('https://')) {
+      return key;
+    }
+    return `https://codebreakers.t3.storage.dev/${key}`;
+  }
+  const oauthImage = user.image || user.avatar;
+  if (
+    oauthImage &&
+    typeof oauthImage === 'string' &&
+    oauthImage !== 'undefined' &&
+    oauthImage !== 'null' &&
+    oauthImage !== '/default-avatar.png' &&
+    oauthImage.trim() !== ''
+  ) {
+    return oauthImage.trim();
+  }
+  return null;
+};

@@ -34,6 +34,7 @@ interface SettingsShellProps {
     role?: string | null;
     createdAt: Date | string;
     profileImageKey?: string | null;
+    image?: string | null;
     githubUsername?: string | null;
     mobileNumber?: string | null;
     whatsappNumber?: string | null;
@@ -127,6 +128,7 @@ export function SettingsShell({
               <SectionLabel>Profile picture</SectionLabel>
               <ProfileImageUpload
                 currentImageKey={userProfile.profileImageKey}
+                currentOAuthImage={userProfile.image}
                 userName={userProfile.name}
               />
             </div>

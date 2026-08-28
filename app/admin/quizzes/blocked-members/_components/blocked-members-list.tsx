@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { BlockUserActions } from "./block-user-actions";
 import { ShieldBan } from "lucide-react";
 import { getQuizzesWithBlockedMembers } from "../actions";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 
 type BlockedMember = {
   id: string;
@@ -40,12 +41,6 @@ type QuizWithBlocked = {
   blockedCount: number;
 };
 
-function getProfileImageUrl(profileImageKey: string | null, oauthImage: string | null) {
-  if (profileImageKey) {
-    return `https://registration.t3.storage.dev/${profileImageKey}`;
-  }
-  return oauthImage || "";
-}
 
 export function BlockedMembersList({ initialData }: { initialData: QuizWithBlocked[] }) {
   const [quizzesWithBlocked, setQuizzesWithBlocked] = useState(initialData);
@@ -115,7 +110,10 @@ export function BlockedMembersList({ initialData }: { initialData: QuizWithBlock
                 >
                   <Avatar className="w-12 h-12">
                     <AvatarImage
-                      src={getProfileImageUrl(member.profileImageKey, member.image)}
+                      src={getUserProfileImageUrl({
+                        profileImageKey: member.profileImageKey,
+                        image: member.image,
+                      }) || undefined}
                       alt={member.name}
                     />
                     <AvatarFallback>

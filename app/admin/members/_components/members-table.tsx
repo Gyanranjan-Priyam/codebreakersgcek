@@ -63,7 +63,13 @@ import {
   Loader2,
   UserCheck,
   Target,
+  Shield,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   MemberData,
   toggleMemberBan,
@@ -487,20 +493,79 @@ export default function MembersTable({ members }: MembersTableProps) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-[160px]">
-                        {parseMemberRoles(member.role).map((role, idx) => {
-                          const { badgeClass } = getRoleBadgeClasses(role);
-                          return (
+                      {(() => {
+                        const roles = parseMemberRoles(member.role);
+                        const mainRole = roles[0] || "Member";
+                        const extraCount = roles.length - 1;
+                        const { badgeClass: mainBadgeClass } = getRoleBadgeClasses(mainRole);
+
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <Badge
-                              key={idx}
                               variant="outline"
-                              className={`text-[10px] py-0 px-1.5 font-normal ${badgeClass}`}
+                              className={`text-[10px] py-0 px-1.5 font-normal truncate max-w-[120px] ${mainBadgeClass}`}
+                              title={mainRole}
                             >
-                              {role}
+                              {mainRole}
                             </Badge>
-                          );
-                        })}
-                      </div>
+
+                            {extraCount > 0 && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center text-[10px] font-bold h-4.5 px-1.5 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0 shadow-2xs"
+                                    title={`Click to view all ${roles.length} roles`}
+                                  >
+                                    +{extraCount}
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  className="w-64 p-3 shadow-xl border-border bg-popover z-50"
+                                  align="start"
+                                >
+                                  <div className="space-y-2.5">
+                                    <div className="flex items-center justify-between border-b pb-2">
+                                      <div className="min-w-0 flex-1 pr-2">
+                                        <p className="text-xs font-semibold text-foreground truncate">
+                                          {member.name}
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground">
+                                          All Assigned Roles ({roles.length})
+                                        </p>
+                                      </div>
+                                      <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {roles.map((r, rIdx) => {
+                                        const { badgeClass } = getRoleBadgeClasses(r);
+                                        return (
+                                          <Badge
+                                            key={rIdx}
+                                            variant="outline"
+                                            className={`text-[11px] py-0.5 px-2 font-normal ${badgeClass} ${
+                                              rIdx === 0
+                                                ? "ring-1 ring-primary/40 font-semibold"
+                                                : ""
+                                            }`}
+                                          >
+                                            {r}
+                                            {rIdx === 0 && (
+                                              <span className="ml-1 text-[9px] opacity-75 font-mono">
+                                                (Main)
+                                              </span>
+                                            )}
+                                          </Badge>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-xs font-mono">{member.email}</TableCell>
                     <TableCell className="text-xs">

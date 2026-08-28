@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { parseMemberRoles, getRoleBadgeClasses } from "@/lib/member-roles";
 import { parseSpecializedDomains, getDomainBadgeClasses } from "@/lib/specialized-domains";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 import GitHubContributionCalendar from "@/components/member/github-contribution-calendar";
 import MemberSocialLinksCard, {
   SocialLinksData,
@@ -39,6 +40,7 @@ interface MemberDetailsProps {
     middleName: string | null;
     lastName: string | null;
     profileImageKey: string | null;
+    image?: string | null;
     registration: string | null;
     rollNumber: string | null;
     branch: string | null;
@@ -101,14 +103,10 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
       .slice(0, 2);
   };
 
-  // Get profile image URL
-  const getImageUrl = (imageKey: string) => {
-    return `https://codebreakers.t3.storage.dev/${imageKey}`;
-  };
-
-  const profileImageUrl = member.profileImageKey 
-    ? getImageUrl(member.profileImageKey)
-    : null;
+  const profileImageUrl = getUserProfileImageUrl({
+    profileImageKey: member.profileImageKey,
+    image: member.image,
+  });
 
   const domains = parseSpecializedDomains(member.specializedDomain);
 

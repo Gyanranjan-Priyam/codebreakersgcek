@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Github, ExternalLink, Users, Calendar, MessageSquare } from "lucide-react";
 import { ContactOwnerDialog } from "./contact-owner-dialog";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 
 interface CollaborativeProject {
   id: string;
@@ -24,6 +25,7 @@ interface CollaborativeProject {
     username: string | null;
     githubUsername: string | null;
     profileImageKey: string | null;
+    image?: string | null;
   };
 }
 
@@ -83,9 +85,9 @@ export function CollaborativeProjectsList({ projects, currentUserId, currentUser
               <div className="space-y-3 flex-1">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-10 w-10 sm:h-12 sm:w-12 border-2">
-                    {project.user.profileImageKey ? (
+                    {getUserProfileImageUrl(project.user) ? (
                       <AvatarImage
-                        src={`https://codebreakers.t3.storage.dev/${project.user.profileImageKey}`}
+                        src={getUserProfileImageUrl(project.user)!}
                         alt={project.user.name}
                       />
                     ) : null}

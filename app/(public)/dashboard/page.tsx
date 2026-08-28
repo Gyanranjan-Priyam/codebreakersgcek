@@ -26,6 +26,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getUserDashboardData } from "./actions";
 import { AnalyticsGraphCard } from "./_components/analytics-graph-card";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -64,9 +65,10 @@ export default async function UserDashboard() {
 
   const { stats, recentActivities, roadmaps = [], user } = dashboardResult.data;
 
-  const profileImageUrl = user.profileImageKey
-    ? `https://codebreakers.t3.storage.dev/${user.profileImageKey}`
-    : user.image || "";
+  const profileImageUrl = getUserProfileImageUrl({
+    profileImageKey: user.profileImageKey,
+    image: user.image,
+  }) || "";
 
   const getInitials = (name: string) => {
     return name

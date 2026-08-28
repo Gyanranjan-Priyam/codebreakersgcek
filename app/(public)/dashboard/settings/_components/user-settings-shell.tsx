@@ -30,6 +30,7 @@ interface UserSettingsShellProps {
     mobileNumber: string | null;
     whatsappNumber: string | null;
     profileImageKey: string | null;
+    image?: string | null;
     aadhaarNumber: string | null;
     state: string | null;
     district: string | null;
@@ -124,6 +125,7 @@ export function UserSettingsShell({ userData }: UserSettingsShellProps) {
               <SectionLabel>Profile picture</SectionLabel>
               <UserProfileImageUpload
                 currentImageKey={userData.profileImageKey}
+                currentOAuthImage={userData.image}
                 userName={userData.name || "User"}
               />
             </div>

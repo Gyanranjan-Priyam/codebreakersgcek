@@ -7,14 +7,17 @@ import { toast } from "sonner";
 import { Trash2, Loader2 } from "lucide-react";
 import { updateUserProfileImage, removeUserProfileImage } from "../actions";
 import { ProfileCropDialog } from "@/components/image-cropper/profile-crop-dialog";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 
 interface UserProfileImageUploadProps {
   currentImageKey?: string | null;
+  currentOAuthImage?: string | null;
   userName: string;
 }
 
 export function UserProfileImageUpload({
   currentImageKey,
+  currentOAuthImage,
   userName,
 }: UserProfileImageUploadProps) {
   const [pending, startTransition] = useTransition();
@@ -23,14 +26,13 @@ export function UserProfileImageUpload({
   const [isCropOpen, setIsCropOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getImageUrl = (imageKey: string | null | undefined) => {
-    if (!imageKey) return undefined;
-    const bucketName = process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES;
-    if (bucketName) return `https://codebreakers.t3.storage.dev/${imageKey}`;
-    return `/uploads/profiles/${imageKey}`;
-  };
+  const displayImageUrl = getUserProfileImageUrl({
+    profileImageKey: currentImageKey,
+    image: currentOAuthImage,
+  });
 
   const getInitials = (name: string) =>
+
     name
       .split(" ")
       .map((n) => n[0])
@@ -107,9 +109,9 @@ export function UserProfileImageUpload({
         {/* Circle avatar */}
         <div className="relative group">
           <Avatar className="w-20 h-20 border border-border">
-            {currentImageKey ? (
+            {displayImageUrl ? (
               <AvatarImage
-                src={getImageUrl(currentImageKey)}
+                src={displayImageUrl}
                 alt={userName}
                 className="object-cover"
               />

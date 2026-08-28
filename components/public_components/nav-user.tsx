@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
+import { getUserProfileImageUrl } from "@/lib/image-utils"
 
 export function NavUser({
   user,
@@ -40,16 +41,11 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const router = useRouter()
 
-  // Get profile image URL - prioritize profileImageKey from S3
-  const getProfileImageUrl = () => {
-    if (user.profileImageKey) {
-      return `https://codebreakers.t3.storage.dev/${user.profileImageKey}`;
-    }
-    // Only return avatar if it's a valid URL, otherwise return undefined
-    return user.avatar && user.avatar !== 'undefined' && user.avatar !== '/default-avatar.png' ? user.avatar : undefined;
-  };
+  const profileImageUrl = getUserProfileImageUrl({
+    profileImageKey: user.profileImageKey,
+    avatar: user.avatar,
+  }) || undefined;
 
-  const profileImageUrl = getProfileImageUrl();
 
   // Generate initials from user name
   const getInitials = (name: string) => {

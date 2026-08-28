@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
         branch: true,
         batchId: true,
         profileImageKey: true,
+        image: true,
         banned: true,
         banReason: true,
         role: true,

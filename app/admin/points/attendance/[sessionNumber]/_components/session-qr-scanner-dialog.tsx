@@ -25,6 +25,7 @@ import {
   RotateCw,
 } from "lucide-react";
 import { format } from "date-fns";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 
 interface SessionQRScannerDialogProps {
   open: boolean;
@@ -49,6 +50,7 @@ interface ScannedUser {
   rollNumber: string | null;
   branch: string | null;
   profileImageKey: string | null;
+  image?: string | null;
   role: string | null;
 }
 
@@ -387,9 +389,9 @@ export default function SessionQRScannerDialog({
               }`}
             >
               <Avatar className="h-10 w-10 border border-background">
-                {lastScanned.user.profileImageKey ? (
+                {getUserProfileImageUrl(lastScanned.user) ? (
                   <AvatarImage
-                    src={`https://codebreakers.t3.storage.dev/${lastScanned.user.profileImageKey}`}
+                    src={getUserProfileImageUrl(lastScanned.user)!}
                     alt={lastScanned.user.name}
                   />
                 ) : null}

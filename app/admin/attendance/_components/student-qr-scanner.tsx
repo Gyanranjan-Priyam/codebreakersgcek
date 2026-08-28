@@ -24,6 +24,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { format } from "date-fns";
+import { getUserProfileImageUrl } from "@/lib/image-utils";
 
 interface ScannedUser {
   id: string;
@@ -34,6 +35,7 @@ interface ScannedUser {
   rollNumber: string | null;
   branch: string | null;
   profileImageKey: string | null;
+  image?: string | null;
   role: string | null;
 }
 
@@ -428,9 +430,9 @@ export default function StudentQRScanner({
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12 border-2 border-background shadow-xs">
-                    {lastScanned.user.profileImageKey ? (
+                    {getUserProfileImageUrl(lastScanned.user) ? (
                       <AvatarImage
-                        src={`https://codebreakers.t3.storage.dev/${lastScanned.user.profileImageKey}`}
+                        src={getUserProfileImageUrl(lastScanned.user)!}
                         alt={lastScanned.user.name}
                       />
                     ) : null}
@@ -527,9 +529,9 @@ export default function StudentQRScanner({
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Avatar className="h-8 w-8">
-                        {item.user.profileImageKey ? (
+                        {getUserProfileImageUrl(item.user) ? (
                           <AvatarImage
-                            src={`https://codebreakers.t3.storage.dev/${item.user.profileImageKey}`}
+                            src={getUserProfileImageUrl(item.user)!}
                             alt={item.user.name}
                           />
                         ) : null}

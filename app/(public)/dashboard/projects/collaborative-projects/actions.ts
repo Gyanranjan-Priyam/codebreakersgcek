@@ -25,6 +25,7 @@ export async function getCollaborativeProjects() {
             username: true,
             githubUsername: true,
             profileImageKey: true,
+            image: true,
           },
         },
       },
