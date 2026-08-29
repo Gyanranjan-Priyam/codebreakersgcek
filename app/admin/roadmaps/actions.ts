@@ -138,6 +138,7 @@ export async function updateAdminRoadmap(
     revalidatePath("/dashboard/roadmaps");
     revalidatePath(`/dashboard/roadmaps/${updated.slug}`);
     revalidatePath("/admin/roadmaps");
+    revalidatePath(`/admin/roadmaps/${id}`);
 
     return {
       status: "success" as const,

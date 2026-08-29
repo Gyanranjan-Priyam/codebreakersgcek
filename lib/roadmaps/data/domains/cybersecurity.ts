@@ -29,7 +29,7 @@ export const cybersecurityRoadmap: RoadmapData = {
 
 Analyze packet frames and uncover vulnerable open ports across enterprise networks.
 `,
-        difficulty: "beginner",
+        difficulty: "beginner", 
         colorKey: "B",
         estimatedHours: 18,
       },

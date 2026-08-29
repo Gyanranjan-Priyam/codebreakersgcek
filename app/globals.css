@@ -514,3 +514,14 @@ body:has(.font-neo) [data-sonner-toast] [data-button]:hover {
   transform: translate(2px, 2px) !important;
   box-shadow: 1px 1px 0px 0px #000000 !important;
 }
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}

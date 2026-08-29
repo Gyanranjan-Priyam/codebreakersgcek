@@ -120,6 +120,8 @@ export const InteractiveEdge = memo((props: EdgeProps) => {
 
   const isStraight = edgePath.startsWith("M") && edgePath.includes("L");
 
+  const isEditable = (props.data as any)?.editable === true;
+
   return (
     <>
       {/* Background wider invisible path for easier dragging/clicking */}
@@ -127,8 +129,8 @@ export const InteractiveEdge = memo((props: EdgeProps) => {
         d={edgePath}
         fill="none"
         stroke="transparent"
-        strokeWidth={24}
-        className="cursor-pointer"
+        strokeWidth={isEditable ? 24 : 0}
+        className={isEditable ? "cursor-pointer" : "pointer-events-none"}
       />
 
       {/* Main Visible Wire */}
@@ -136,15 +138,15 @@ export const InteractiveEdge = memo((props: EdgeProps) => {
         path={edgePath}
         style={{
           ...style,
-          stroke: selected ? "#ef4444" : style.stroke || "#3b82f6",
-          strokeWidth: selected ? 3 : isStraight ? 2.5 : 2,
+          stroke: isEditable && selected ? "#ef4444" : style.stroke || "#3b82f6",
+          strokeWidth: isEditable && selected ? 3 : isStraight ? 2.5 : 2,
           strokeDasharray: isStraight ? undefined : style.strokeDasharray || "4 4",
           transition: "stroke 0.2s, stroke-width 0.2s",
         }}
       />
 
-      {/* Interactive Delete Button on selection */}
-      {selected && (
+      {/* Interactive Delete Button on selection (Admin only) */}
+      {isEditable && selected && (
         <EdgeLabelRenderer>
           <div
             style={{

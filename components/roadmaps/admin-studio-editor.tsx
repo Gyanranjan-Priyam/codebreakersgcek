@@ -171,6 +171,7 @@ function AdminStudioEditorInternal({ roadmap, availableRoadmaps = [] }: AdminStu
       sourceHandle: (e as any).sourceHandle,
       targetHandle: (e as any).targetHandle,
       type: "interactive",
+      data: { editable: true },
       animated: e.animated !== false,
       style: { stroke: "#3b82f6", strokeWidth: 2 },
     }));
@@ -196,6 +197,7 @@ function AdminStudioEditorInternal({ roadmap, availableRoadmaps = [] }: AdminStu
             sourceHandle,
             targetHandle,
             type: "interactive",
+            data: { editable: true },
             animated: true,
             style: { stroke: "#3b82f6", strokeWidth: 2 },
           },
@@ -1051,6 +1053,12 @@ function AdminStudioEditorInternal({ roadmap, availableRoadmaps = [] }: AdminStu
           type: n.type,
           position: n.position,
           data: n.data,
+          ...(n.style ? { style: n.style } : {}),
+          ...(n.parentId ? { parentId: n.parentId } : {}),
+          ...(n.extent ? { extent: n.extent } : {}),
+          ...(n.width ? { width: n.width } : {}),
+          ...(n.height ? { height: n.height } : {}),
+          ...(n.zIndex !== undefined ? { zIndex: n.zIndex } : {}),
         })),
         edges: edges.map((e) => ({
           id: e.id,
@@ -1060,6 +1068,8 @@ function AdminStudioEditorInternal({ roadmap, availableRoadmaps = [] }: AdminStu
           targetHandle: (e as any).targetHandle,
           type: e.type,
           animated: e.animated,
+          ...((e as any).label ? { label: (e as any).label } : {}),
+          ...((e as any).style ? { style: (e as any).style } : {}),
         })),
       });
 
