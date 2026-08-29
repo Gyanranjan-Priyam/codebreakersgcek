@@ -102,7 +102,9 @@ export default function MemberSubmissionList({
       );
 
       if (result.status === "success") {
-        toast.success(result.message);
+        toast.success("Submission evaluated!", {
+          description: `${selectedMember.name} • ${evalStatus.toUpperCase()} (${evalPoints} pts)`,
+        });
         setSubmissionStatus((prev) => ({
           ...prev,
           [selectedMember.id]: {
@@ -116,10 +118,14 @@ export default function MemberSubmissionList({
         setEvalDialogOpen(false);
         router.refresh();
       } else {
-        toast.error(result.message);
+        toast.error("Evaluation failed", {
+          description: result.message || "Failed to record evaluation. Please try again.",
+        });
       }
     } catch (error) {
-      toast.error("Failed to evaluate submission");
+      toast.error("Evaluation error", {
+        description: "Failed to evaluate submission. Please check your network.",
+      });
     } finally {
       setEvaluatingId(null);
     }

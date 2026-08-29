@@ -51,28 +51,36 @@ export function ExportQuizPDF({
     try {
       setIsExporting(true);
 
-      const pdfBlob = await generateQuizPDF({
-        title: quizTitle,
-        quizId,
-        description,
-        duration,
-        pointsPerQuestion,
-        targetAudience,
-        setNumber,
-        questions,
-        questionsBySet,
-        shiftsMap,
+      const generatePromise = (async () => {
+        const pdfBlob = await generateQuizPDF({
+          title: quizTitle,
+          quizId,
+          description,
+          duration,
+          pointsPerQuestion,
+          targetAudience,
+          setNumber,
+          questions,
+          questionsBySet,
+          shiftsMap,
+        });
+
+        const filename = setNumber
+          ? `${quizId}_Set_${setNumber}_Exam.pdf`
+          : `${quizId}_Exam_Question_Paper.pdf`;
+
+        downloadQuizPDF(pdfBlob, filename);
+        return filename;
+      })();
+
+      await toast.promise(generatePromise, {
+        loading: "Generating optimized exam PDF...",
+        success: "Exam PDF exported successfully!",
+        error: "Failed to export PDF",
+        description: "Official printable question paper ready",
       });
-
-      const filename = setNumber
-        ? `${quizId}_Set_${setNumber}_Exam.pdf`
-        : `${quizId}_Exam_Question_Paper.pdf`;
-
-      downloadQuizPDF(pdfBlob, filename);
-      toast.success("Exam PDF exported successfully!");
     } catch (error) {
       console.error("Error exporting PDF:", error);
-      toast.error("Failed to export PDF");
     } finally {
       setIsExporting(false);
     }

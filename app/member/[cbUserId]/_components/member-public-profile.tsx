@@ -43,6 +43,7 @@ import {
   PortfolioIcon,
   CustomLinkIcon,
 } from "@/components/icons/social-icons";
+import Image from "next/image";
 
 export interface SocialLinksData {
   github?: string | null;
@@ -135,7 +136,9 @@ export default function MemberPublicProfile({ member }: MemberPublicProfileProps
       if (typeof window !== "undefined") {
         await navigator.clipboard.writeText(window.location.href);
         setCopied(true);
-        toast.success("Profile link copied to clipboard!");
+        toast.success("Profile link copied to clipboard!", {
+          description: "URL ready to share with others",
+        });
         setTimeout(() => setCopied(false), 2500);
       }
     } catch {
@@ -257,7 +260,7 @@ export default function MemberPublicProfile({ member }: MemberPublicProfileProps
   ];
 
   return (
-    <div className="min-h-screen bg-[#FFFDF5] text-black antialiased font-sans selection:bg-[#FFD93D] selection:text-black pb-16">
+    <div data-neo-page="true" className="min-h-screen bg-[#FFFDF5] text-black antialiased font-sans selection:bg-[#FFD93D] selection:text-black pb-16">
       {/* Global font and Neo-Brutalist CSS tokens */}
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&display=swap');
@@ -304,10 +307,12 @@ export default function MemberPublicProfile({ member }: MemberPublicProfileProps
             className="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-black"
           >
             <div className="h-9 w-9 bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000] flex items-center justify-center group-hover:-rotate-3 transition-transform">
-              <img
+              <Image
                 src="/assets/logo.png"
                 alt="CodeBreakers Logo"
                 className="h-6 w-6 object-contain"
+                width={23}
+                height={23}
               />
             </div>
             <div className="flex flex-col">

@@ -99,7 +99,9 @@ export default function QRScannerComponent() {
         !parsedData.sessionId ||
         parsedData.type !== "attendance"
       ) {
-        toast.error("Invalid QR code");
+        toast.error("Invalid QR Code", {
+          description: "Please scan an official CodeBreakers attendance session QR code.",
+        });
         setScanResult({
           success: false,
           message: "Invalid QR code format",
@@ -129,14 +131,18 @@ export default function QRScannerComponent() {
           sessionTitle: data.sessionTitle,
           points: data.points,
         });
-        toast.success("Attendance marked successfully!");
+        toast.success("Attendance marked successfully!", {
+          description: `${data.sessionTitle || "Session"} • +${data.points || 0} XP awarded`,
+        });
       } else {
         setScanResult({
           success: false,
           message: data.error,
           error: data.error,
         });
-        toast.error(data.error || "Failed to mark attendance");
+        toast.error("Attendance check-in failed", {
+          description: data.error || "Please verify your session status and try again.",
+        });
       }
     } catch (error) {
       console.error("Error marking attendance:", error);
@@ -145,7 +151,9 @@ export default function QRScannerComponent() {
         message: "Invalid QR code format or network error",
         error: "Invalid QR code format or network error",
       });
-      toast.error("Failed to process QR code");
+      toast.error("QR Code error", {
+        description: "Could not decode QR code. Please check your camera focus.",
+      });
     }
   };
 

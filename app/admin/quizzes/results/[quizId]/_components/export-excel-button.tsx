@@ -52,7 +52,9 @@ export function ExportExcelButton({
 
   const handleExportExcel = () => {
     if (!attempts || attempts.length === 0) {
-      toast.error("No attempts available to export");
+      toast.warning("No attempts available", {
+        description: "There are no student attempts to export to Excel.",
+      });
       return;
     }
 
@@ -116,10 +118,14 @@ export function ExportExcelButton({
       const safeTitle = (quizTitle || "Quiz").replace(/[^a-zA-Z0-9_-]/g, "_");
       XLSX.writeFile(workbook, `${safeTitle}_Ranked_Results.xlsx`);
 
-      toast.success(`Exported ${sortedAttempts.length} ranked results to Excel!`);
+      toast.success("Exported results to Excel!", {
+        description: `${sortedAttempts.length} participant records saved`,
+      });
     } catch (error) {
       console.error("Error exporting to Excel:", error);
-      toast.error("Failed to export Excel file");
+      toast.error("Failed to export Excel file", {
+        description: "An unexpected error occurred during Excel workbook generation.",
+      });
     } finally {
       setIsExporting(false);
     }

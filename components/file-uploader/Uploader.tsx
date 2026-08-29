@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card, CardContent } from '../ui/card';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from "sonner";
 import { Button } from '../ui/button';
 import { CloudUploadIcon, EyeIcon, FileIcon, ImageIcon, Loader2, TrashIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -30,6 +30,10 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
         setUploadProgress(0);
         setFileName(file.name);
         
+        const toastId = toast.loading(`Uploading ${file.name}... (0%)`, {
+            description: "Preparing upload...",
+        });
+
         try {
             // Create preview URL
             const objectUrl = URL.createObjectURL(file);
@@ -37,6 +41,10 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
 
             // Server-side direct upload fallback helper
             const uploadDirectly = async () => {
+                toast.loading(`Uploading ${file.name}...`, {
+                    id: toastId,
+                    description: "Uploading directly to server...",
+                });
                 const formData = new FormData();
                 formData.append('file', file);
                 const directRes = await fetch('/api/s3/upload-direct', {
@@ -50,7 +58,11 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
                 if (!data.key) throw new Error('No key returned from server upload');
                 setUploadProgress(100);
                 onChange?.(data.key);
-                toast.success('File uploaded successfully');
+                toast.success('File uploaded successfully', {
+                    id: toastId,
+                    description: file.name,
+                });
+                return data.key;
             };
 
             try {
@@ -74,14 +86,20 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
 
                 const { preSignedUrl, key } = await response.json();
 
-                // Upload to S3 via presigned URL
-                await new Promise<void>((resolve, reject) => {
+                // Upload to S3 via presigned URL with real-time progress
+                await new Promise<string>((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
 
                     xhr.upload.addEventListener('progress', (event) => {
                         if (event.lengthComputable) {
                             const progress = Math.round((event.loaded / event.total) * 100);
                             setUploadProgress(progress);
+                            const loadedMB = (event.loaded / (1024 * 1024)).toFixed(1);
+                            const totalMB = (event.total / (1024 * 1024)).toFixed(1);
+                            toast.loading(`Uploading ${file.name}... (${progress}%)`, {
+                                id: toastId,
+                                description: `${loadedMB} MB of ${totalMB} MB`,
+                            });
                         }
                     });
 
@@ -89,8 +107,11 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
                         if (xhr.status >= 200 && xhr.status < 300) {
                             setUploadProgress(100);
                             onChange?.(key);
-                            toast.success('File uploaded successfully');
-                            resolve();
+                            toast.success('File uploaded successfully', {
+                                id: toastId,
+                                description: file.name,
+                            });
+                            resolve(key);
                         } else {
                             reject(new Error(`Upload failed with status ${xhr.status}`));
                         }
@@ -112,10 +133,12 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
                 console.warn('Presigned upload failed or blocked by CORS. Using direct upload fallback...', presignedErr);
                 await uploadDirectly();
             }
-
-        } catch (error) {
+        } catch (error: any) {
             console.error('All upload attempts failed:', error);
-            toast.error('Upload failed. Please try again.');
+            toast.error('Upload failed', {
+                id: toastId,
+                description: error?.message || 'Please check the file and try again.',
+            });
             setPreviewUrl('');
             setUploadProgress(0);
         } finally {
@@ -133,12 +156,20 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
         if (rejectedFiles.length > 0) {
             const errors = rejectedFiles[0].errors;
             if (errors.some((e: any) => e.code === 'file-invalid-type')) {
-                toast.error(`Please upload a valid ${fileTypeAccepted === 'image' ? 'image (JPG/PNG/WebP)' : 'PDF'} file`);
+                toast.error('Invalid file format', {
+                    description: `Please upload a valid ${fileTypeAccepted === 'image' ? 'image (JPG/PNG/WebP)' : 'PDF'} file`,
+                });
             } else if (errors.some((e: any) => e.code === 'file-too-large')) {
                 const maxSizeMB = Math.round(maxSize / 1024 / 1024);
                 const maxSizeKB = Math.round(maxSize / 1024);
                 const sizeText = maxSizeMB >= 1 ? `${maxSizeMB}MB` : `${maxSizeKB}KB`;
-                toast.error(`File is too large. Maximum size is ${sizeText}`);
+                toast.warning('File exceeds size limit', {
+                    description: `Maximum file size allowed is ${sizeText}`,
+                });
+            } else {
+                toast.error('File rejected', {
+                    description: errors[0]?.message || 'Please choose a valid file',
+                });
             }
         }
     }, [fileTypeAccepted, maxSize]);

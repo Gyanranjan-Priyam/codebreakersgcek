@@ -1,10 +1,13 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/preserve-manual-memoization */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useCallback, useState } from 'react';
 import { useDropzone, Accept } from 'react-dropzone';
 import { Card, CardContent } from '../ui/card';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from "sonner";
 import { Button } from '../ui/button';
 import { CloudUploadIcon, EyeIcon, ImageIcon, Loader2, TrashIcon, XIcon, FileTextIcon, FileIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -114,9 +117,16 @@ export function MultipleUploader({
         };
         
         setUploadingFiles(prev => [...prev, uploadingFile]);
-        
-        // Server-side direct upload fallback helper
+
+        const toastId = toast.loading(`Uploading ${file.name}... (0%)`, {
+            description: "Preparing upload...",
+        });
+
         const uploadDirectly = async () => {
+            toast.loading(`Uploading ${file.name}...`, {
+                id: toastId,
+                description: "Uploading directly to server...",
+            });
             const formData = new FormData();
             formData.append('file', file);
             const directRes = await fetch('/api/s3/upload-direct', {
@@ -132,7 +142,11 @@ export function MultipleUploader({
             setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
             const newValue = [...value, data.key];
             onChange?.(newValue);
-            toast.success(`${file.name} uploaded successfully`);
+            toast.success('File uploaded successfully', {
+                id: toastId,
+                description: file.name,
+            });
+            return data.key;
         };
 
         try {
@@ -156,8 +170,8 @@ export function MultipleUploader({
 
             const { preSignedUrl, key } = await response.json();
 
-            // Upload to S3 with progress tracking wrapped in a Promise
-            await new Promise<void>((resolve, reject) => {
+            // Upload to S3 with real-time progress tracking
+            await new Promise<string>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
 
                 xhr.upload.addEventListener('progress', (event) => {
@@ -166,6 +180,12 @@ export function MultipleUploader({
                         setUploadingFiles(prev => 
                             prev.map(f => f.id === uploadId ? { ...f, progress } : f)
                         );
+                        const loadedMB = (event.loaded / (1024 * 1024)).toFixed(1);
+                        const totalMB = (event.total / (1024 * 1024)).toFixed(1);
+                        toast.loading(`Uploading ${file.name}... (${progress}%)`, {
+                            id: toastId,
+                            description: `${loadedMB} MB of ${totalMB} MB`,
+                        });
                     }
                 });
 
@@ -174,8 +194,11 @@ export function MultipleUploader({
                         setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
                         const newValue = [...value, key];
                         onChange?.(newValue);
-                        toast.success(`${file.name} uploaded successfully`);
-                        resolve();
+                        toast.success('File uploaded successfully', {
+                            id: toastId,
+                            description: file.name,
+                        });
+                        resolve(key);
                     } else {
                         reject(new Error(`Upload failed with status ${xhr.status}`));
                     }
@@ -198,9 +221,12 @@ export function MultipleUploader({
             console.warn('Presigned upload failed or blocked by CORS. Trying server direct upload fallback...', presignedErr);
             try {
                 await uploadDirectly();
-            } catch (fallbackErr) {
+            } catch (fallbackErr: any) {
                 console.error('All upload attempts failed:', fallbackErr);
-                toast.error(`Failed to upload ${file.name}`);
+                toast.error(`Failed to upload ${file.name}`, {
+                    id: toastId,
+                    description: fallbackErr?.message || 'Please check your connection.',
+                });
                 setUploadingFiles(prev => prev.filter(f => f.id !== uploadId));
                 URL.revokeObjectURL(objectUrl);
             }

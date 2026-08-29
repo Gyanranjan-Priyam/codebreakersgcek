@@ -27,10 +27,14 @@ export function PublishResultButton({
     setIsLoading(true);
     const res = await publishStudentResult(attemptId);
     if (res.status === "success") {
-      toast.success(res.message);
+      toast.success("Result published successfully", {
+        description: res.message || "Email notification dispatched to student.",
+      });
       setIsPublished(true);
     } else {
-      toast.error(res.message || "Failed to publish result");
+      toast.error("Failed to publish result", {
+        description: res.message || "Please check your connection and try again.",
+      });
     }
     setIsLoading(false);
   };

@@ -555,7 +555,7 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         <Button
           type="submit"
           disabled={pending}
-          className="bg-foreground text-background hover:bg-foreground/90 h-9 px-5 text-sm font-medium rounded-full cursor-pointer"
+          className="mb-10 bg-foreground text-background hover:bg-foreground/90 h-9 px-5 text-sm font-medium rounded-full cursor-pointer"
         >
           {pending ? (
             <>

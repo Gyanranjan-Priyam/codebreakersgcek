@@ -71,22 +71,27 @@ export function ResumePreview({
   // Pure Vector PDF Download matching the Word DOCX precision
   const handleDirectDownloadPDF = async () => {
     setIsGeneratingPdf(true);
-    toast.loading("Generating ATS Vector PDF...", { id: "pdf-download" });
 
     try {
-      const { generatePdfFromResume } = await import("@/lib/resume/pdf-exporter");
-      const blob = await generatePdfFromResume(visualData, parsedLatex);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${(visualData.personalInfo.fullName || "Resume").replace(/\s+/g, "_")}_Resume.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const generatePromise = (async () => {
+        const { generatePdfFromResume } = await import("@/lib/resume/pdf-exporter");
+        const blob = await generatePdfFromResume(visualData, parsedLatex);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${(visualData.personalInfo.fullName || "Resume").replace(/\s+/g, "_")}_Resume.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return a.download;
+      })();
 
-      toast.success("PDF downloaded successfully", { id: "pdf-download" });
+      await toast.promise(generatePromise, {
+        loading: "Generating ATS Vector PDF...",
+        success: "PDF downloaded successfully",
+        error: "Failed to generate PDF",
+      });
     } catch (err) {
       console.error("PDF generation error:", err);
-      toast.error("Failed to generate PDF", { id: "pdf-download" });
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -118,19 +123,25 @@ export function ResumePreview({
 
   const handleDownloadDocx = async () => {
     try {
-      toast.loading("Generating Word (.docx) document...", { id: "docx-export" });
-      const { generateDocxFromResume } = await import("@/lib/resume/docx-exporter");
-      const blob = await generateDocxFromResume(visualData, parsedLatex);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${visualData.personalInfo.fullName.replace(/\s+/g, "_")}_Resume.docx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Word document (.docx) downloaded", { id: "docx-export" });
+      const docxPromise = (async () => {
+        const { generateDocxFromResume } = await import("@/lib/resume/docx-exporter");
+        const blob = await generateDocxFromResume(visualData, parsedLatex);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${visualData.personalInfo.fullName.replace(/\s+/g, "_")}_Resume.docx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return a.download;
+      })();
+
+      await toast.promise(docxPromise, {
+        loading: "Generating Word (.docx) document...",
+        success: "Word document (.docx) downloaded",
+        error: "Failed to generate DOCX file",
+      });
     } catch (err) {
       console.error("DOCX export error:", err);
-      toast.error("Failed to generate DOCX file", { id: "docx-export" });
     }
   };
 

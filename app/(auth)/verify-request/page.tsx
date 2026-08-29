@@ -32,11 +32,15 @@ function VerifyRequest() {
                 otp: otp,
                 fetchOptions: {
                     onSuccess: () => {
-                        toast.success("Email verified successfully!");
+                        toast.success("Email verified successfully!", {
+                            description: "Signing you in and redirecting to dashboard...",
+                        });
                         router.push("/auth/callback");
                     },
                     onError: () => {
-                        toast.error("Invalid OTP. Please try again.");
+                        toast.error("Invalid verification code", {
+                            description: "Please check the 6-digit OTP and try again.",
+                        });
                     }
                 }
             })
@@ -113,10 +117,14 @@ function VerifyRequest() {
                                 type: "sign-in",
                                 fetchOptions: {
                                     onSuccess: () => {
-                                        toast.success("Verification code has been resent to your email.");
+                                        toast.success("Verification code resent!", {
+                                            description: `A fresh 6-digit OTP was sent to ${email}.`,
+                                        });
                                     },
                                     onError: (ctx) => {
-                                        toast.error(ctx.error.message || "Failed to resend code. Please try again.");
+                                        toast.error("Failed to resend code", {
+                                            description: ctx.error.message || "Please wait a moment before trying again.",
+                                        });
                                     }
                                 }
                             });

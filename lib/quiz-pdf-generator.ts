@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import jsPDF from "jspdf";
 
 export interface QuizQuestion {
@@ -27,22 +28,111 @@ export interface QuizPDFData {
   showAnswerKey?: boolean;
 }
 
-async function loadImageAsBase64(imagePath: string): Promise<string> {
+async function loadImageAsBase64(imagePath: string, maxDim: number = 300): Promise<string> {
   try {
     if (typeof window === "undefined") return "";
     const response = await fetch(imagePath);
     if (!response.ok) return "";
     const blob = await response.blob();
+
+    // Downsample image using canvas to reduce decoded bitmap memory and PDF size (40MB+ -> <100KB)
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(blob);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve("");
+            return;
+          }
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL("image/png", 0.85);
+          resolve(dataUrl);
+        } catch {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(blob);
+        }
+      };
+      img.onerror = () => resolve("");
+      img.src = URL.createObjectURL(blob);
     });
   } catch (error) {
     console.warn(`Could not load logo from ${imagePath}:`, error);
     return "";
   }
+}
+
+/**
+ * Sanitizes and normalizes text for clean rendering in jsPDF standard fonts.
+ * - Converts Unicode characters (NFKC normalization to fix full-width chars)
+ * - Replaces currency symbols like ₹ with Rs.
+ * - Replaces smart quotes, em/en dashes, bullets, and ellipses
+ * - Strips zero-width chars and normalizes strange whitespace
+ */
+export function sanitizePdfText(text: string | null | undefined): string {
+  if (text === null || text === undefined) return "";
+
+  let str = String(text);
+
+  // 1. Unicode Compatibility Decomposition / Composition (fixes full-width Latin chars)
+  try {
+    str = str.normalize("NFKC");
+  } catch {
+    // ignore if normalize is unsupported
+  }
+
+  // 2. Fix Indian Rupee symbol & other currencies not supported in standard font encoding
+  str = str.replace(/₹\s*/g, "Rs. ");
+
+  // 3. Normalize quotes and typography
+  str = str
+    .replace(/[\u2018\u2019\u201A\u201B`]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F«»]/g, '"')
+    .replace(/[\u2013\u2014\u2015]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/[\u2022\u25CF\u25CB\u25AA\u25AB]/g, "*")
+    .replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ") // Non-breaking & wide spaces
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/g, ""); // Zero-width characters
+
+  // 4. Remove any remaining non-printable or unsupported control characters (preserve standard printable ASCII & Latin-1)
+  str = str.replace(/[^\x20-\x7E\t\n\r\xA0-\xFF]/g, (char) => {
+    if (char === "×") return "x";
+    if (char === "÷") return "/";
+    if (char === "±") return "+/-";
+    if (char === "≤") return "<=";
+    if (char === "≥") return ">=";
+    if (char === "≠") return "!=";
+    if (char === "≈") return "~";
+    if (char === "√") return "sqrt";
+    if (char === "π") return "pi";
+    if (char === "∞") return "infinity";
+    if (char === "°") return " deg";
+    return "";
+  });
+
+  return str;
 }
 
 /**
@@ -56,7 +146,8 @@ function measureText(
   lineHeightFactor: number = 1.35
 ): { lines: string[]; height: number; lineHeight: number } {
   pdf.setFontSize(fontSize);
-  const raw = String(text ?? "").replace(/\r\n/g, "\n");
+  const clean = sanitizePdfText(text);
+  const raw = clean.replace(/\r\n/g, "\n");
   const segments = raw.split("\n");
   const lines: string[] = [];
 
@@ -64,7 +155,7 @@ function measureText(
     if (seg.trim().length === 0) {
       lines.push("");
     } else {
-      const wrapped = pdf.splitTextToSize(seg, maxWidth) as string[];
+      const wrapped = pdf.splitTextToSize(seg.trim(), maxWidth) as string[];
       lines.push(...wrapped);
     }
   }
@@ -110,20 +201,22 @@ function getAnswerDetails(
   let correctLetter = "";
   let correctText = "";
 
+  const sanitizedOptions = options.map((opt) => sanitizePdfText(opt));
+
   if (typeof answer === "number") {
     correctIndex = answer;
   } else if (typeof answer === "string") {
-    const trimmed = answer.trim();
+    const trimmed = sanitizePdfText(answer).trim();
     if (/^\d+$/.test(trimmed)) {
       correctIndex = parseInt(trimmed, 10);
     } else if (/^[A-Za-z]$/.test(trimmed)) {
       correctIndex = trimmed.toUpperCase().charCodeAt(0) - 65;
     } else {
       // Find matching option text
-      const foundIdx = options.findIndex(
+      const foundIdx = sanitizedOptions.findIndex(
         (opt) =>
-          String(opt).trim().toLowerCase() === trimmed.toLowerCase() ||
-          String(opt).toLowerCase().startsWith(trimmed.toLowerCase())
+          opt.trim().toLowerCase() === trimmed.toLowerCase() ||
+          opt.toLowerCase().startsWith(trimmed.toLowerCase())
       );
       if (foundIdx !== -1) {
         correctIndex = foundIdx;
@@ -131,12 +224,12 @@ function getAnswerDetails(
     }
   }
 
-  if (correctIndex >= 0 && correctIndex < options.length) {
+  if (correctIndex >= 0 && correctIndex < sanitizedOptions.length) {
     correctLetter = String.fromCharCode(65 + correctIndex);
-    correctText = options[correctIndex] || "";
+    correctText = sanitizedOptions[correctIndex] || "";
   } else if (typeof answer === "string" && answer.trim()) {
     correctLetter = "?";
-    correctText = answer.trim();
+    correctText = sanitizePdfText(answer).trim();
   }
 
   return { correctIndex, correctLetter, correctText };
@@ -147,6 +240,7 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
     orientation: "portrait",
     unit: "mm",
     format: "a4",
+    compress: true,
   });
 
   const PAGE_WIDTH = 210;
@@ -170,10 +264,10 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
 
   let y = MARGIN_TOP;
 
-  // Load logos
+  // Load logos (downsampled to max 300px)
   const [gcekLogo, cbLogo] = await Promise.all([
-    loadImageAsBase64("/assets/gcek_logo.png"),
-    loadImageAsBase64("/assets/logo.png"),
+    loadImageAsBase64("/assets/gcek_logo.png", 300),
+    loadImageAsBase64("/assets/logo.png", 300),
   ]);
 
   // Running Header Helper for page 2+
@@ -183,12 +277,12 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
     pdf.text(
-      `CodeBreakers Examination System · ${data.title}`,
+      `CodeBreakers Examination System · ${sanitizePdfText(data.title)}`,
       MARGIN_LEFT,
       10
     );
     pdf.text(
-      `Quiz ID: ${data.quizId}`,
+      data.setNumber ? `Set ${data.setNumber}` : "Examination Question Paper",
       PAGE_WIDTH - MARGIN_RIGHT,
       10,
       { align: "right" }
@@ -218,7 +312,7 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
 
   if (gcekLogo) {
     try {
-      pdf.addImage(gcekLogo, "PNG", MARGIN_LEFT, headerTop, logoSize, logoSize);
+      pdf.addImage(gcekLogo, "PNG", MARGIN_LEFT, headerTop, logoSize, logoSize, "GCEK_LOGO", "FAST");
     } catch {
       // ignore
     }
@@ -226,7 +320,7 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
 
   if (cbLogo) {
     try {
-      pdf.addImage(cbLogo, "PNG", PAGE_WIDTH - MARGIN_RIGHT - logoSize, headerTop, logoSize, logoSize);
+      pdf.addImage(cbLogo, "PNG", PAGE_WIDTH - MARGIN_RIGHT - logoSize, headerTop, logoSize, logoSize, "CB_LOGO", "FAST");
     } catch {
       // ignore
     }
@@ -257,7 +351,7 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
   pdf.text(
-    data.title.toUpperCase(),
+    sanitizePdfText(data.title).toUpperCase(),
     PAGE_WIDTH / 2,
     headerTop + 15,
     { align: "center" }
@@ -272,7 +366,7 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
   y += 3;
 
   // -------------------------------------------------------------
-  // 2. EXAM METADATA BOX (4-Column Key Info Grid)
+  // 2. EXAM METADATA BOX (3-Column Key Info Grid without Quiz ID)
   // -------------------------------------------------------------
   const metaBoxHeight = 13;
   pdf.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
@@ -280,51 +374,41 @@ export async function generateQuizPDF(data: QuizPDFData): Promise<Blob> {
   pdf.setLineWidth(0.3);
   pdf.roundedRect(MARGIN_LEFT, y, CONTENT_WIDTH, metaBoxHeight, 2, 2, "FD");
 
-  const colWidth = CONTENT_WIDTH / 4;
+  const colWidth = CONTENT_WIDTH / 3;
   const colYLabel = y + 4.5;
   const colYVal = y + 9.5;
 
-  // Col 1: Quiz ID
+  // Col 1: Duration
   pdf.setFontSize(7);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
-  pdf.text("QUIZ ID", MARGIN_LEFT + 4, colYLabel);
+  pdf.text("DURATION", MARGIN_LEFT + 4, colYLabel);
   pdf.setFontSize(8.5);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
-  pdf.text(data.quizId, MARGIN_LEFT + 4, colYVal);
+  pdf.text(`${data.duration} Minutes`, MARGIN_LEFT + 4, colYVal);
 
-  // Col 2: Duration
+  // Col 2: Points per Question
   pdf.setFontSize(7);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
-  pdf.text("DURATION", MARGIN_LEFT + colWidth + 4, colYLabel);
+  pdf.text("POINTS / QUESTION", MARGIN_LEFT + colWidth + 4, colYLabel);
   pdf.setFontSize(8.5);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
-  pdf.text(`${data.duration} Minutes`, MARGIN_LEFT + colWidth + 4, colYVal);
+  pdf.text(`${data.pointsPerQuestion || 1} Mark(s)`, MARGIN_LEFT + colWidth + 4, colYVal);
 
-  // Col 3: Points per Question
+  // Col 3: Target Audience / Set
   pdf.setFontSize(7);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
-  pdf.text("POINTS / QUESTION", MARGIN_LEFT + colWidth * 2 + 4, colYLabel);
-  pdf.setFontSize(8.5);
-  pdf.setFont("helvetica", "bold");
-  pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
-  pdf.text(`${data.pointsPerQuestion || 1} Mark(s)`, MARGIN_LEFT + colWidth * 2 + 4, colYVal);
-
-  // Col 4: Target Audience / Set
-  pdf.setFontSize(7);
-  pdf.setFont("helvetica", "bold");
-  pdf.setTextColor(COLOR_MUTED_TEXT[0], COLOR_MUTED_TEXT[1], COLOR_MUTED_TEXT[2]);
-  pdf.text("AUDIENCE / SET", MARGIN_LEFT + colWidth * 3 + 4, colYLabel);
+  pdf.text("AUDIENCE / SET", MARGIN_LEFT + colWidth * 2 + 4, colYLabel);
   pdf.setFontSize(8.5);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(COLOR_DARK_TEXT[0], COLOR_DARK_TEXT[1], COLOR_DARK_TEXT[2]);
   pdf.text(
     data.setNumber ? `Set ${data.setNumber}` : data.targetAudience === "EXTERNAL" ? "External Kiosk" : "Internal Quiz",
-    MARGIN_LEFT + colWidth * 3 + 4,
+    MARGIN_LEFT + colWidth * 2 + 4,
     colYVal
   );
 

@@ -194,17 +194,25 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
         const result = await updateUserProfileData(formData as any);
 
         if (result.status === "requires_email_verification") {
-          toast.info(result.message);
+          toast.info("Verification Required", {
+            description: result.message || "Please enter the OTP sent to your new email address.",
+          });
           setPendingVerifyEmail(result.pendingEmail || formData.email);
           setIsVerifyDialogOpen(true);
         } else if (result.status === "success") {
           setCurrentSavedEmail(formData.email);
-          toast.success(result.message);
+          toast.success("Profile updated successfully!", {
+            description: result.message || "Your personal details and preferences have been saved.",
+          });
         } else {
-          toast.error(result.message);
+          toast.error("Failed to update profile", {
+            description: result.message || "Please check the entered values.",
+          });
         }
       } catch (error) {
-        toast.error("An unexpected error occurred");
+        toast.error("Update failed", {
+          description: "An unexpected error occurred while saving your profile.",
+        });
       }
     });
   };
@@ -590,7 +598,7 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
         <Button
           type="submit"
           disabled={pending}
-          className="bg-foreground text-background hover:bg-foreground/90 h-9 px-5 text-sm font-medium rounded-full cursor-pointer"
+          className="mb-10 bg-foreground text-background hover:bg-foreground/90 h-9 px-5 text-sm font-medium rounded-full cursor-pointer"
         >
           {pending ? (
             <>

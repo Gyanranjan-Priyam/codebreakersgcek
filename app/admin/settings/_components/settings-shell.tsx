@@ -81,7 +81,7 @@ export function SettingsShell({
   const [activeTab, setActiveTab] = useState<Tab>("profile");
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6">
+    <div className="w-full max-w-5xl mx-auto space-y-6 mt-4">
       {/* ── Page Header ────────────────────────────────────── */}
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>

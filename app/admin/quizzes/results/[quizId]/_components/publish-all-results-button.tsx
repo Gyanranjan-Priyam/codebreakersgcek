@@ -17,13 +17,24 @@ export function PublishAllResultsButton({ quizId }: PublishAllResultsButtonProps
     if (!confirm("Are you sure you want to publish results and send emails to ALL students who have completed this quiz? This action cannot be undone.")) return;
 
     setIsLoading(true);
-    const res = await publishAllResults(quizId);
-    if (res.status === "success") {
-      toast.success(res.message);
-    } else {
-      toast.error(res.message || "Failed to publish all results");
+    try {
+      const publishPromise = (async () => {
+        const res = await publishAllResults(quizId);
+        if (res.status !== "success") {
+          throw new Error(res.message || "Failed to publish all results");
+        }
+        return res.message;
+      })();
+
+      await toast.promise(publishPromise, {
+        loading: "Publishing results and dispatching emails...",
+        success: (msg: string) => msg || "Results published and emails sent successfully!",
+        error: (err: any) => String(err?.message || err || "Failed to publish all results"),
+        description: "Official scorecard notifications dispatched to all participants",
+      });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (

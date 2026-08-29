@@ -59,6 +59,9 @@ export function ProfileImageUpload({
 
   const handleCropSave = async (croppedFile: File, sizeKB: number) => {
     setUploading(true);
+    const toastId = toast.loading("Uploading avatar...", {
+      description: `Optimized image (${sizeKB} KB)`,
+    });
     try {
       const formData = new FormData();
       formData.append("file", croppedFile);
@@ -71,16 +74,19 @@ export function ProfileImageUpload({
         startTransition(async () => {
           const r = await updateProfileImage(result.key);
           if (r.status === "success") {
-            toast.success(`Avatar updated (${sizeKB} KB)`);
+            toast.success("Avatar updated successfully", {
+              id: toastId,
+              description: `Saved (${sizeKB} KB)`,
+            });
           } else {
-            toast.error(r.message);
+            toast.error(r.message || "Failed to update profile", { id: toastId });
           }
         });
       } else {
-        toast.error(result.message || "Upload failed");
+        toast.error(result.message || "Upload failed", { id: toastId });
       }
     } catch {
-      toast.error("Upload failed. Please try again.");
+      toast.error("Upload failed. Please try again.", { id: toastId });
     } finally {
       setUploading(false);
       setIsCropOpen(false);

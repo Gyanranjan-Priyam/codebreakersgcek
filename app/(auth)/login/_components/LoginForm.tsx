@@ -94,12 +94,14 @@ export function LoginForm() {
         callbackURL: "/auth/callback",
         fetchOptions: {
           onSuccess: () => {
-            toast.success("Redirecting for signed in with Google!");
+            toast.success("Redirecting to Google...", {
+              description: "Please complete authentication on the Google page.",
+            });
           },
           onError: (ctx) => {
-            toast.error(
-              ctx.error.message || "Unauthorized access or error signing in.",
-            );
+            toast.error("Google sign-in failed", {
+              description: ctx.error.message || "Unauthorized access or error signing in.",
+            });
           },
         },
       });
@@ -114,12 +116,14 @@ export function LoginForm() {
         callbackURL: "/auth/callback",
         fetchOptions: {
           onSuccess: () => {
-            toast.success("Redirecting for signed in with GitHub!");
+            toast.success("Redirecting to GitHub...", {
+              description: "Please complete authentication on the GitHub page.",
+            });
           },
           onError: (ctx) => {
-            toast.error(
-              ctx.error.message || "Unauthorized access or error signing in.",
-            );
+            toast.error("GitHub sign-in failed", {
+              description: ctx.error.message || "Unauthorized access or error signing in.",
+            });
           },
         },
       });
@@ -134,12 +138,14 @@ export function LoginForm() {
         callbackURL: "/auth/callback",
         fetchOptions: {
           onSuccess: () => {
-            toast.success("Redirecting for signed in with Discord!");
+            toast.success("Redirecting to Discord...", {
+              description: "Please complete authentication on the Discord page.",
+            });
           },
           onError: (ctx) => {
-            toast.error(
-              ctx.error.message || "Unauthorized access or error signing in.",
-            );
+            toast.error("Discord sign-in failed", {
+              description: ctx.error.message || "Unauthorized access or error signing in.",
+            });
           },
         },
       });
@@ -149,7 +155,9 @@ export function LoginForm() {
   function signInWithEmail() {
     setUnauthorizedError(null);
     if (!email) {
-      toast.error("Please enter your email");
+      toast.error("Email required", {
+        description: "Please enter your registered email address.",
+      });
       return;
     }
 
@@ -159,7 +167,9 @@ export function LoginForm() {
 
       if (!permResult.allowed) {
         setUnauthorizedError(permResult.message);
-        toast.error("Unauthorized Access: Only registered members can log in.");
+        toast.error("Unauthorized Access", {
+          description: "Only registered club members can log in. Contact an admin if this is a mistake.",
+        });
         return;
       }
 
@@ -169,13 +179,17 @@ export function LoginForm() {
         type: "sign-in",
         fetchOptions: {
           onSuccess: () => {
-            toast.success("Verification email sent!");
+            toast.success("Verification code sent!", {
+              description: `Check your inbox at ${email} for the 6-digit OTP.`,
+            });
             router.push(`/verify-request?email=${encodeURIComponent(email)}`);
           },
           onError: (ctx) => {
             const msg = ctx.error.message || "Error sending verification email";
             setUnauthorizedError(msg);
-            toast.error(msg);
+            toast.error("Failed to send OTP", {
+              description: msg,
+            });
           },
         },
       });

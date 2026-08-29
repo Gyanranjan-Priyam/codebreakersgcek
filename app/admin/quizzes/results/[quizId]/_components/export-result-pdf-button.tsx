@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Loader2, FileText } from "lucide-react";
+import { Loader2, FileText } from "lucide-react";
 import { generateStudentScorecardPDF, ScorecardPDFData } from "@/lib/student-result-pdf";
 import { toast } from "sonner";
 
@@ -24,15 +24,22 @@ export function ExportResultPdfButton({
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
     try {
-      toast.info("Generating official PDF scorecard...");
-      const pdf = await generateStudentScorecardPDF(data);
-      const safeName = (data.studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
-      const safeTitle = (data.quizTitle || "Quiz").replace(/[^a-zA-Z0-9_-]/g, "_");
-      pdf.save(`${safeName}_Scorecard_${safeTitle}.pdf`);
-      toast.success("Scorecard PDF downloaded successfully!");
+      const pdfPromise = (async () => {
+        const pdf = await generateStudentScorecardPDF(data);
+        const safeName = (data.studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const safeTitle = (data.quizTitle || "Quiz").replace(/[^a-zA-Z0-9_-]/g, "_");
+        pdf.save(`${safeName}_Scorecard_${safeTitle}.pdf`);
+        return `${safeName}_Scorecard_${safeTitle}.pdf`;
+      })();
+
+      await toast.promise(pdfPromise, {
+        loading: "Generating official PDF scorecard...",
+        success: "Scorecard PDF downloaded successfully!",
+        error: "Failed to generate PDF scorecard",
+        description: `${data.studentName || "Student"} - ${data.quizTitle || "Quiz"}`,
+      });
     } catch (error) {
       console.error("Error generating scorecard PDF:", error);
-      toast.error("Failed to generate PDF scorecard");
     } finally {
       setIsGenerating(false);
     }

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Source_Code_Pro } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import LenisProvider from "@/components/providers/lenis-provider";
 import { Analytics } from "@vercel/analytics/next";
 import CapacitorProvider from "@/components/providers/capacitor-provider";
@@ -199,7 +199,7 @@ export default function RootLayout({
           <MobileRedirect />
           <LenisProvider>{children}</LenisProvider>
         </CapacitorProvider>
-        <Toaster position="bottom-right" richColors closeButton />
+        <Toaster position="top-right" richColors closeButton />
         <Analytics />
       </body>
     </html>

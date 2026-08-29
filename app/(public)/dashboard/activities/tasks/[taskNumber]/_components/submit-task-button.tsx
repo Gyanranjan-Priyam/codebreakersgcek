@@ -183,16 +183,22 @@ export default function SubmitTaskButton({ taskId, userId, isResubmit = false, g
       const result = await submitTask(taskId, userId, projectUrl, screenshotKey);
 
       if (result.status === "success") {
-        toast.success(result.message);
+        toast.success("Task submitted successfully!", {
+          description: result.message || "Your submission has been recorded for admin review.",
+        });
         setOpen(false);
         resetForm();
         router.refresh();
       } else {
-        toast.error(result.message);
+        toast.error("Submission failed", {
+          description: result.message || "Please check your repository URL and try again.",
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Submission error:', error);
-      toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
+      toast.error("Submission error", {
+        description: error?.message || "An unexpected error occurred during submission.",
+      });
     } finally {
       setIsSubmitting(false);
     }

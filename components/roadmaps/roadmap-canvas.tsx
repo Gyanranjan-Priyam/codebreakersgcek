@@ -299,7 +299,7 @@ function RoadmapCanvasInternal({
     try {
       const res = await updateNodeProgress(roadmap.id, nodeId, newStatus);
       if (res.status === "error") {
-        toast.error(res.message);
+        toast.error(res.message || "Failed to update node progress");
       }
     } catch {
       toast.error("Failed to sync progress to cloud");

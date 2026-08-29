@@ -29,17 +29,54 @@ export interface ScorecardPDFData {
   questions: ScorecardQuestionItem[];
 }
 
-async function loadImageAsBase64(imagePath: string): Promise<string> {
+async function loadImageAsBase64(imagePath: string, maxDim: number = 300): Promise<string> {
   try {
     if (typeof window === "undefined") return "";
     const response = await fetch(imagePath);
     if (!response.ok) return "";
     const blob = await response.blob();
+
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(blob);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve("");
+            return;
+          }
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL("image/png", 0.85);
+          resolve(dataUrl);
+        } catch {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(blob);
+        }
+      };
+      img.onerror = () => resolve("");
+      img.src = URL.createObjectURL(blob);
     });
   } catch (error) {
     console.warn(`Could not load logo from ${imagePath}:`, error);
@@ -54,6 +91,7 @@ export async function generateStudentScorecardPDF(
     orientation: "portrait",
     unit: "mm",
     format: "a4",
+    compress: true,
   });
 
   // =========================================================

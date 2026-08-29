@@ -15,7 +15,9 @@ export default function CopyCodeButton({ code }: CopyCodeButtonProps) {
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {
       setCopied(true);
-      toast.success(`Access code ${code} copied to clipboard`);
+      toast.success("Access code copied to clipboard", {
+        description: `Code: ${code}`,
+      });
       setTimeout(() => setCopied(false), 2000);
     });
   };

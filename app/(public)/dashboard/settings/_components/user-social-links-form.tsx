@@ -112,13 +112,19 @@ export function UserSocialLinksForm({
       });
 
       if (res.status === "success") {
-        toast.success(res.message);
+        toast.success("Social links updated!", {
+          description: res.message || "Your profile and portfolio links have been saved.",
+        });
         router.refresh();
       } else {
-        toast.error(res.message);
+        toast.error("Failed to save links", {
+          description: res.message || "Please check the entered URLs and try again.",
+        });
       }
     } catch {
-      toast.error("Failed to save links. Please try again.");
+      toast.error("Network error", {
+        description: "Failed to save links. Please try again.",
+      });
     } finally {
       setIsSaving(false);
     }
