@@ -8,6 +8,8 @@
     "db:push": "node scripts/db-push.js",
     "db:push:local": "node scripts/db-push.js --local-only",
     "db:push:prod": "node scripts/db-push.js --prod-only",
+    "db:seed:roadmaps": "npx tsx scripts/seed-roadmaps.ts",
+    "db:seed:roadmaps:prod": "npx tsx scripts/seed-roadmaps.ts --prod",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",

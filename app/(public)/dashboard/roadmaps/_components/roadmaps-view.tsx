@@ -36,6 +36,12 @@ import {
   ShieldAlert,
   Code2,
   Cpu,
+  Globe,
+  Smartphone,
+  Box,
+  Palette,
+  Gamepad2,
+  Bot,
   Layers,
   Filter,
   CircleDot,
@@ -53,6 +59,12 @@ const ICON_MAP: Record<string, any> = {
   Code2,
   Cpu,
   Layers,
+  Globe,
+  Smartphone,
+  Box,
+  Palette,
+  Gamepad2,
+  Bot,
 };
 
 export type RoadmapWithProgress = RoadmapData & {

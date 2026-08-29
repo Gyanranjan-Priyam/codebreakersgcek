@@ -8,14 +8,24 @@ import { cachedFetch, deleteCache, setCache } from "@/lib/cache/redis";
 import type { RoadmapData, RoadmapStatus, UserProgressData } from "@/lib/roadmaps/types";
 
 /**
- * Ensures default roadmaps exist in database
+ * Ensures all 15 major default roadmaps exist in database
  */
 export async function ensureDefaultRoadmaps() {
-  const count = await prisma.roadmap.count();
-  if (count === 0) {
+  try {
     for (const r of DEFAULT_ROADMAPS) {
-      await prisma.roadmap.create({
-        data: {
+      await prisma.roadmap.upsert({
+        where: { slug: r.slug },
+        update: {
+          title: r.title,
+          description: r.description,
+          category: r.category,
+          badgeText: r.badgeText || "Core Track",
+          iconName: r.iconName || "Compass",
+          nodesJson: JSON.stringify(r.nodes),
+          edgesJson: JSON.stringify(r.edges),
+          isPublished: true,
+        },
+        create: {
           id: r.id,
           slug: r.slug,
           title: r.title,
@@ -30,6 +40,8 @@ export async function ensureDefaultRoadmaps() {
         },
       });
     }
+  } catch (err) {
+    console.error("Error ensuring default roadmaps:", err);
   }
 }
 
