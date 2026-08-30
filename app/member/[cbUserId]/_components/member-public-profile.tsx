@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -105,6 +105,11 @@ interface MemberPublicProfileProps {
 
 export default function MemberPublicProfile({ member }: MemberPublicProfileProps) {
   const [copied, setCopied] = useState(false);
+
+  // Dismiss any existing background/socket toasts upon visiting public member profile
+  useEffect(() => {
+    toast.dismiss();
+  }, []);
 
   // Generate initials from name
   const getInitials = (name: string) => {

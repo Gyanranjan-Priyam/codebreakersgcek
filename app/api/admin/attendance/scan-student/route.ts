@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { isSystemAdminRole } from "@/lib/member-roles";
-import { emitSocketEvent } from "@/lib/socket-server";
+import { emitSocketEvent, emitSocketEventToRooms } from "@/lib/socket-server";
 
 export function extractStudentIdentifier(qrContent: string): string {
   if (!qrContent) return "";
@@ -179,11 +179,14 @@ export async function POST(req: NextRequest) {
         message: `${user.name}, your attendance for "${session.title}" is already recorded as Present!`,
       };
 
-      await emitSocketEvent(`user-${user.id}`, "attendance-marked", verifyPayload);
-      await emitSocketEvent(`user:${user.id}`, "attendance-marked", verifyPayload);
-      if (user.cbUserId) {
-        await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", verifyPayload);
-      }
+      const userRooms = Array.from(
+        new Set([
+          `user-${user.id}`,
+          `user:${user.id}`,
+          ...(user.cbUserId ? [`user-${user.cbUserId}`, `user:${user.cbUserId}`] : []),
+        ])
+      );
+      await emitSocketEventToRooms(userRooms, "attendance-marked", verifyPayload);
 
       return NextResponse.json({
         success: true,
@@ -236,11 +239,14 @@ export async function POST(req: NextRequest) {
       message: `Your attendance for "${session.title}" (Session #${session.sessionNumber}) has been marked Present (+10 points)!`,
     };
 
-    await emitSocketEvent(`user-${user.id}`, "attendance-marked", realtimePayload);
-    await emitSocketEvent(`user:${user.id}`, "attendance-marked", realtimePayload);
-    if (user.cbUserId) {
-      await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", realtimePayload);
-    }
+    const userRooms = Array.from(
+      new Set([
+        `user-${user.id}`,
+        `user:${user.id}`,
+        ...(user.cbUserId ? [`user-${user.cbUserId}`, `user:${user.cbUserId}`] : []),
+      ])
+    );
+    await emitSocketEventToRooms(userRooms, "attendance-marked", realtimePayload);
     // 2. To the attendance session room for live admin monitor screens
     await emitSocketEvent(`attendance-session-${sessionId}`, "attendance-updated", realtimePayload);
     // 3. To the global leaderboard room for real-time leaderboard ranking updates

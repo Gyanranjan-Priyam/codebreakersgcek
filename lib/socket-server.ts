@@ -76,9 +76,7 @@ export async function emitSocketEventToRooms(
     let emitted = false;
     const io = getIO();
     if (io) {
-      for (const room of rooms) {
-        io.to(room).emit(event, data);
-      }
+      io.to(rooms).emit(event, data);
       emitted = true;
     }
 

@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Activity,
   Layers,
+  QrCode,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -26,8 +28,10 @@ import { redirect } from "next/navigation";
 import { getUserDashboardData } from "./actions";
 import { AnalyticsGraphCard } from "./_components/analytics-graph-card";
 import { OnboardingDialog } from "./_components/onboarding-dialog";
+import { UserQRDialog } from "./_components/user-qr-dialog";
 import { getUserProfileImageUrl } from "@/lib/image-utils";
 import { getBranchFullName } from "@/lib/branch-constants";
+import { parseSpecializedDomains } from "@/lib/specialized-domains";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -66,10 +70,11 @@ export default async function UserDashboard() {
 
   const { stats, recentActivities, roadmaps = [], user } = dashboardResult.data;
 
-  const profileImageUrl = getUserProfileImageUrl({
-    profileImageKey: user.profileImageKey,
-    image: user.image,
-  }) || "";
+  const profileImageUrl =
+    getUserProfileImageUrl({
+      profileImageKey: user.profileImageKey,
+      image: user.image,
+    }) || "";
 
   const getInitials = (name: string) => {
     return name
@@ -176,9 +181,51 @@ export default async function UserDashboard() {
     },
   ];
 
+  const currentPoints = stats.totalPoints || 0;
+  let tierName = "Initiate";
+  let tierColor = "text-muted-foreground";
+  let nextTierPoints = 50;
+  let prevTierPoints = 0;
+
+  if (currentPoints >= 300) {
+    tierName = "CodeBreaker Elite 🏆";
+    tierColor = "text-amber-500";
+    nextTierPoints = 500;
+    prevTierPoints = 300;
+  } else if (currentPoints >= 150) {
+    tierName = "Gold Architect 🥇";
+    tierColor = "text-amber-400";
+    nextTierPoints = 300;
+    prevTierPoints = 150;
+  } else if (currentPoints >= 50) {
+    tierName = "Silver Pioneer 🥈";
+    tierColor = "text-slate-300";
+    nextTierPoints = 150;
+    prevTierPoints = 50;
+  } else {
+    tierName = "Bronze Initiate 🥉";
+    tierColor = "text-amber-600 dark:text-amber-400";
+    nextTierPoints = 50;
+    prevTierPoints = 0;
+  }
+
+  const tierProgress = Math.min(
+    100,
+    Math.max(
+      0,
+      Math.round(
+        ((currentPoints - prevTierPoints) / (nextTierPoints - prevTierPoints)) *
+          100,
+      ),
+    ),
+  );
+
+  const specializedDomainList = user.specializedDomain
+    ? parseSpecializedDomains(user.specializedDomain)
+    : [];
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-8xl mx-auto w-full space-y-6">
-      {/* ── 1. Student Header HUD ── */}
       <div className="p-5 rounded-xl border border-border/80 bg-card flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0">
           <Avatar className="w-14 h-14 rounded-lg border border-border/70 shrink-0">
@@ -187,7 +234,6 @@ export default async function UserDashboard() {
               {getInitials(user.name || "User")}
             </AvatarFallback>
           </Avatar>
-
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
@@ -208,7 +254,6 @@ export default async function UserDashboard() {
                 </Badge>
               )}
             </div>
-
             <p className="text-xs text-muted-foreground font-mono truncate">
               {user.registration ? `Reg: ${user.registration}` : user.email}
               {user.branch ? ` • ${getBranchFullName(user.branch)}` : ""}
@@ -218,65 +263,66 @@ export default async function UserDashboard() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <UserQRDialog
+            user={user}
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-mono gap-1.5 cursor-pointer hover:bg-muted/80"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>View QR</span>
+              </Button>
+            }
+          />
           <Button
             variant="outline"
             size="sm"
             asChild
-            className="h-8 text-xs font-mono gap-1.5"
+            className="h-8 text-xs font-mono"
           >
             <Link href="/dashboard/settings" prefetch={true}>
-              <Settings className="w-3.5 h-3.5" />
+              <Settings className="w-3.5 h-3.5 mr-1.5" />
               Settings
-            </Link>
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            asChild
-            className="h-8 text-xs font-mono gap-1.5"
-          >
-            <Link href="/dashboard/activities/tasks" prefetch={true}>
-              <CheckSquare className="w-3.5 h-3.5" />
-              My Tasks
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* ── 2. Flat Geometric 4-KPI Grid ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {coreStats.map((stat) => {
-          const Icon = stat.icon;
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {coreStats.map((card) => {
+          const Icon = card.icon;
           return (
             <Card
-              key={stat.title}
+              key={card.title}
               className="p-4 border border-border/80 bg-card flex flex-col justify-between space-y-3"
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-medium truncate">
-                  {stat.title}
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-medium text-muted-foreground uppercase tracking-wider">
+                  {card.title}
                 </span>
-                <div className="p-1.5 rounded-md bg-muted/60 border border-border/40 shrink-0">
-                  <Icon className="w-3.5 h-3.5 text-foreground" />
+                <div className="p-2 rounded-md bg-muted/60 text-foreground">
+                  <Icon className="w-4 h-4" />
                 </div>
               </div>
 
               <div>
-                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight font-mono">
-                  {stat.value}
+                <div className="text-2xl font-bold tracking-tight text-foreground font-mono">
+                  {card.value}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">
-                  {stat.subtext}
+                <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                  {card.subtext}
                 </p>
               </div>
 
               <div className="pt-2 border-t border-border/40 flex items-center justify-between">
                 <Link
-                  href={stat.actionHref}
+                  href={card.actionHref}
                   prefetch={true}
-                  className="text-[11px] font-mono text-foreground hover:underline inline-flex items-center gap-1"
+                  className="text-[11px] font-mono font-medium text-primary hover:underline inline-flex items-center gap-1"
                 >
-                  <span>{stat.actionLabel}</span>
+                  <span>{card.actionLabel}</span>
                   <ArrowUpRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -285,14 +331,12 @@ export default async function UserDashboard() {
         })}
       </div>
 
-      {/* ── 3. Main Work Area Split (2 Columns) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Analytics Velocity Graph, Roadmaps in Progress & Recent Activity Ledger */}
         <div className="lg:col-span-8 space-y-6">
-          {/* 📈 Learning Velocity & Points Sparkline Chart */}
-          <AnalyticsGraphCard stats={stats} recentActivities={recentActivities} />
-
-          {/* Active Roadmaps Track */}
+          <AnalyticsGraphCard
+            stats={stats}
+            recentActivities={recentActivities}
+          />
           {roadmaps.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -314,9 +358,8 @@ export default async function UserDashboard() {
                   </Link>
                 </Button>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {roadmaps.map((r) => {
+                {roadmaps.slice(0, 2).map((r) => {
                   const percent = Math.round(r.percentage || 0);
                   return (
                     <Card
@@ -334,7 +377,6 @@ export default async function UserDashboard() {
                           {percent}%
                         </span>
                       </div>
-
                       <div>
                         <h3 className="text-sm font-bold text-foreground truncate">
                           {r.roadmap.title}
@@ -343,7 +385,6 @@ export default async function UserDashboard() {
                           {r.completedNodeIds.length} topics mastered
                         </p>
                       </div>
-
                       <div className="space-y-2">
                         <Progress value={percent} className="h-1.5" />
                         <div className="flex justify-end pt-1">
@@ -363,8 +404,6 @@ export default async function UserDashboard() {
               </div>
             </div>
           )}
-
-          {/* Recent Activity Ledger */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -377,7 +416,6 @@ export default async function UserDashboard() {
                 {recentActivities.length} logs
               </span>
             </div>
-
             <Card className="border border-border/80 bg-card overflow-hidden">
               {recentActivities.length > 0 ? (
                 <div className="divide-y divide-border/40">
@@ -402,7 +440,6 @@ export default async function UserDashboard() {
                           {act.description}
                         </p>
                       </div>
-
                       <div className="text-right shrink-0 space-y-0.5">
                         {act.points !== undefined && act.points > 0 && (
                           <Badge
@@ -428,8 +465,6 @@ export default async function UserDashboard() {
             </Card>
           </div>
         </div>
-
-        {/* Right Column: Academic Standing & Quick Action Hub */}
         <div className="lg:col-span-4 space-y-6">
           {/* Student Academic Standing */}
           <Card className="border border-border/80 bg-card p-4 space-y-4">
@@ -478,6 +513,86 @@ export default async function UserDashboard() {
             </Button>
           </Card>
 
+          <Card className="border border-border/80 bg-card p-4 space-y-3.5">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-3.5 h-3.5 text-foreground" />
+                <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
+                  Digital Pass
+                </h3>
+              </div>
+              <Badge
+                variant="outline"
+                className="text-[9px] font-mono text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+              >
+                Active Member
+              </Badge>
+            </div>
+            <div className="p-3 rounded-xl bg-muted/30 border border-border/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                  Member ID
+                </span>
+                <span className="text-xs font-mono font-bold text-foreground">
+                  {user.cbUserId
+                    ? `CB-${user.cbUserId}`
+                    : user.registration || "CB-MEMBER"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                  Cohort
+                </span>
+                <span className="text-xs font-mono text-foreground truncate max-w-[150px]">
+                  {user.batch?.name || "CodeBreakers GCEK"}
+                </span>
+              </div>
+              {specializedDomainList.length > 0 && (
+                <div className="pt-1 flex flex-wrap gap-1">
+                  {specializedDomainList.slice(0, 3).map((d) => (
+                    <Badge
+                      key={d}
+                      variant="secondary"
+                      className="text-[9px] font-mono h-4 px-1.5 py-0"
+                    >
+                      {d}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <UserQRDialog
+                user={user}
+                trigger={
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-8 text-xs font-mono bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>View QR</span>
+                  </Button>
+                }
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className="h-8 text-xs font-mono"
+              >
+                <Link
+                  href={`/member/${encodeURIComponent(user.cbUserId || user.username || user.id)}`}
+                  prefetch={true}
+                  className="flex items-center justify-center gap-1.5"
+                >
+                  <span>Public Profile</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              </Button>
+            </div>
+          </Card>
+
           {/* Quick Access Navigation Hub */}
           <Card className="border border-border/80 bg-card p-4 space-y-3">
             <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground border-b border-border/40 pb-2">
@@ -516,8 +631,6 @@ export default async function UserDashboard() {
           </Card>
         </div>
       </div>
-
-      {/* ── First-Time User Onboarding Popup ── */}
       <OnboardingDialog user={user} />
     </div>
   );

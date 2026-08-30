@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
 import { revalidatePath } from "next/cache";
-import { emitSocketEvent } from "@/lib/socket-server";
+import { emitSocketEvent, emitSocketEventToRooms } from "@/lib/socket-server";
 
 export interface AttendanceSessionData {
   id: string;
@@ -329,12 +329,15 @@ export async function markAttendance(
           message: `Your attendance for "${session.title}" (Session #${session.sessionNumber}) has been marked as ${status}${points > 0 ? ` (+${points} points)` : ""}!`,
         };
 
-        await emitSocketEvent(`user-${userId}`, "attendance-marked", realtimePayload);
-        await emitSocketEvent(`user:${userId}`, "attendance-marked", realtimePayload);
-        if (user.cbUserId) {
-          await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", realtimePayload);
-          await emitSocketEvent(`user:${user.cbUserId}`, "attendance-marked", realtimePayload);
-        }
+        const userRooms = Array.from(
+          new Set([
+            `user-${userId}`,
+            `user:${userId}`,
+            ...(user.cbUserId ? [`user-${user.cbUserId}`, `user:${user.cbUserId}`] : []),
+          ])
+        );
+
+        await emitSocketEventToRooms(userRooms, "attendance-marked", realtimePayload);
         await emitSocketEvent(`attendance-session-${sessionId}`, "attendance-updated", realtimePayload);
         await emitSocketEvent("leaderboard", "leaderboard-updated", realtimePayload);
       }

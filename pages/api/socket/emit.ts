@@ -30,10 +30,8 @@ export default async function handler(req: NextApiRequest, res: SocketNextApiRes
       return res.status(400).json({ error: "Missing event name" });
     }
 
-    if (rooms && Array.isArray(rooms)) {
-      rooms.forEach((r: string) => {
-        io.to(r).emit(event, data);
-      });
+    if (rooms && Array.isArray(rooms) && rooms.length > 0) {
+      io.to(rooms).emit(event, data);
     } else if (room) {
       io.to(room).emit(event, data);
     } else {

@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { emitSocketEvent } from "@/lib/socket-server";
+import { emitSocketEvent, emitSocketEventToRooms } from "@/lib/socket-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -146,12 +146,14 @@ export async function POST(req: NextRequest) {
         message: `Your attendance for "${qrRecord.session.title}" (Session #${qrRecord.session.sessionNumber}) has been marked Present (+${attendance.points} points)!`,
       };
 
-      await emitSocketEvent(`user-${session.user.id}`, "attendance-marked", realtimePayload);
-      await emitSocketEvent(`user:${session.user.id}`, "attendance-marked", realtimePayload);
-      if (user?.cbUserId) {
-        await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", realtimePayload);
-        await emitSocketEvent(`user:${user.cbUserId}`, "attendance-marked", realtimePayload);
-      }
+      const userRooms = Array.from(
+        new Set([
+          `user-${session.user.id}`,
+          `user:${session.user.id}`,
+          ...(user?.cbUserId ? [`user-${user.cbUserId}`, `user:${user.cbUserId}`] : []),
+        ])
+      );
+      await emitSocketEventToRooms(userRooms, "attendance-marked", realtimePayload);
       await emitSocketEvent(`attendance-session-${qrRecord.sessionId}`, "attendance-updated", realtimePayload);
       await emitSocketEvent("leaderboard", "leaderboard-updated", realtimePayload);
     } catch (broadcastErr) {
