@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -19,11 +19,12 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
 import { Search, Camera } from "lucide-react";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import { MemberForAttendance, markAttendance } from "../../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { initSocket, joinRoom, onSocketEvent } from "@/lib/socket-client";
 import SessionQRScannerDialog from "./session-qr-scanner-dialog";
 
 interface MemberAttendanceListProps {
@@ -50,6 +51,39 @@ export default function MemberAttendanceList({
     useState<Record<string, string>>(initialAttendance);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
+
+  useEffect(() => {
+    setAttendanceStatus(initialAttendance);
+  }, [initialAttendance]);
+
+  // Realtime Socket.IO synchronization
+  useEffect(() => {
+    if (!sessionId) return;
+
+    let cleanupRoom: (() => void) | undefined;
+    let cleanupListener: (() => void) | undefined;
+
+    initSocket().then((socket) => {
+      if (!socket) return;
+
+      const room = `attendance-session-${sessionId}`;
+      cleanupRoom = joinRoom(room);
+
+      cleanupListener = onSocketEvent("attendance-updated", (data: any) => {
+        if (data?.userId && data?.status) {
+          setAttendanceStatus((prev) => ({
+            ...prev,
+            [data.userId]: data.status,
+          }));
+        }
+      });
+    });
+
+    return () => {
+      cleanupListener?.();
+      cleanupRoom?.();
+    };
+  }, [sessionId]);
 
   const handleAttendanceChange = async (userId: string, status: string) => {
     setUpdatingId(userId);
@@ -204,6 +238,8 @@ export default function MemberAttendanceList({
           <Camera className="h-4 w-4" />
           Scan Student QR
         </Button>
+
+        <SilentRefreshButton toastMessage="Attendance list refreshed silently" />
       </div>
 
       {/* Dedicated QR Scanner Dialog */}

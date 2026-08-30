@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -53,13 +54,16 @@ export default async function AchievementsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          My Achievements
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Track your earned points and completed activities
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            My Achievements
+          </h1>
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+            Track your earned points and completed activities
+          </p>
+        </div>
+        <SilentRefreshButton toastMessage="Achievements refreshed silently" />
       </div>
 
       {/* Summary Cards */}

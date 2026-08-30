@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use server";
 
 import { randomUUID } from "node:crypto";
@@ -573,6 +575,11 @@ export async function deleteMembers(ids: string[]) {
         message: "No members were deleted",
       };
     }
+
+    revalidatePath("/admin/members");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/leaderboard");
+    revalidatePath("/member");
 
     return {
       status: "success" as const,
@@ -1274,6 +1281,505 @@ export async function updateMemberRolesAndDomain(
     return {
       status: "error" as const,
       message: "Failed to update member roles and domains.",
+    };
+  }
+}
+
+export interface UpdateMemberDetailsInput {
+  id: string;
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
+  name?: string | null;
+  email: string;
+  username?: string | null;
+  cbUserId?: string | null;
+  mobileNumber?: string | null;
+  whatsappNumber?: string | null;
+  aadhaarNumber?: string | null;
+  upiId?: string | null;
+  registration?: string | null;
+  rollNumber?: string | null;
+  branch?: string | null;
+  admissionYear?: string | null;
+  collegeName?: string | null;
+  collegeAddress?: string | null;
+  state?: string | null;
+  district?: string | null;
+  address?: string | null;
+  postOffice?: string | null;
+  policeStation?: string | null;
+  block?: string | null;
+  pinCode?: string | null;
+  githubUsername?: string | null;
+  batchId?: string | null;
+  specializedDomain?: string | null;
+  roles?: string[] | null;
+  socialLinks?: any;
+  customLinks?: any;
+  emailVerified?: boolean;
+  profileComplete?: boolean;
+}
+
+export async function updateMemberDetails(input: UpdateMemberDetailsInput) {
+  await requireAdmin();
+
+  try {
+    const userId = input.id;
+    if (!userId) {
+      return {
+        status: "error" as const,
+        message: "Member ID is required",
+      };
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        cbUserId: true,
+        role: true,
+        registration: true,
+      },
+    });
+
+    if (!existing) {
+      return {
+        status: "error" as const,
+        message: "Member not found",
+      };
+    }
+
+    // Email validation
+    const normalizedEmail = (input.email || existing.email).trim().toLowerCase();
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      return {
+        status: "error" as const,
+        message: "A valid email address is required",
+      };
+    }
+
+    if (normalizedEmail !== existing.email.toLowerCase()) {
+      const emailConflict = await prisma.user.findFirst({
+        where: {
+          email: { equals: normalizedEmail, mode: "insensitive" },
+          id: { not: userId },
+        },
+        select: { id: true },
+      });
+      if (emailConflict) {
+        return {
+          status: "error" as const,
+          message: "Another member is already using this email address",
+        };
+      }
+    }
+
+    // Username validation & uniqueness check
+    const cleanUsername = input.username?.trim().toLowerCase() || null;
+    if (cleanUsername && cleanUsername !== existing.username?.toLowerCase()) {
+      const usernameConflict = await prisma.user.findFirst({
+        where: {
+          username: { equals: cleanUsername, mode: "insensitive" },
+          id: { not: userId },
+        },
+        select: { id: true },
+      });
+      if (usernameConflict) {
+        return {
+          status: "error" as const,
+          message: "This username is already taken by another member",
+        };
+      }
+    }
+
+    // CB User ID uniqueness check
+    const cleanCbUserId = input.cbUserId?.trim() || null;
+    if (cleanCbUserId && cleanCbUserId !== existing.cbUserId) {
+      const cbUserIdConflict = await prisma.user.findFirst({
+        where: {
+          cbUserId: { equals: cleanCbUserId, mode: "insensitive" },
+          id: { not: userId },
+        },
+        select: { id: true },
+      });
+      if (cbUserIdConflict) {
+        return {
+          status: "error" as const,
+          message: "This CB User ID is already assigned to another member",
+        };
+      }
+    }
+
+    // Compute display name
+    const computedName =
+      [
+        input.firstName?.trim(),
+        input.middleName?.trim(),
+        input.lastName?.trim(),
+      ]
+        .filter(Boolean)
+        .join(" ") ||
+      input.name?.trim() ||
+      existing.name;
+
+    // Batch ID
+    const cleanBatchId =
+      input.batchId && input.batchId !== "none" ? input.batchId : null;
+
+    // Roles serialization
+    let serializedRoles: string | undefined = undefined;
+    if (input.roles !== undefined && input.roles !== null) {
+      const isSystemAdmin = isSystemAdminRole(existing.role);
+      serializedRoles = serializeMemberRoles(input.roles, isSystemAdmin);
+    }
+
+    // Determine profile completeness
+    let profileCompleteVal = input.profileComplete;
+    if (profileCompleteVal === undefined) {
+      const essentialFields = [
+        computedName,
+        normalizedEmail,
+        input.mobileNumber || "",
+        input.whatsappNumber || "",
+        input.branch || "",
+        input.registration || "",
+      ];
+      profileCompleteVal = essentialFields.every((f) => Boolean(f && f.trim().length > 0));
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: computedName,
+        email: normalizedEmail,
+        username: cleanUsername,
+        cbUserId: cleanCbUserId,
+        firstName: input.firstName !== undefined ? input.firstName?.trim() || null : undefined,
+        middleName: input.middleName !== undefined ? input.middleName?.trim() || null : undefined,
+        lastName: input.lastName !== undefined ? input.lastName?.trim() || null : undefined,
+        mobileNumber: input.mobileNumber !== undefined ? input.mobileNumber?.trim() || null : undefined,
+        whatsappNumber: input.whatsappNumber !== undefined ? input.whatsappNumber?.trim() || null : undefined,
+        aadhaarNumber: input.aadhaarNumber !== undefined ? input.aadhaarNumber?.trim() || null : undefined,
+        upiId: input.upiId !== undefined ? input.upiId?.trim() || null : undefined,
+        registration: input.registration !== undefined ? input.registration?.trim() || null : undefined,
+        rollNumber: input.rollNumber !== undefined ? input.rollNumber?.trim() || null : undefined,
+        branch: input.branch !== undefined ? input.branch?.trim() || null : undefined,
+        admissionYear: input.admissionYear !== undefined ? input.admissionYear?.trim() || null : undefined,
+        collegeName: input.collegeName !== undefined ? input.collegeName?.trim() || null : undefined,
+        collegeAddress: input.collegeAddress !== undefined ? input.collegeAddress?.trim() || null : undefined,
+        state: input.state !== undefined ? input.state?.trim() || null : undefined,
+        district: input.district !== undefined ? input.district?.trim() || null : undefined,
+        address: input.address !== undefined ? input.address?.trim() || null : undefined,
+        postOffice: input.postOffice !== undefined ? input.postOffice?.trim() || null : undefined,
+        policeStation: input.policeStation !== undefined ? input.policeStation?.trim() || null : undefined,
+        block: input.block !== undefined ? input.block?.trim() || null : undefined,
+        pinCode: input.pinCode !== undefined ? input.pinCode?.trim() || null : undefined,
+        githubUsername: input.githubUsername !== undefined ? input.githubUsername?.trim() || null : undefined,
+        batchId: input.batchId !== undefined ? cleanBatchId : undefined,
+        specializedDomain: input.specializedDomain !== undefined ? input.specializedDomain?.trim() || null : undefined,
+        ...(serializedRoles !== undefined ? { role: serializedRoles } : {}),
+        socialLinks: input.socialLinks !== undefined ? input.socialLinks : undefined,
+        customLinks: input.customLinks !== undefined ? input.customLinks : undefined,
+        emailVerified: input.emailVerified !== undefined ? input.emailVerified : undefined,
+        profileComplete: profileCompleteVal,
+        updatedAt: new Date(),
+      },
+      include: {
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    // Revalidate all affected routes
+    revalidatePath("/admin/members");
+    revalidatePath(`/admin/members/${userId}`);
+    if (existing.cbUserId) revalidatePath(`/admin/members/${existing.cbUserId}`);
+    if (cleanCbUserId && cleanCbUserId !== existing.cbUserId) {
+      revalidatePath(`/admin/members/${cleanCbUserId}`);
+    }
+    if (existing.username) revalidatePath(`/admin/members/${existing.username}`);
+    if (existing.registration) revalidatePath(`/admin/members/${existing.registration}`);
+
+    // Revalidate Member Dashboard, Settings, Leaderboard & Public Views
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/leaderboard");
+    revalidatePath("/dashboard/attendance");
+    revalidatePath("/dashboard/activities/tasks");
+    revalidatePath("/dashboard/activities/quizzes");
+    revalidatePath("/(public)/dashboard", "layout");
+    revalidatePath("/member");
+    if (existing.cbUserId) revalidatePath(`/member/${existing.cbUserId}`);
+    if (cleanCbUserId && cleanCbUserId !== existing.cbUserId) {
+      revalidatePath(`/member/${cleanCbUserId}`);
+    }
+
+    return {
+      status: "success" as const,
+      message: "Member details updated successfully.",
+      data: updatedUser,
+    };
+  } catch (error) {
+    console.error("Error updating member details:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update member details. Please try again.",
+    };
+  }
+}
+
+export async function checkExistingMemberEmails(emails: string[]) {
+  await requireAdmin();
+
+  try {
+    const cleanEmails = Array.from(
+      new Set(
+        emails
+          .map((e) => e?.trim().toLowerCase())
+          .filter((e) => e && /^\S+@\S+\.\S+$/.test(e))
+      )
+    );
+
+    if (cleanEmails.length === 0) {
+      return {
+        status: "success" as const,
+        existingEmails: [] as string[],
+        existingUsers: [],
+      };
+    }
+
+    const existingUsers = await prisma.user.findMany({
+      where: {
+        email: {
+          in: cleanEmails,
+          mode: "insensitive",
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        cbUserId: true,
+      },
+    });
+
+    return {
+      status: "success" as const,
+      existingEmails: existingUsers.map((u) => u.email.toLowerCase()),
+      existingUsers,
+    };
+  } catch (error) {
+    console.error("Error checking existing member emails:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to verify existing emails",
+      existingEmails: [] as string[],
+      existingUsers: [],
+    };
+  }
+}
+
+export interface ExcelMemberCandidate {
+  firstName: string;
+  middleName?: string | null;
+  lastName?: string | null;
+  name?: string | null;
+  email: string;
+  mobileNumber?: string | null;
+  whatsappNumber?: string | null;
+  branch?: string | null;
+  admissionYear?: string | null;
+  registration?: string | null;
+  rollNumber?: string | null;
+  collegeName?: string | null;
+  collegeAddress?: string | null;
+  state?: string | null;
+  district?: string | null;
+  address?: string | null;
+  pinCode?: string | null;
+  batchId?: string | null;
+  specializedDomain?: string | null;
+  roles?: string[] | null;
+}
+
+export async function bulkCreateMembersFromExcel(input: {
+  members: ExcelMemberCandidate[];
+  defaultBatchId?: string | null;
+  defaultRoles?: string[] | null;
+  defaultDomain?: string | null;
+  sendWelcomeEmails?: boolean;
+}) {
+  await requireAdmin();
+
+  try {
+    if (!input.members || input.members.length === 0) {
+      return {
+        status: "error" as const,
+        message: "No members provided for import",
+        successCount: 0,
+        failedCount: 0,
+        errors: [],
+      };
+    }
+
+    const appUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+    let successCount = 0;
+    let failedCount = 0;
+    const errors: string[] = [];
+    const createdUsers = [];
+
+    for (const item of input.members) {
+      const normalizedEmail = (item.email || "").trim().toLowerCase();
+      if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+        failedCount++;
+        errors.push(`Invalid email: "${item.email}"`);
+        continue;
+      }
+
+      // Check if already exists
+      const existing = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true, name: true },
+      });
+
+      if (existing) {
+        failedCount++;
+        errors.push(`${normalizedEmail} is already registered as a member`);
+        continue;
+      }
+
+      const fName = item.firstName?.trim() || item.name?.split(" ")[0]?.trim() || "Member";
+      const mName = item.middleName?.trim() || null;
+      const lName =
+        item.lastName?.trim() ||
+        (item.name ? item.name.split(" ").slice(1).join(" ").trim() : "") ||
+        "";
+      const fullName = [fName, mName, lName].filter(Boolean).join(" ");
+
+      const candidateRoles =
+        item.roles && item.roles.length > 0
+          ? item.roles
+          : input.defaultRoles || ["Member"];
+      const serializedRoles = serializeMemberRoles(candidateRoles);
+
+      const targetBatchId =
+        item.batchId && item.batchId !== "none"
+          ? item.batchId
+          : input.defaultBatchId && input.defaultBatchId !== "none"
+          ? input.defaultBatchId
+          : null;
+      const targetDomain =
+        item.specializedDomain?.trim() || input.defaultDomain?.trim() || null;
+
+      try {
+        let createdMember = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const cbUserId = await generateCbUserId();
+          try {
+            createdMember = await prisma.user.create({
+              data: {
+                id: randomUUID(),
+                cbUserId,
+                name: fullName,
+                email: normalizedEmail,
+                firstName: fName,
+                middleName: mName,
+                lastName: lName || null,
+                mobileNumber: item.mobileNumber?.trim() || null,
+                whatsappNumber:
+                  item.whatsappNumber?.trim() || item.mobileNumber?.trim() || null,
+                branch: item.branch?.trim() || null,
+                admissionYear: item.admissionYear?.trim() || null,
+                registration: item.registration?.trim() || null,
+                rollNumber: item.rollNumber?.trim() || null,
+                collegeName: item.collegeName?.trim() || null,
+                collegeAddress: item.collegeAddress?.trim() || null,
+                state: item.state?.trim() || null,
+                district: item.district?.trim() || null,
+                address: item.address?.trim() || null,
+                pinCode: item.pinCode?.trim() || null,
+                batchId: targetBatchId,
+                specializedDomain: targetDomain,
+                role: serializedRoles,
+                emailVerified: false,
+                profileComplete: false,
+              },
+              select: {
+                id: true,
+                cbUserId: true,
+                name: true,
+                email: true,
+              },
+            });
+            break;
+          } catch (createErr) {
+            if (
+              createErr instanceof Error &&
+              "code" in createErr &&
+              (createErr as { code?: string }).code === "P2002"
+            ) {
+              continue;
+            }
+            throw createErr;
+          }
+        }
+
+        if (createdMember) {
+          successCount++;
+          createdUsers.push(createdMember);
+
+          if (input.sendWelcomeEmails) {
+            sendMemberWelcomeEmail({
+              to: normalizedEmail,
+              memberName: fullName,
+              dashboardUrl: `${appUrl}/login`,
+            }).catch((e) =>
+              console.error(`Error sending email to ${normalizedEmail}:`, e)
+            );
+          }
+        } else {
+          failedCount++;
+          errors.push(`Could not allocate CB User ID for ${normalizedEmail}`);
+        }
+      } catch (err: any) {
+        failedCount++;
+        errors.push(
+          `Error creating ${normalizedEmail}: ${err?.message || "Unknown error"}`
+        );
+      }
+    }
+
+    revalidatePath("/admin/members");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/leaderboard");
+    revalidatePath("/member");
+
+    return {
+      status: "success" as const,
+      message: `Successfully imported ${successCount} member${
+        successCount === 1 ? "" : "s"
+      }${failedCount > 0 ? ` (${failedCount} skipped or failed)` : ""}.`,
+      successCount,
+      failedCount,
+      errors,
+    };
+  } catch (error) {
+    console.error("Error bulk creating members from Excel:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to import members from Excel",
+      successCount: 0,
+      failedCount: 0,
+      errors: [],
     };
   }
 }

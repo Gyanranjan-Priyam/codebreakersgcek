@@ -3,6 +3,8 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
+import { serializeSpecializedDomains } from "@/lib/specialized-domains";
 
 export interface DashboardStats {
   totalPoints: number;
@@ -228,30 +230,45 @@ export async function getUserDashboardData() {
     const userProfile = await prisma.user.findUnique({
       where: { id: userId },
       select: {
+        id: true,
         name: true,
         email: true,
         image: true,
         profileImageKey: true,
         emailVerified: true,
         createdAt: true,
+        updatedAt: true,
         mobileNumber: true,
         whatsappNumber: true,
+        aadhaarNumber: true,
+        upiId: true,
         state: true,
         district: true,
         collegeName: true,
+        collegeAddress: true,
         username: true,
+        cbUserId: true,
         firstName: true,
+        middleName: true,
         lastName: true,
         registration: true,
         rollNumber: true,
         branch: true,
         admissionYear: true,
         address: true,
+        postOffice: true,
+        policeStation: true,
+        block: true,
         pinCode: true,
         githubUsername: true,
+        specializedDomain: true,
+        role: true,
+        socialLinks: true,
+        customLinks: true,
         profileComplete: true,
         batch: {
           select: {
+            id: true,
             name: true,
             code: true,
           }
@@ -266,27 +283,41 @@ export async function getUserDashboardData() {
         recentActivities: activities,
         roadmaps: userRoadmapProgress,
         user: userProfile || {
+          id: session.user.id,
           name: session.user.name || "",
           email: session.user.email || "",
           image: session.user.image || null,
           profileImageKey: null,
           emailVerified: false,
           createdAt: new Date(),
+          updatedAt: new Date(),
           mobileNumber: null,
           whatsappNumber: null,
+          aadhaarNumber: null,
+          upiId: null,
           state: null,
           district: null,
           collegeName: null,
+          collegeAddress: null,
           username: null,
+          cbUserId: null,
           firstName: null,
+          middleName: null,
           lastName: null,
           registration: null,
           rollNumber: null,
           branch: null,
           admissionYear: null,
           address: null,
+          postOffice: null,
+          policeStation: null,
+          block: null,
           pinCode: null,
           githubUsername: null,
+          specializedDomain: null,
+          role: null,
+          socialLinks: null,
+          customLinks: null,
           profileComplete: false,
           batch: null,
         },
@@ -297,6 +328,50 @@ export async function getUserDashboardData() {
     return {
       status: "error" as const,
       message: "Failed to fetch dashboard data",
+    };
+  }
+}
+
+export async function saveUserSpecializedDomain(domains: string[]) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized. Please log in first.",
+      };
+    }
+
+    const serialized = serializeSpecializedDomains(domains);
+
+    const updatedUser = await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        specializedDomain: serialized,
+      },
+      select: {
+        id: true,
+        specializedDomain: true,
+        profileComplete: true,
+      },
+    });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/admin/members");
+
+    return {
+      status: "success" as const,
+      data: updatedUser,
+    };
+  } catch (error) {
+    console.error("Error saving user specialized domain:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to save domain preferences. Please try again.",
     };
   }
 }

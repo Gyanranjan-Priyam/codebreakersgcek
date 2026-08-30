@@ -1,9 +1,11 @@
-"use client"
+"use client";
 
 import {
   MoreVertical,
   LogOut,
 } from "lucide-react"
+import { IconUsers } from "@tabler/icons-react"
+import Link from "next/link"
 
 import {
   Avatar,
@@ -15,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -82,7 +85,7 @@ export function NavUser({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
                 <AvatarImage src={avatarUrl} alt={user.name} />
@@ -117,8 +120,16 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="cursor-pointer text-foreground focus:text-foreground">
+              <Link href="/dashboard" className="flex items-center gap-2">
+                <IconUsers className="h-4 w-4 text-muted-foreground" />
+                <span>Member Dashboard</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
-              <LogOut />
+              <LogOut className="h-4 w-4" />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

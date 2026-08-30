@@ -19,7 +19,7 @@ function getIO(): SocketIOServer | null {
  */
 export async function emitSocketEvent(room: string, event: string, data: any): Promise<void> {
   try {
-    const io = getIO();
+    let io = getIO();
     if (io) {
       io.to(room).emit(event, data);
       return;
@@ -27,21 +27,27 @@ export async function emitSocketEvent(room: string, event: string, data: any): P
 
     // Fallback: if the Socket.IO server hasn't been initialized yet via the API route,
     // try to initialize it by making an internal request, then retry
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      await fetch(`${baseUrl}/api/socketio`);
+    const fallbackUrls = [
+      process.env.NEXT_PUBLIC_APP_URL,
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+    ].filter(Boolean) as string[];
 
-      // Retry after init
-      const retryIO = getIO();
-      if (retryIO) {
-        retryIO.to(room).emit(event, data);
-        return;
+    for (const url of fallbackUrls) {
+      try {
+        const cleanUrl = url.replace(/\/$/, "");
+        await fetch(`${cleanUrl}/api/socketio`, { cache: "no-store" });
+        io = getIO();
+        if (io) {
+          io.to(room).emit(event, data);
+          return;
+        }
+      } catch {
+        // Try next fallback
       }
-    } catch {
-      // If we can't reach the API route, the Socket.IO server isn't running
     }
 
-    // Silent fallback — event will be picked up by client polling
+    // Silent fallback
     console.warn(`⚠️ Socket.IO server not available. Event "${event}" to room "${room}" was not sent.`);
   } catch (error: any) {
     console.error("Socket.IO emit error:", error?.message || error);

@@ -41,6 +41,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import type {
   UserTransactionsResponse,
   UserTransactionItem,
@@ -415,14 +416,17 @@ export function UserTransactionsClient({
           </TabsList>
         </Tabs>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by ID, Form, Ref..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 text-xs sm:text-sm h-9 bg-card border-border/80 rounded-xl"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by ID, Form, Ref..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 text-xs sm:text-sm h-9 bg-card border-border/80 rounded-xl"
+            />
+          </div>
+          <SilentRefreshButton toastMessage="Transactions refreshed silently" />
         </div>
       </div>
 

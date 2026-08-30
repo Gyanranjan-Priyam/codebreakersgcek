@@ -29,12 +29,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Edit, Eye, MoreVertical } from "lucide-react";
+import { Trash2, Edit, Eye, MoreVertical, Search } from "lucide-react";
 import { format } from "date-fns";
 import { AttendanceSessionData, deleteAttendanceSession } from "../actions";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import EditSessionDialog from "./edit-session-dialog";
 
 interface SessionsTableProps {
@@ -107,19 +109,45 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredSessions = sessions.filter((s) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      s.title.toLowerCase().includes(q) ||
+      s.sessionNumber.toString().includes(q) ||
+      s.day.toLowerCase().includes(q)
+    );
+  });
+
   if (sessions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
+      <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
         <p className="text-muted-foreground">
-          No attendance sessions found. Create your first session to get
-          started.
+          No attendance sessions found. Create your first session to get started.
         </p>
+        <SilentRefreshButton showLabel label="Refresh" toastMessage="Attendance sessions refreshed" />
       </div>
     );
   }
 
   return (
-    <>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search sessions..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 text-xs h-9"
+          />
+        </div>
+        <SilentRefreshButton toastMessage="Attendance sessions refreshed silently" />
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -134,8 +162,15 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sessions.map((session) => (
-              <TableRow key={session.id}>
+            {filteredSessions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-xs">
+                  No sessions match &quot;{searchQuery}&quot;
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredSessions.map((session) => (
+                <TableRow key={session.id}>
                 <TableCell className="font-medium">
                   <Badge variant="outline">#{session.sessionNumber}</Badge>
                 </TableCell>
@@ -192,7 +227,7 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            )))}
           </TableBody>
         </Table>
       </div>
@@ -227,6 +262,6 @@ export default function SessionsTable({ sessions }: SessionsTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

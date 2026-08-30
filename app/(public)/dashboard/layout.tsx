@@ -8,7 +8,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { isSystemAdminRole } from "@/lib/member-roles";
+import { RealtimeAttendanceListener } from "@/components/realtime/realtime-attendance-listener";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Ensure user is authenticated
@@ -18,11 +18,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!session) {
     return redirect('/login');
-  }
-
-  // If user is admin, redirect them to admin dashboard
-  if (isSystemAdminRole(session.user.role)) {
-    return redirect("/admin");
   }
 
   // Fetch user profile with profileImageKey
@@ -35,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       image: true,
       profileImageKey: true,
       role: true,
+      cbUserId: true,
     }
   });
 
@@ -51,8 +47,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     >
       <AppSidebar variant="inset" user={userData} />
       <SidebarInset>
-        <SiteHeader />
+        <SiteHeader user={userData} />
         {children}
+        <RealtimeAttendanceListener
+          userId={userData.id}
+          cbUserId={(userData as any).cbUserId || null}
+          userName={userData.name || undefined}
+        />
       </SidebarInset>
     </SidebarProvider>
   )

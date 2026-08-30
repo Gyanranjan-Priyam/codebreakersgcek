@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
 import { revalidatePath } from "next/cache";
+import { emitSocketEvent } from "@/lib/socket-server";
 
 export interface AttendanceSessionData {
   id: string;
@@ -301,6 +302,40 @@ export async function markAttendance(
         markedBy,
       },
     });
+
+    // Realtime broadcast via Socket.IO
+    try {
+      const session = await prisma.attendanceSession.findUnique({
+        where: { id: sessionId },
+        select: { id: true, title: true, sessionNumber: true },
+      });
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, cbUserId: true },
+      });
+
+      if (session && user) {
+        const realtimePayload = {
+          type: "attendance-marked",
+          sessionId: session.id,
+          sessionTitle: session.title,
+          sessionNumber: session.sessionNumber,
+          userId: user.id,
+          userName: user.name,
+          cbUserId: user.cbUserId,
+          points,
+          status,
+          timestamp: new Date().toISOString(),
+          message: `Your attendance for "${session.title}" (Session #${session.sessionNumber}) has been marked as ${status}${points > 0 ? ` (+${points} points)` : ""}!`,
+        };
+
+        await emitSocketEvent(`user-${userId}`, "attendance-marked", realtimePayload);
+        await emitSocketEvent(`attendance-session-${sessionId}`, "attendance-updated", realtimePayload);
+        await emitSocketEvent("leaderboard", "leaderboard-updated", realtimePayload);
+      }
+    } catch (broadcastErr) {
+      console.warn("Could not broadcast attendance socket event:", broadcastErr);
+    }
 
     revalidatePath(`/admin/points`);
     revalidatePath("/leaderboard");

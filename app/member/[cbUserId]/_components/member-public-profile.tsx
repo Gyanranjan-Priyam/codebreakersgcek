@@ -19,18 +19,16 @@ import {
   Sparkles,
   Target,
   ExternalLink,
-  Copy,
   Check,
   Share2,
   Building2,
   Compass,
   FileText,
-  MessageCircle,
-  Home,
   Award,
 } from "lucide-react";
 import { parseMemberRoles } from "@/lib/member-roles";
 import { parseSpecializedDomains } from "@/lib/specialized-domains";
+import { getBranchFullName } from "@/lib/branch-constants";
 import { getUserProfileImageUrl } from "@/lib/image-utils";
 import GitHubContributionCalendar from "@/components/member/github-contribution-calendar";
 import {
@@ -420,7 +418,7 @@ export default function MemberPublicProfile({ member }: MemberPublicProfileProps
 
                     {member.branch && (
                       <span className="inline-block bg-white text-black font-neo font-bold text-xs px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_0px_#000]">
-                        {member.branch}
+                        {getBranchFullName(member.branch)}
                       </span>
                     )}
 
@@ -923,7 +921,7 @@ export default function MemberPublicProfile({ member }: MemberPublicProfileProps
                       Branch / Discipline
                     </p>
                     <p className="text-xs sm:text-sm font-neo font-black text-black">
-                      {member.branch}
+                      {getBranchFullName(member.branch)}
                     </p>
                   </div>
                 </div>

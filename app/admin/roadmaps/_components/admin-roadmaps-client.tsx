@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import {
   Dialog,
   DialogContent,
@@ -164,14 +165,17 @@ export function AdminRoadmapsClient({
           />
         </div>
 
-        <Button
-          size="sm"
-          onClick={() => setIsCreateOpen(true)}
-          className="gap-1.5 text-xs h-9"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Create New Roadmap
-        </Button>
+        <div className="flex items-center gap-2">
+          <SilentRefreshButton toastMessage="Roadmaps refreshed silently" />
+          <Button
+            size="sm"
+            onClick={() => setIsCreateOpen(true)}
+            className="gap-1.5 text-xs h-9"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create New Roadmap
+          </Button>
+        </div>
       </div>
 
       {/* ── Roadmaps Table ── */}

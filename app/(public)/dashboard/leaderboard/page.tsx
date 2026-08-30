@@ -87,7 +87,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <OverallLeaderboard data={overallData} />
+              <OverallLeaderboard data={overallData} batchId={studentBatch?.id || requestedBatch} />
             </CardContent>
           </Card>
         </TabsContent>

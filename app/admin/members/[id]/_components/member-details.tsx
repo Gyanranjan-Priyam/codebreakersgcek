@@ -2,8 +2,11 @@
 /* eslint-disable react-hooks/static-components */
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { 
@@ -19,15 +22,18 @@ import {
   IdCard,
   Target,
   Layers,
+  UserPen,
 } from "lucide-react";
 import { parseMemberRoles, getRoleBadgeClasses } from "@/lib/member-roles";
-import { parseSpecializedDomains, getDomainBadgeClasses } from "@/lib/specialized-domains";
+import { parseSpecializedDomains } from "@/lib/specialized-domains";
+import { getBranchFullName } from "@/lib/branch-constants";
 import { getUserProfileImageUrl } from "@/lib/image-utils";
 import GitHubContributionCalendar from "@/components/member/github-contribution-calendar";
 import MemberSocialLinksCard, {
   SocialLinksData,
   CustomLinkItem,
 } from "@/components/member/member-social-links-card";
+import { EditMemberSheet } from "../../_components/edit-member-sheet";
 
 interface MemberDetailsProps {
   member: {
@@ -73,6 +79,9 @@ interface MemberDetailsProps {
 }
 
 export default function MemberDetails({ member }: MemberDetailsProps) {
+  const router = useRouter();
+  const [showEditSheet, setShowEditSheet] = useState(false);
+
   const InfoItem = ({ 
     icon: Icon, 
     label, 
@@ -150,6 +159,18 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
                   );
                 })}
               </div>
+
+              <div className="pt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 gap-1.5"
+                  onClick={() => setShowEditSheet(true)}
+                >
+                  <UserPen className="h-3.5 w-3.5 text-primary" />
+                  Edit Member Details
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -217,7 +238,7 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoItem icon={Hash} label="Registration Number" value={member.registration} />
             <InfoItem icon={Hash} label="Roll Number" value={member.rollNumber} />
-            <InfoItem icon={School} label="Branch/Department" value={member.branch} />
+            <InfoItem icon={School} label="Branch/Department" value={getBranchFullName(member.branch)} />
             <InfoItem icon={School} label="Admission Year" value={member.admissionYear} />
             {member.batch && (
               <InfoItem
@@ -263,6 +284,13 @@ export default function MemberDetails({ member }: MemberDetailsProps) {
           </div>
         </CardContent>
       </Card>
+
+      <EditMemberSheet
+        isOpen={showEditSheet}
+        onClose={() => setShowEditSheet(false)}
+        member={member}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

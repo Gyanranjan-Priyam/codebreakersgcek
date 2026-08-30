@@ -5,6 +5,9 @@ import { io, Socket } from "socket.io-client";
 let socketInstance: Socket | null = null;
 let initPromise: Promise<Socket | null> | null = null;
 
+// Track all active room subscriptions so they can be re-joined on reconnect
+const activeRooms = new Set<string>();
+
 /**
  * Initialize and return the Socket.IO client singleton.
  * On first call, hits /api/socketio to ensure the server is running,
@@ -33,6 +36,10 @@ export function getSocket(): Socket | null {
 
     socketInstance.on("connect", () => {
       console.log("🔌 Socket.IO connected:", socketInstance?.id);
+      // Re-join all active rooms on connect or reconnection
+      activeRooms.forEach((room) => {
+        socketInstance?.emit("join-room", room);
+      });
     });
 
     socketInstance.on("disconnect", (reason) => {
@@ -75,13 +82,18 @@ export async function initSocket(): Promise<Socket | null> {
  * Returns a cleanup function to leave the room.
  */
 export function joinRoom(room: string): () => void {
+  if (!room) return () => {};
+
+  activeRooms.add(room);
   const socket = getSocket();
-  if (socket) {
+  if (socket?.connected) {
     socket.emit("join-room", room);
   }
+
   return () => {
+    activeRooms.delete(room);
     const s = getSocket();
-    if (s) {
+    if (s?.connected) {
       s.emit("leave-room", room);
     }
   };
@@ -112,5 +124,7 @@ export function disconnectSocket(): void {
     socketInstance.disconnect();
     socketInstance = null;
     initPromise = null;
+    activeRooms.clear();
   }
 }
+

@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import {
   Select,
   SelectContent,
@@ -332,8 +333,8 @@ export function TransactionsClient({
                   </CardDescription>
                 </div>
 
-                <div className="w-full sm:w-72">
-                  <div className="relative">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative w-full sm:w-72">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
@@ -343,6 +344,7 @@ export function TransactionsClient({
                       className="pl-8 text-xs h-9"
                     />
                   </div>
+                  <SilentRefreshButton toastMessage="Transactions refreshed silently" />
                 </div>
               </div>
             </CardHeader>
@@ -657,6 +659,8 @@ export function TransactionsClient({
                       className="pl-8 text-xs h-9"
                     />
                   </div>
+
+                  <SilentRefreshButton toastMessage="Form transactions refreshed silently" />
                 </div>
               </div>
             </CardHeader>

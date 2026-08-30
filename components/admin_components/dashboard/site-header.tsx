@@ -1,15 +1,28 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ArrowLeft } from "lucide-react"
+import { IconUsers } from "@tabler/icons-react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 import { ThemeSelectorDropdown } from "@/components/ui/theme-selector-dropdown"
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  user?: {
+    role?: string | null;
+    [key: string]: any;
+  };
+}
+
+export function SiteHeader({ user }: SiteHeaderProps = {}) {
   const router = useRouter();
+
+  // If user is passed, we can verify admin status if needed
+  void user;
 
   const handleBack = () => {
     router.back();

@@ -25,7 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Copy, Eye, Edit, ToggleLeft, ToggleRight, Trash2, Inbox, Ban, PlayCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
+import { MoreHorizontal, Copy, Eye, Edit, ToggleLeft, ToggleRight, Trash2, Inbox, Ban, PlayCircle, Search } from "lucide-react";
 import { deleteForm, toggleFormPublish, toggleAcceptingResponses } from "../actions";
 
 interface FormRow {
@@ -96,16 +98,43 @@ export default function FormsList({ forms }: FormsListProps) {
     setIsLoading(false);
   };
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredForms = forms.filter((form) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      form.title.toLowerCase().includes(q) ||
+      form.formId.toLowerCase().includes(q) ||
+      (form.description && form.description.toLowerCase().includes(q))
+    );
+  });
+
   if (forms.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-        No forms yet. Create your first form to get started.
+      <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground flex flex-col items-center gap-3">
+        <p>No forms yet. Create your first form to get started.</p>
+        <SilentRefreshButton showLabel label="Refresh" toastMessage="Forms refreshed" />
       </div>
     );
   }
 
   return (
-    <>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search forms..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 text-xs h-9"
+          />
+        </div>
+        <SilentRefreshButton toastMessage="Forms list refreshed silently" />
+      </div>
+
       <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
@@ -119,8 +148,15 @@ export default function FormsList({ forms }: FormsListProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {forms.map((form) => (
-              <TableRow key={form.id}>
+            {filteredForms.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-xs">
+                  No forms match &quot;{searchQuery}&quot;
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredForms.map((form) => (
+                <TableRow key={form.id}>
                 <TableCell>
                   <div className="space-y-1">
                     <p className="font-medium">{form.title}</p>
@@ -222,7 +258,7 @@ export default function FormsList({ forms }: FormsListProps) {
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            )))}
           </TableBody>
         </Table>
       </div>
@@ -247,6 +283,6 @@ export default function FormsList({ forms }: FormsListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

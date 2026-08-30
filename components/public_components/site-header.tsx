@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Separator } from "@/components/ui/separator"
@@ -6,13 +7,28 @@ import { BackButton } from "@/components/ui/back-button"
 import { usePathname } from "next/navigation"
 import { useMemo } from "react"
 import { ReceiptText } from "lucide-react";
+import { IconUserShield } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { isSystemAdminRole } from "@/lib/member-roles";
+import { useSession } from "@/lib/auth-client";
 
 import { ThemeSelectorDropdown } from "@/components/ui/theme-selector-dropdown";
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  user?: {
+    role?: string | null;
+    [key: string]: any;
+  };
+}
+
+export function SiteHeader({ user }: SiteHeaderProps = {}) {
   const pathname = usePathname();
+  const session = useSession();
+
+  const isAdmin =
+    isSystemAdminRole(user?.role) ||
+    isSystemAdminRole(session?.data?.user?.role);
 
   // Generate page title based on current path
   const pageTitle = useMemo(() => {

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
 import { revalidatePath } from "next/cache";
+import { emitSocketEvent } from "@/lib/socket-server";
 
 export interface EventPointData {
   id: string;
@@ -338,6 +339,39 @@ export async function evaluateParticipation(
         evaluatedAt: new Date(),
       },
     });
+
+    // Realtime broadcast via Socket.IO
+    try {
+      const event = await prisma.eventPoint.findUnique({
+        where: { id: eventId },
+        select: { id: true, title: true, eventNumber: true },
+      });
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, cbUserId: true },
+      });
+
+      if (event && user) {
+        const realtimePayload = {
+          type: "event-evaluated",
+          eventId: event.id,
+          eventTitle: event.title,
+          eventNumber: event.eventNumber,
+          userId: user.id,
+          userName: user.name,
+          cbUserId: user.cbUserId,
+          points: pointsAwarded,
+          status,
+          timestamp: new Date().toISOString(),
+          message: `Your participation in Event #${event.eventNumber} (${event.title}) has been ${status}${pointsAwarded > 0 ? ` (+${pointsAwarded} points)` : ""}!`,
+        };
+
+        await emitSocketEvent(`user-${userId}`, "event-evaluated", realtimePayload);
+        await emitSocketEvent("leaderboard", "leaderboard-updated", realtimePayload);
+      }
+    } catch (broadcastErr) {
+      console.warn("Could not broadcast event participation socket event:", broadcastErr);
+    }
 
     revalidatePath(`/admin/points`);
     revalidatePath("/leaderboard");

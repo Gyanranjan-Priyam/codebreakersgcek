@@ -14,11 +14,17 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-import { updateUserProfileData, type UserProfileData } from "../actions";
+import { Loader2, X, Plus, Check } from "lucide-react";
+import { updateUserProfileData } from "../actions";
 import statesDistrictsData from "@/lib/new/states-districts.json";
 import { cn } from "@/lib/utils";
 import { VerifyEmailDialog } from "@/components/email-verification/verify-email-dialog";
+import {
+  PREDEFINED_DOMAINS,
+  parseSpecializedDomains,
+  serializeSpecializedDomains,
+} from "@/lib/specialized-domains";
+import { BRANCH_OPTIONS, getBranchCode } from "@/lib/branch-constants";
 
 interface UserProfileFormProps {
   initialData: {
@@ -44,6 +50,7 @@ interface UserProfileFormProps {
     policeStation?: string | null;
     block?: string | null;
     pinCode?: string | null;
+    specializedDomain?: string | null;
   };
 }
 
@@ -131,18 +138,48 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
     lastName: initialData.lastName || "",
     registration: initialData.registration || "",
     rollNumber: initialData.rollNumber || "",
-    branch: initialData.branch || "",
+    branch: getBranchCode(initialData.branch),
     admissionYear: initialData.admissionYear || "",
     address: initialData.address || "",
     postOffice: initialData.postOffice || "",
     policeStation: initialData.policeStation || "",
     block: initialData.block || "",
     pinCode: initialData.pinCode || "",
+    specializedDomain: initialData.specializedDomain || "",
   });
 
+  const [customDomainInput, setCustomDomainInput] = useState("");
   const [currentSavedEmail, setCurrentSavedEmail] = useState(initialData.email || "");
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null);
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+
+  const currentDomains = useMemo(
+    () => parseSpecializedDomains(formData.specializedDomain),
+    [formData.specializedDomain]
+  );
+
+  const toggleDomain = (domain: string) => {
+    const updated = currentDomains.includes(domain)
+      ? currentDomains.filter((d) => d !== domain)
+      : [...currentDomains, domain];
+    set("specializedDomain", serializeSpecializedDomains(updated) || "");
+  };
+
+  const handleAddCustomDomain = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = customDomainInput.trim();
+    if (!trimmed) return;
+    if (!currentDomains.includes(trimmed)) {
+      const updated = [...currentDomains, trimmed];
+      set("specializedDomain", serializeSpecializedDomains(updated) || "");
+    }
+    setCustomDomainInput("");
+  };
+
+  const handleRemoveDomain = (domain: string) => {
+    const updated = currentDomains.filter((d) => d !== domain);
+    set("specializedDomain", serializeSpecializedDomains(updated) || "");
+  };
 
   const [selectedState, setSelectedState] = useState(initialData.state || "");
   const [selectedCollege, setSelectedCollege] = useState(
@@ -191,7 +228,7 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
 
     startTransition(async () => {
       try {
-        const result = await updateUserProfileData(formData as any);
+        const result = await updateUserProfileData(formData);
 
         if (result.status === "requires_email_verification") {
           toast.info("Verification Required", {
@@ -209,7 +246,7 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
             description: result.message || "Please check the entered values.",
           });
         }
-      } catch (error) {
+      } catch {
         toast.error("Update failed", {
           description: "An unexpected error occurred while saving your profile.",
         });
@@ -438,11 +475,11 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
               <SelectValue placeholder="Select branch" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="CSE">CSE</SelectItem>
-              <SelectItem value="EE">EE</SelectItem>
-              <SelectItem value="ME">ME</SelectItem>
-              <SelectItem value="CE">CE</SelectItem>
-              <SelectItem value="ECE">ECE</SelectItem>
+              {BRANCH_OPTIONS.map((b) => (
+                <SelectItem key={b.code} value={b.code}>
+                  {b.code}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </FormField>
@@ -489,6 +526,83 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
             className="text-sm resize-none"
           />
         </FormField>
+      </div>
+
+      {/* ── Domain Preferences ── */}
+      <SubHeading>Interested Domains & Specialized Tracks</SubHeading>
+
+      <div className="space-y-3 pt-2">
+        <p className="text-xs text-muted-foreground">
+          Select the technical and creative areas you are interested in or specialize in. Admins and you can update these at any time.
+        </p>
+
+        {/* Selected domain badges */}
+        {currentDomains.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 p-3 rounded-xl bg-muted/30 border border-border/80">
+            {currentDomains.map((domain) => (
+              <span
+                key={domain}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/25"
+              >
+                <span>{domain}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDomain(domain)}
+                  disabled={pending}
+                  className="hover:text-destructive transition-colors cursor-pointer"
+                  title="Remove domain"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Predefined domain chips list */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {PREDEFINED_DOMAINS.map((domain) => {
+            const isSelected = currentDomains.includes(domain);
+            return (
+              <button
+                key={domain}
+                type="button"
+                onClick={() => toggleDomain(domain)}
+                disabled={pending}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                  isSelected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {isSelected && <Check className="size-3 inline mr-1" />}
+                {domain}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom domain input */}
+        <div className="flex items-center gap-2 pt-1">
+          <Input
+            placeholder="Add another custom domain / track..."
+            value={customDomainInput}
+            onChange={(e) => setCustomDomainInput(e.target.value)}
+            disabled={pending}
+            className="text-xs h-9"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAddCustomDomain}
+            disabled={pending || !customDomainInput.trim()}
+            className="h-9 text-xs gap-1 cursor-pointer shrink-0"
+          >
+            <Plus className="size-3.5" />
+            <span>Add</span>
+          </Button>
+        </div>
       </div>
 
       {/* ── Address ── */}

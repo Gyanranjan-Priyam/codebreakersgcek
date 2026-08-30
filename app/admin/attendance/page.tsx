@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Users, ListChecks } from "lucide-react";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import CreateSessionDialog from "./_components/create-session-dialog";
 import SessionsTable from "./_components/sessions-table";
 import StudentQRScanner from "./_components/student-qr-scanner";
@@ -141,13 +142,18 @@ export default function AttendanceQRPage() {
       {/* Attendance Sessions Table with View Details & Delete Actions */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ListChecks className="h-5 w-5 text-primary" />
-            All Attendance Sessions ({sessions.length})
-          </CardTitle>
-          <CardDescription>
-            Manage sessions, select active scanner session, view detailed attendance lists, or delete sessions.
-          </CardDescription>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ListChecks className="h-5 w-5 text-primary" />
+                All Attendance Sessions ({sessions.length})
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Manage sessions, select active scanner session, view detailed attendance lists, or delete sessions.
+              </CardDescription>
+            </div>
+            <SilentRefreshButton onRefresh={fetchSessions} toastMessage="Attendance sessions refreshed" />
+          </div>
         </CardHeader>
         <CardContent>
           <SessionsTable

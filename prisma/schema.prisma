@@ -594,6 +594,3 @@ model UserRoadmapProgress {
   @@index([roadmapId])
   @@map("user_roadmap_progress")
 }
-
-
-

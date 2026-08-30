@@ -12,12 +12,16 @@ import {
   ReceiptText,
   FileText,
   Compass,
-  Code2,
 } from "lucide-react";
+import { IconUserShield } from "@tabler/icons-react";
+import { isSystemAdminRole } from "@/lib/member-roles";
 
 import { NavMain } from "@/components/public_components/nav-main";
 import { NavSecondary } from "@/components/public_components/nav-secondary";
 import { NavUser } from "@/components/public_components/nav-user";
+import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher";
+import Link from "next/link";
+import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -27,8 +31,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import Link from "next/link";
-import Image from "next/image";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -116,6 +118,20 @@ const data = {
 };
 
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
+  const isAdmin = isSystemAdminRole(user?.role);
+
+  const secondaryNav = React.useMemo(() => {
+    const items = [...data.navSecondary];
+    if (isAdmin) {
+      items.unshift({
+        title: "Admin Panel",
+        url: "/admin",
+        icon: IconUserShield,
+      });
+    }
+    return items;
+  }, [isAdmin]);
+
   // Create user data with proper formatting
   const userData = user
     ? {
@@ -123,17 +139,20 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         email: user.email,
         avatar: user.image || "/default-avatar.png",
         profileImageKey: user.profileImageKey || null,
+        role: user.role || null,
       }
     : {
         name: "User",
         email: "user@example.com",
         avatar: "/default-avatar.png",
         profileImageKey: null,
+        role: null,
       };
 
   return (
     <Sidebar variant="floating" collapsible="icon" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="gap-3 pb-1">
+        {/* Brand Logo & Name */}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -162,10 +181,15 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+
+        {/* Workspace Switcher Below Logo (Only shown for admins) */}
+        {isAdmin && (
+          <WorkspaceSwitcher currentWorkspace="member" />
+        )}
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavSecondary items={secondaryNav} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={userData} />

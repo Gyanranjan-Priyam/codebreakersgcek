@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { auth } from "@/lib/auth";
@@ -6,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { isSystemAdminRole } from "@/lib/member-roles";
+import { parseUserAgent, ParsedDeviceInfo } from "@/lib/device-parser";
 
 // Validation schema for user profile updates
 const userProfileUpdateSchema = z.object({
@@ -34,6 +35,7 @@ const userProfileUpdateSchema = z.object({
   policeStation: z.string().optional(),
   block: z.string().optional(),
   pinCode: z.string().optional(),
+  specializedDomain: z.string().optional().nullable(),
 });
 
 export interface UserProfileData {
@@ -57,8 +59,8 @@ export interface UserProfileData {
   address?: string;
   postOffice?: string;
   policeStation?: string;
-  block?: string;
   pinCode?: string;
+  specializedDomain?: string | null;
 }
 
 export async function getCurrentUserProfileData() {
@@ -200,8 +202,19 @@ export async function updateUserProfileData(data: UserProfileData) {
       }
     }
 
+    // Calculate whether essential profile fields are completed (changing status from pending to active)
+    const essentialFields = [
+      validatedData.name,
+      validatedData.email,
+      validatedData.mobileNumber,
+      validatedData.registration,
+      validatedData.branch,
+      validatedData.admissionYear,
+    ];
+    const isProfileComplete = essentialFields.every((f) => Boolean(f && typeof f === "string" && f.trim().length > 0));
+
     // Update user profile (keep current email if changed until verified)
-    const updatedUser = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       return await tx.user.update({
         where: { id: session.user.id },
         data: {
@@ -227,6 +240,11 @@ export async function updateUserProfileData(data: UserProfileData) {
           policeStation: validatedData.policeStation || null,
           block: validatedData.block || null,
           pinCode: validatedData.pinCode || null,
+          specializedDomain:
+            validatedData.specializedDomain !== undefined
+              ? validatedData.specializedDomain?.trim() || null
+              : undefined,
+          profileComplete: isProfileComplete,
           updatedAt: new Date(),
         },
       });
@@ -425,3 +443,232 @@ export async function updateUserSocialAndCustomLinks(data: {
     };
   }
 }
+
+export interface UserSessionItem {
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt: Date;
+  isCurrent: boolean;
+  deviceInfo: ParsedDeviceInfo;
+}
+
+export interface UserActiveSessionsResponse {
+  status: "success" | "error";
+  message?: string;
+  sessions?: UserSessionItem[];
+  currentSessionId?: string | null;
+  maxAllowed: number;
+  activeCount: number;
+  isAdmin: boolean;
+}
+
+/**
+ * Fetch all active logged-in devices/sessions for the authenticated user.
+ */
+export async function getUserActiveSessions(): Promise<UserActiveSessionsResponse> {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return {
+        status: "error",
+        message: "Authentication required",
+        maxAllowed: 2,
+        activeCount: 0,
+        isAdmin: false,
+      };
+    }
+
+    const currentToken = session.session?.token || session.session?.id || "";
+    const isAdmin = isSystemAdminRole(session.user.role);
+
+    // Fetch active non-expired sessions
+    const rawSessions = await prisma.session.findMany({
+      where: {
+        userId: session.user.id,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
+
+    const parsedSessions: UserSessionItem[] = rawSessions.map((s) => {
+      const isCurrent = s.token === currentToken || s.id === session.session?.id;
+      return {
+        id: s.id,
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+        expiresAt: s.expiresAt,
+        isCurrent,
+        deviceInfo: parseUserAgent(s.userAgent),
+      };
+    });
+
+    // Ensure current device is sorted at the top
+    parsedSessions.sort((a, b) => (b.isCurrent ? 1 : 0) - (a.isCurrent ? 1 : 0));
+
+    return {
+      status: "success",
+      sessions: parsedSessions,
+      currentSessionId: session.session?.id || null,
+      maxAllowed: 2,
+      activeCount: parsedSessions.length,
+      isAdmin,
+    };
+  } catch (error) {
+    console.error("Error fetching active sessions:", error);
+    return {
+      status: "error",
+      message: "Failed to load active sessions",
+      maxAllowed: 2,
+      activeCount: 0,
+      isAdmin: false,
+    };
+  }
+}
+
+/**
+ * Revoke/log out a specific session of the user.
+ */
+export async function revokeUserSession(targetSessionId: string) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized. Please log in first.",
+      };
+    }
+
+    // Verify session belongs to user
+    const targetSession = await prisma.session.findUnique({
+      where: { id: targetSessionId },
+    });
+
+    if (!targetSession || targetSession.userId !== session.user.id) {
+      return {
+        status: "error" as const,
+        message: "Session not found or permission denied.",
+      };
+    }
+
+    await prisma.session.delete({
+      where: { id: targetSessionId },
+    });
+
+    revalidatePath("/dashboard/settings");
+
+    return {
+      status: "success" as const,
+      message: "Device logged out successfully.",
+      isCurrentRevoked: targetSessionId === session.session?.id,
+    };
+  } catch (error) {
+    console.error("Error revoking session:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to log out device.",
+    };
+  }
+}
+
+/**
+ * Revoke all other active sessions except the current device.
+ */
+export async function revokeAllOtherUserSessions() {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id || !session.session?.id) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized. Please log in first.",
+      };
+    }
+
+    const currentSessionId = session.session.id;
+
+    await prisma.session.deleteMany({
+      where: {
+        userId: session.user.id,
+        id: {
+          not: currentSessionId,
+        },
+      },
+    });
+
+    revalidatePath("/dashboard/settings");
+
+    return {
+      status: "success" as const,
+      message: "All other devices logged out successfully.",
+    };
+  } catch (error) {
+    console.error("Error revoking other sessions:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to log out other devices.",
+    };
+  }
+}
+
+/**
+ * Used during login device-limit interception:
+ * Revokes a chosen older session so the user can proceed with their new session.
+ */
+export async function revokeSessionAndProceed(targetSessionId: string) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return {
+        status: "error" as const,
+        message: "Session expired or authentication required.",
+      };
+    }
+
+    const target = await prisma.session.findUnique({
+      where: { id: targetSessionId },
+    });
+
+    if (!target || target.userId !== session.user.id) {
+      return {
+        status: "error" as const,
+        message: "Target session not found.",
+      };
+    }
+
+    await prisma.session.delete({
+      where: { id: targetSessionId },
+    });
+
+    return {
+      status: "success" as const,
+      message: "Selected device logged out. Redirecting to dashboard...",
+    };
+  } catch (error) {
+    console.error("Error during device logout and proceed:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to log out device. Please try again.",
+    };
+  }
+}
+

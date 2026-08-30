@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, Medal, Award } from "lucide-react";
 import { LeaderboardEntry, getMonthlyLeaderboard } from "../actions";
 import { toast } from "sonner";
+import { initSocket, joinRoom, onSocketEvent } from "@/lib/socket-client";
 
 interface MonthlyLeaderboardProps {
   initialData: LeaderboardEntry[];
@@ -38,6 +39,38 @@ export default function MonthlyLeaderboard({
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
+  // Real-time Socket.IO synchronization on every point update
+  useEffect(() => {
+    let cleanupRoom: (() => void) | undefined;
+    let cleanupListener: (() => void) | undefined;
+
+    initSocket().then((socket) => {
+      if (!socket) return;
+
+      cleanupRoom = joinRoom("leaderboard");
+
+      cleanupListener = onSocketEvent("leaderboard-updated", async () => {
+        try {
+          const res = await getMonthlyLeaderboard(selectedYear, selectedMonth, batchId);
+          if (res.status === "success" && res.data) {
+            setData(res.data);
+          }
+        } catch (err) {
+          console.debug("Silent monthly leaderboard re-fetch error:", err);
+        }
+      });
+    });
+
+    return () => {
+      cleanupListener?.();
+      cleanupRoom?.();
+    };
+  }, [selectedYear, selectedMonth, batchId]);
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const months = [
@@ -142,6 +175,14 @@ export default function MonthlyLeaderboard({
             ))}
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20 self-start sm:self-center">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="font-semibold text-[11px] tracking-wide uppercase">Live Sync</span>
+        </div>
       </div>
 
       {loading ? (

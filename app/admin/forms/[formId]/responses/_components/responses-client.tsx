@@ -62,6 +62,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import {
   updateFormResponseStatus,
   updateFormResponsesStatus,
@@ -462,6 +463,8 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
                   className="pl-10"
                 />
               </div>
+
+              <SilentRefreshButton toastMessage="Form responses refreshed silently" />
             </div>
           </div>
         </CardHeader>

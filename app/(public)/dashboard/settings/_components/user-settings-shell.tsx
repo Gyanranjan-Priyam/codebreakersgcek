@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -5,6 +6,7 @@ import { UserProfileImageUpload } from "./user-profile-image-upload";
 import { UserProfileForm } from "./user-profile-form";
 import { LinkedAccountsSection } from "./linked-accounts-section";
 import { UserSocialLinksForm } from "./user-social-links-form";
+import { UserActiveSessionsSection } from "./user-active-sessions-section";
 import { Separator } from "@/components/ui/separator";
 import {
   User,
@@ -17,10 +19,11 @@ import {
   Phone,
   Info,
   Globe,
+  MonitorSmartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Tab = "profile" | "social" | "security" | "notifications";
+type Tab = "profile" | "social" | "devices" | "security" | "notifications";
 
 interface UserSettingsShellProps {
   userData: {
@@ -63,6 +66,7 @@ interface UserSettingsShellProps {
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "social", label: "Social & Links", icon: Globe },
+  { id: "devices", label: "Devices & Sessions", icon: MonitorSmartphone },
   { id: "security", label: "Account Security", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
@@ -158,6 +162,7 @@ export function UserSettingsShell({ userData }: UserSettingsShellProps) {
                   policeStation: userData.policeStation || "",
                   block: userData.block || "",
                   pinCode: userData.pinCode || "",
+                  specializedDomain: userData.specializedDomain || "",
                 }}
               />
             </div>
@@ -235,6 +240,13 @@ export function UserSettingsShell({ userData }: UserSettingsShellProps) {
               <SectionHeading>Linked Accounts</SectionHeading>
               <LinkedAccountsSection githubUsername={userData.githubUsername} />
             </div>
+          </div>
+        )}
+
+        {/* Tab: Devices & Active Sessions */}
+        {activeTab === "devices" && (
+          <div className="space-y-6 max-w-3xl">
+            <UserActiveSessionsSection />
           </div>
         )}
 

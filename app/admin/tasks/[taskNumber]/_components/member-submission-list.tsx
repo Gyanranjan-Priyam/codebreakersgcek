@@ -30,6 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Search, CheckCircle, XCircle, Clock, Eye, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import { MemberForTask, evaluateSubmission } from "../../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -252,6 +253,8 @@ export default function MemberSubmissionList({
               <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
+
+          <SilentRefreshButton toastMessage="Task submissions refreshed silently" />
         </div>
 
         <div className="rounded-md border">

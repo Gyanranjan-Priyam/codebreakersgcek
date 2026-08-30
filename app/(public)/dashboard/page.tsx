@@ -17,7 +17,6 @@ import {
   ChevronRight,
   Activity,
   Layers,
-  Code2,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -26,7 +25,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getUserDashboardData } from "./actions";
 import { AnalyticsGraphCard } from "./_components/analytics-graph-card";
+import { OnboardingDialog } from "./_components/onboarding-dialog";
 import { getUserProfileImageUrl } from "@/lib/image-utils";
+import { getBranchFullName } from "@/lib/branch-constants";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -210,7 +211,7 @@ export default async function UserDashboard() {
 
             <p className="text-xs text-muted-foreground font-mono truncate">
               {user.registration ? `Reg: ${user.registration}` : user.email}
-              {user.branch ? ` • ${user.branch}` : ""}
+              {user.branch ? ` • ${getBranchFullName(user.branch)}` : ""}
               {user.admissionYear ? ` • Class of ${user.admissionYear}` : ""}
             </p>
           </div>
@@ -515,6 +516,9 @@ export default async function UserDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* ── First-Time User Onboarding Popup ── */}
+      <OnboardingDialog user={user} />
     </div>
   );
 }

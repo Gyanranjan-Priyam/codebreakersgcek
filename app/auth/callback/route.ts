@@ -92,9 +92,22 @@ export async function GET() {
         // Don't fail the redirect if this fails
     }
 
-    // If user is admin, redirect to admin dashboard
-    if (isSystemAdminRole(session.user.role)) {
+    // If user is admin, they have unlimited device access -> redirect to admin dashboard
+    if (isSystemAdminRole(session.user.role) || isSystemAdminRole(dbUser.role)) {
         return redirect("/admin");
+    }
+
+    // ── Device Limit Enforcement (Max 2 Devices for Regular Users) ──
+    const activeSessions = await prisma.session.findMany({
+        where: {
+            userId: session.user.id,
+            expiresAt: { gt: new Date() },
+        },
+        orderBy: { updatedAt: "desc" },
+    });
+
+    if (activeSessions.length > 2) {
+        return redirect("/device-limit");
     }
 
     // Otherwise, redirect to user dashboard

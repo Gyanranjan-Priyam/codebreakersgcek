@@ -1,5 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -36,26 +37,16 @@ import {
   Target,
   Hash,
   UserCheck,
+  UserPen,
 } from "lucide-react";
 import { toggleMemberBan, deleteMember } from "../../actions";
 import { format } from "date-fns";
 import EmailComposeSidebar from "./email-compose-sidebar";
 import { AssignRolesDomainSheet } from "../../_components/assign-roles-domain-sheet";
+import { EditMemberSheet } from "../../_components/edit-member-sheet";
 
 interface MemberSidebarProps {
-  member: {
-    id: string;
-    cbUserId: string | null;
-    name: string;
-    email: string;
-    username: string | null;
-    githubUsername: string | null;
-    specializedDomain?: string | null;
-    banned: boolean | null;
-    createdAt: Date;
-    emailVerified: boolean;
-    role?: string | null;
-  };
+  member: any;
   stats: {
     totalPoints: number;
     currentRanking: number;
@@ -75,6 +66,7 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
   const [banReason, setBanReason] = useState("");
   const [isEmailSidebarOpen, setIsEmailSidebarOpen] = useState(false);
   const [showAssignSheet, setShowAssignSheet] = useState(false);
+  const [showEditSheet, setShowEditSheet] = useState(false);
 
   const handleToggleBan = async () => {
     if (!member.banned && !banReason.trim()) {
@@ -336,6 +328,16 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Edit Member Details */}
+          <Button
+            variant="outline"
+            className="w-full justify-start text-xs font-medium"
+            onClick={() => setShowEditSheet(true)}
+          >
+            <UserPen className="mr-2 h-4 w-4 text-primary" />
+            <span>Edit Member Details</span>
+          </Button>
+
           {/* Assign Roles & Domain */}
           <Button
             variant="outline"
@@ -463,6 +465,13 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
       <AssignRolesDomainSheet
         isOpen={showAssignSheet}
         onClose={() => setShowAssignSheet(false)}
+        member={member}
+        onSuccess={() => router.refresh()}
+      />
+
+      <EditMemberSheet
+        isOpen={showEditSheet}
+        onClose={() => setShowEditSheet(false)}
         member={member}
         onSuccess={() => router.refresh()}
       />

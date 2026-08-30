@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     >
       <AppSidebar user={session.user} />
       <SidebarInset className="overflow-hidden">
-        <SiteHeader />
+        <SiteHeader user={session.user} />
         <div className="flex-1 flex flex-col min-h-0 w-full">
             {children}
         </div>

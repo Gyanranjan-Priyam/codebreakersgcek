@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { isSystemAdminRole } from "@/lib/member-roles";
+import { emitSocketEvent } from "@/lib/socket-server";
 
 export function extractStudentIdentifier(qrContent: string): string {
   if (!qrContent) return "";
@@ -163,6 +164,27 @@ export async function POST(req: NextRequest) {
     });
 
     if (existingAttendance && existingAttendance.status === "present") {
+      const verifyPayload = {
+        type: "attendance-marked",
+        sessionId: session.id,
+        sessionTitle: session.title,
+        sessionNumber: session.sessionNumber,
+        userId: user.id,
+        userName: user.name,
+        cbUserId: user.cbUserId,
+        points: existingAttendance.points || 10,
+        status: "present",
+        alreadyMarked: true,
+        timestamp: new Date().toISOString(),
+        message: `${user.name}, your attendance for "${session.title}" is already recorded as Present!`,
+      };
+
+      await emitSocketEvent(`user-${user.id}`, "attendance-marked", verifyPayload);
+      await emitSocketEvent(`user:${user.id}`, "attendance-marked", verifyPayload);
+      if (user.cbUserId) {
+        await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", verifyPayload);
+      }
+
       return NextResponse.json({
         success: true,
         alreadyMarked: true,
@@ -197,6 +219,32 @@ export async function POST(req: NextRequest) {
         method: "admin-qr-scan",
       },
     });
+
+    // Realtime broadcast via Socket.IO:
+    // 1. To the student's personal rooms -> updates student dashboard instantly + triggers browser push notification
+    const realtimePayload = {
+      type: "attendance-marked",
+      sessionId: session.id,
+      sessionTitle: session.title,
+      sessionNumber: session.sessionNumber,
+      userId: user.id,
+      userName: user.name,
+      cbUserId: user.cbUserId,
+      points: 10,
+      status: "present",
+      timestamp: new Date().toISOString(),
+      message: `Your attendance for "${session.title}" (Session #${session.sessionNumber}) has been marked Present (+10 points)!`,
+    };
+
+    await emitSocketEvent(`user-${user.id}`, "attendance-marked", realtimePayload);
+    await emitSocketEvent(`user:${user.id}`, "attendance-marked", realtimePayload);
+    if (user.cbUserId) {
+      await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", realtimePayload);
+    }
+    // 2. To the attendance session room for live admin monitor screens
+    await emitSocketEvent(`attendance-session-${sessionId}`, "attendance-updated", realtimePayload);
+    // 3. To the global leaderboard room for real-time leaderboard ranking updates
+    await emitSocketEvent("leaderboard", "leaderboard-updated", realtimePayload);
 
     return NextResponse.json({
       success: true,

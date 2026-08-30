@@ -13,12 +13,14 @@ import {
   QrCode,
   Receipt,
   Compass,
-  Code2,
 } from "lucide-react";
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main";
 import { NavSecondary } from "@/components/admin_components/dashboard/nav-secondary";
 import { NavUser } from "@/components/admin_components/dashboard/nav-user";
+import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher";
+import Link from "next/link";
+import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -28,8 +30,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import Link from "next/link";
-import Image from "next/image";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -119,7 +119,8 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
 
   return (
     <Sidebar variant="floating" collapsible="icon" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="gap-4 pb-1">
+        {/* Brand Logo & Name */}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -148,6 +149,9 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+
+        {/* Workspace Switcher Below Logo */}
+        <WorkspaceSwitcher currentWorkspace="admin" />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />

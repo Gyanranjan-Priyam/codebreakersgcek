@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { getUserAttendanceHistory } from "../actions";
 import { CheckCircle, Calendar, Trophy, QrCode } from "lucide-react";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 
 interface Attendance {
   id: string;
@@ -142,10 +143,15 @@ export default function AttendanceHistory() {
       {/* Attendance History Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Attendance History</CardTitle>
-          <CardDescription>
-            View all your attendance records and points earned
-          </CardDescription>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Attendance History</CardTitle>
+              <CardDescription className="mt-1">
+                View all your attendance records and points earned
+              </CardDescription>
+            </div>
+            <SilentRefreshButton onRefresh={loadAttendance} toastMessage="Attendance records refreshed" />
+          </div>
         </CardHeader>
         <CardContent>
           {attendances.length === 0 ? (

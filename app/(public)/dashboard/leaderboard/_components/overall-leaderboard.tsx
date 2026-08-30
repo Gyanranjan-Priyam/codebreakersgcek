@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -9,23 +10,69 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Medal, Award } from "lucide-react";
-import { LeaderboardEntry } from "../actions";
+import { Trophy, Medal, Award, Radio } from "lucide-react";
+import { LeaderboardEntry, getOverallLeaderboard } from "../actions";
+import { initSocket, joinRoom, onSocketEvent } from "@/lib/socket-client";
 
 interface OverallLeaderboardProps {
   data: LeaderboardEntry[];
+  batchId?: string | null;
 }
 
-export default function OverallLeaderboard({ data }: OverallLeaderboardProps) {
+export default function OverallLeaderboard({
+  data: initialData,
+  batchId,
+}: OverallLeaderboardProps) {
+  const [data, setData] = useState<LeaderboardEntry[]>(initialData);
+
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
+  // Real-time Socket.IO synchronization on every point update
+  useEffect(() => {
+    let cleanupRoom: (() => void) | undefined;
+    let cleanupListener: (() => void) | undefined;
+
+    initSocket().then((socket) => {
+      if (!socket) return;
+
+      cleanupRoom = joinRoom("leaderboard");
+
+      cleanupListener = onSocketEvent("leaderboard-updated", async () => {
+        try {
+          const res = await getOverallLeaderboard(batchId);
+          if (res.status === "success" && res.data) {
+            setData(res.data);
+          }
+        } catch (err) {
+          console.debug("Silent leaderboard re-fetch error:", err);
+        }
+      });
+    });
+
+    return () => {
+      cleanupListener?.();
+      cleanupRoom?.();
+    };
+  }, [batchId]);
+
   if (data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
+      <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
         <p className="text-muted-foreground">
           No points data available yet
         </p>
-        <p className="text-sm text-muted-foreground mt-2">
+        <p className="text-sm text-muted-foreground">
           Start earning points for attendance, tasks, or events to see the leaderboard
         </p>
+        <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="font-medium text-[11px]">Real-time Live Sync Active</span>
+        </div>
       </div>
     );
   }
@@ -58,6 +105,19 @@ export default function OverallLeaderboard({ data }: OverallLeaderboardProps) {
 
   return (
     <div className="space-y-4">
+      {/* Real-time live status indicator */}
+      <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="font-semibold text-[11px] tracking-wide uppercase">Live Sync Active</span>
+        </div>
+        <span className="text-[11px] text-muted-foreground">
+          Auto-updates via Socket.IO on every point
+        </span>
+      </div>
       {/* Top 3 Podium */}
       {data.length >= 3 && (
         <div className="grid grid-cols-3 gap-4 mb-6">

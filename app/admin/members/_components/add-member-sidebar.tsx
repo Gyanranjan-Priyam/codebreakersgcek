@@ -44,6 +44,7 @@ import {
   Search,
   UserCheck,
   Target,
+  FileSpreadsheet,
 } from "lucide-react";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import {
@@ -57,22 +58,15 @@ import {
   parseSpecializedDomains,
   serializeSpecializedDomains,
 } from "@/lib/specialized-domains";
+import { BRANCH_OPTIONS, getBranchCode } from "@/lib/branch-constants";
 
 interface AddMemberSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenExcelImport?: () => void;
 }
 
-const branchOptions = [
-  "Computer Science & Engineering",
-  "Mechanical Engineering",
-  "Electrical Engineering",
-  "Civil Engineering",
-  "Basic Science & Humanities",
-  "Other",
-];
-
-export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarProps) {
+export default function AddMemberSidebar({ isOpen, onClose, onOpenExcelImport }: AddMemberSidebarProps) {
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
@@ -128,7 +122,7 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
       !cand.whatsappNumber || cand.whatsappNumber === cand.mobileNumber
     );
     if (cand.branch) {
-      setBranch(cand.branch);
+      setBranch(getBranchCode(cand.branch));
     }
 
     const sourceLabel = cand.formTitle
@@ -228,7 +222,7 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
       } else {
         toast.error(result.message);
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred while adding the member");
     } finally {
       setIsSubmitting(false);
@@ -252,11 +246,35 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
 
         <div
           data-lenis-prevent
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 no-scrollbar"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           onWheel={(event) => event.stopPropagation()}
           onTouchMoveCapture={(event) => event.stopPropagation()}
         >
           <div className="space-y-5 pb-4">
+            {/* Quick Link to Excel Import */}
+            {onOpenExcelImport && (
+              <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="text-muted-foreground">
+                    Have an Excel spreadsheet?
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    onOpenExcelImport();
+                  }}
+                  className="h-7 text-xs border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                >
+                  Import from Excel
+                </Button>
+              </div>
+            )}
+
             {/* Auto-Fill by Response ID Card */}
             <div className="p-3.5 rounded-lg border bg-muted/30 space-y-2.5">
               <div className="flex items-center justify-between">
@@ -440,20 +458,20 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <Label htmlFor="branch">
                     Branch <span className="text-destructive">*</span>
                   </Label>
-                  <div className="relative">
+                  <div className="relative min-w-0">
                     <GraduationCap className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <Select value={branch} onValueChange={setBranch} disabled={isSubmitting}>
-                      <SelectTrigger className="pl-10">
+                      <SelectTrigger className="pl-10 w-full truncate">
                         <SelectValue placeholder="Select branch" />
                       </SelectTrigger>
                       <SelectContent>
-                        {branchOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
+                        {BRANCH_OPTIONS.map((option) => (
+                          <SelectItem key={option.code} value={option.code}>
+                            {option.code}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -461,19 +479,19 @@ export default function AddMemberSidebar({ isOpen, onClose }: AddMemberSidebarPr
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <Label htmlFor="batch">Assign Batch</Label>
-                  <div className="relative">
+                  <div className="relative min-w-0">
                     <Layers className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <Select value={batchId} onValueChange={setBatchId} disabled={isSubmitting}>
-                      <SelectTrigger className="pl-10">
+                      <SelectTrigger className="pl-10 w-full truncate">
                         <SelectValue placeholder="Select Batch (Optional)" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No Batch (Unassigned)</SelectItem>
                         {batchesList.map((b) => (
                           <SelectItem key={b.id} value={b.id}>
-                            {b.name} ({b.code})
+                            {b.code} ({b.name})
                           </SelectItem>
                         ))}
                       </SelectContent>

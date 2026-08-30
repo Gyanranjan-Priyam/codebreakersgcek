@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -48,6 +50,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import { 
   Search, 
   MoreVertical, 
@@ -64,6 +67,8 @@ import {
   UserCheck,
   Target,
   Shield,
+  UserPen,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   Popover,
@@ -81,6 +86,8 @@ import {
 } from "../actions";
 import { parseMemberRoles, getRoleBadgeClasses } from "@/lib/member-roles";
 import { AssignRolesDomainSheet } from "./assign-roles-domain-sheet";
+import { EditMemberSheet } from "./edit-member-sheet";
+import { ImportExcelSidebar } from "./import-excel-sidebar";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -119,6 +126,24 @@ export default function MembersTable({ members }: MembersTableProps) {
   const [qrMember, setQrMember] = useState<MemberData | null>(null);
   const [showAssignRolesDomainSheet, setShowAssignRolesDomainSheet] = useState(false);
   const [rolesDomainMember, setRolesDomainMember] = useState<MemberData | null>(null);
+  const [showEditMemberSheet, setShowEditMemberSheet] = useState(false);
+  const [editMemberData, setEditMemberData] = useState<any | null>(null);
+  const [showImportExcelSidebar, setShowImportExcelSidebar] = useState(false);
+
+  const openEditMember = async (member: MemberData) => {
+    try {
+      const res = await getMemberBySlugId(member.id);
+      if (res.status === "success" && res.data) {
+        setEditMemberData(res.data);
+      } else {
+        setEditMemberData(member);
+      }
+      setShowEditMemberSheet(true);
+    } catch {
+      setEditMemberData(member);
+      setShowEditMemberSheet(true);
+    }
+  };
 
   useEffect(() => {
     getActiveBatchesList().then((list) => setBatchesList(list));
@@ -379,10 +404,20 @@ export default function MembersTable({ members }: MembersTableProps) {
             <Button
               type="button"
               onClick={() => setShowAddMemberSidebar(true)}
-              className="w-full sm:w-auto h-9 text-xs"
+              className="w-full sm:w-auto h-9 text-xs gap-1.5"
             >
               <Plus className="h-4 w-4" />
               Add Member
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowImportExcelSidebar(true)}
+              className="w-full sm:w-auto h-9 text-xs gap-1.5"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              Import from Excel
             </Button>
 
             {selectedMemberIds.size > 0 && (
@@ -422,11 +457,13 @@ export default function MembersTable({ members }: MembersTableProps) {
                 className="pl-10 text-xs h-9"
               />
             </div>
+
+            <SilentRefreshButton toastMessage="Members list refreshed silently" />
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-md border overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -610,6 +647,13 @@ export default function MembersTable({ members }: MembersTableProps) {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="cursor-pointer"
+                            onClick={() => openEditMember(member)}
+                          >
+                            <UserPen className="mr-2 h-3.5 w-3.5 text-primary" />
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
                             onClick={() => {
                               setRolesDomainMember(member);
                               setShowAssignRolesDomainSheet(true);
@@ -775,7 +819,7 @@ export default function MembersTable({ members }: MembersTableProps) {
             </SheetHeader>
           </div>
 
-          <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-6" onWheel={(event) => event.stopPropagation()} onTouchMoveCapture={(event) => event.stopPropagation()}>
+          <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-6 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" onWheel={(event) => event.stopPropagation()} onTouchMoveCapture={(event) => event.stopPropagation()}>
             {isDetailsLoading && (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
@@ -935,6 +979,7 @@ export default function MembersTable({ members }: MembersTableProps) {
       <AddMemberSidebar
         isOpen={showAddMemberSidebar}
         onClose={() => setShowAddMemberSidebar(false)}
+        onOpenExcelImport={() => setShowImportExcelSidebar(true)}
       />
 
       {qrMember && (
@@ -955,6 +1000,22 @@ export default function MembersTable({ members }: MembersTableProps) {
           setRolesDomainMember(null);
         }}
         member={rolesDomainMember}
+        onSuccess={() => router.refresh()}
+      />
+
+      <EditMemberSheet
+        isOpen={showEditMemberSheet}
+        onClose={() => {
+          setShowEditMemberSheet(false);
+          setEditMemberData(null);
+        }}
+        member={editMemberData}
+        onSuccess={() => router.refresh()}
+      />
+
+      <ImportExcelSidebar
+        isOpen={showImportExcelSidebar}
+        onClose={() => setShowImportExcelSidebar(false)}
         onSuccess={() => router.refresh()}
       />
     </Card>

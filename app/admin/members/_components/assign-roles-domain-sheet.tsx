@@ -19,7 +19,6 @@ import {
   UserCheck,
   Target,
   Loader2,
-  Sparkles,
   ShieldAlert,
   Check,
   RotateCcw,
@@ -198,7 +197,7 @@ export function AssignRolesDomainSheet({
         {/* Scrollable Content (Hidden Scrollbar + Lenis Prevent) */}
         <div
           data-lenis-prevent
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-6 no-scrollbar"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-6 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           onWheel={(event) => event.stopPropagation()}
           onTouchMoveCapture={(event) => event.stopPropagation()}
         >

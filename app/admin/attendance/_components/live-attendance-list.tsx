@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Users, Clock, CheckCircle, QrCode } from "lucide-react";
 import { format } from "date-fns";
+import { initSocket, joinRoom, onSocketEvent } from "@/lib/socket-client";
 
 interface User {
   name: string;
@@ -53,12 +54,32 @@ export default function LiveAttendanceList({ sessionId, isActive }: LiveAttendan
     // Initial fetch
     fetchAttendances();
 
-    // Poll every 3 seconds for updates
+    // Socket.IO realtime event listener
+    let cleanupRoom: (() => void) | undefined;
+    let cleanupListener: (() => void) | undefined;
+
+    initSocket().then((socket) => {
+      if (!socket) return;
+
+      const room = `attendance-session-${sessionId}`;
+      cleanupRoom = joinRoom(room);
+
+      cleanupListener = onSocketEvent("attendance-updated", () => {
+        // Instantly re-fetch records when a new scan occurs
+        fetchAttendances();
+      });
+    });
+
+    // Fallback polling every 5 seconds for resilience
     const interval = setInterval(() => {
       fetchAttendances();
-    }, 3000);
+    }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      cleanupListener?.();
+      cleanupRoom?.();
+    };
   }, [sessionId, isActive]);
 
   const fetchAttendances = async () => {

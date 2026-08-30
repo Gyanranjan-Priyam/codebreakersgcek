@@ -1,9 +1,11 @@
-"use client"
+"use client";
 
 import {
   MoreVertical,
   LogOut,
 } from "lucide-react"
+import { IconUserShield } from "@tabler/icons-react"
+import Link from "next/link"
 
 import {
   Avatar,
@@ -24,9 +26,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { authClient } from "@/lib/auth-client"
+import { authClient, useSession } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 import { getUserProfileImageUrl } from "@/lib/image-utils"
+import { isSystemAdminRole } from "@/lib/member-roles"
 
 export function NavUser({
   user,
@@ -36,10 +39,16 @@ export function NavUser({
     email: string
     avatar: string
     profileImageKey?: string | null
+    role?: string | null
   }
 }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const session = useSession()
+
+  const isAdmin =
+    isSystemAdminRole(user.role) ||
+    isSystemAdminRole(session?.data?.user?.role);
 
   const profileImageUrl = getUserProfileImageUrl({
     profileImageKey: user.profileImageKey,
@@ -81,7 +90,7 @@ export function NavUser({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
                 <AvatarImage src={profileImageUrl} alt={user.name} />
@@ -116,9 +125,22 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild className="cursor-pointer text-foreground focus:text-foreground">
+                  <Link href="/admin" className="flex items-center gap-2">
+                    <IconUserShield className="h-4 w-4 text-muted-foreground" />
+                    <span>Admin Dashboard</span>
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
+
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
-              <LogOut />
+              <LogOut className="h-4 w-4" />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

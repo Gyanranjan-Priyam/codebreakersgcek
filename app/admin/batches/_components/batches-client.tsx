@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -280,6 +281,8 @@ export function BatchesClient({
               >
                 Inactive ({batches.filter((b) => !b.isActive).length})
               </Button>
+
+              <SilentRefreshButton toastMessage="Batches list refreshed silently" />
             </div>
           </div>
         </CardHeader>
