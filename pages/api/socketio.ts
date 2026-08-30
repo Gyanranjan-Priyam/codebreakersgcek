@@ -17,11 +17,21 @@ export const config = {
   },
 };
 
-export default function handler(req: NextApiRequest, res: SocketNextApiResponse) {
-  if (!res.socket.server.io) {
-    console.log("🔌 Initializing Socket.IO server...");
+async function readRequestBody(req: NextApiRequest): Promise<string> {
+  let data = "";
+  for await (const chunk of req) {
+    data += chunk;
+  }
+  return data;
+}
 
-    const io = new SocketIOServer(res.socket.server, {
+export default async function handler(req: NextApiRequest, res: SocketNextApiResponse) {
+  let io = res.socket.server.io;
+
+  if (!io) {
+    console.log("🔌 Initializing Socket.IO server on Node HTTP server...");
+
+    io = new SocketIOServer(res.socket.server, {
       path: "/api/socketio",
       addTrailingSlash: false,
       cors: {
@@ -34,7 +44,6 @@ export default function handler(req: NextApiRequest, res: SocketNextApiResponse)
       connectTimeout: 45000,
       maxHttpBufferSize: 1e6,
       transports: ["websocket", "polling"],
-      // Allow upgrades from polling to websocket
       allowUpgrades: true,
     });
 
@@ -49,13 +58,13 @@ export default function handler(req: NextApiRequest, res: SocketNextApiResponse)
         socket.leave(room);
       });
 
-      // Join multiple rooms at once (for admin dashboards)
+      // Join multiple rooms at once
       socket.on("join-rooms", (rooms: string[]) => {
         rooms.forEach((room) => socket.join(room));
       });
 
-      socket.on("disconnect", () => {
-        // Cleanup is automatic — Socket.IO removes from all rooms on disconnect
+      socket.on("disconnect", (reason) => {
+        // Cleanup is automatic in Socket.IO
       });
     });
 
@@ -65,8 +74,33 @@ export default function handler(req: NextApiRequest, res: SocketNextApiResponse)
     console.log("✅ Socket.IO server initialized successfully");
   } else {
     // Ensure global reference is always up to date
-    (globalThis as any).__socketio = res.socket.server.io;
+    (globalThis as any).__socketio = io;
   }
 
-  res.end();
+  // Handle server-to-server broadcast requests via HTTP POST
+  if (req.method === "POST") {
+    try {
+      const rawBody = await readRequestBody(req);
+      if (rawBody) {
+        const payload = JSON.parse(rawBody);
+        const { room, rooms, event, data } = payload;
+
+        if (event) {
+          if (rooms && Array.isArray(rooms)) {
+            rooms.forEach((r: string) => {
+              io?.to(r).emit(event, data);
+            });
+          } else if (room) {
+            io?.to(room).emit(event, data);
+          }
+        }
+      }
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("Error broadcasting socket event:", err?.message || err);
+      return res.status(500).json({ error: "Failed to broadcast socket event" });
+    }
+  }
+
+  return res.status(200).json({ status: "Socket.IO server running" });
 }

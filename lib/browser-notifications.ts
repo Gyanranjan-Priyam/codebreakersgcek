@@ -9,7 +9,7 @@ export type NotificationPermissionStatus = "granted" | "denied" | "default" | "u
  * Check if the current browser environment supports the Notifications API.
  */
 export function isNotificationSupported(): boolean {
-  return typeof window !== "undefined" && "Notification" in window;
+  return typeof window !== "undefined" && ("Notification" in window || "serviceWorker" in navigator);
 }
 
 /**
@@ -17,7 +17,26 @@ export function isNotificationSupported(): boolean {
  */
 export function getNotificationPermission(): NotificationPermissionStatus {
   if (!isNotificationSupported()) return "unsupported";
-  return Notification.permission as NotificationPermissionStatus;
+  if (typeof Notification !== "undefined") {
+    return Notification.permission as NotificationPermissionStatus;
+  }
+  return "default";
+}
+
+/**
+ * Register Service Worker for reliable push notifications across all mobile & desktop browsers.
+ */
+export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return null;
+  }
+  try {
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    return registration;
+  } catch (err) {
+    console.warn("ServiceWorker registration failed:", err);
+    return null;
+  }
 }
 
 /**
@@ -27,19 +46,25 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   if (!isNotificationSupported()) return "unsupported";
 
   try {
+    // Ensure service worker is registered in background
+    registerServiceWorker().catch(() => {});
+
     let perm: NotificationPermission;
-    const req = Notification.requestPermission();
-    if (req && typeof req.then === "function") {
-      perm = await req;
-    } else {
-      perm = await new Promise<NotificationPermission>((resolve) => {
-        Notification.requestPermission((p) => resolve(p));
-      });
+    if (typeof Notification !== "undefined" && typeof Notification.requestPermission === "function") {
+      const req = Notification.requestPermission();
+      if (req && typeof req.then === "function") {
+        perm = await req;
+      } else {
+        perm = await new Promise<NotificationPermission>((resolve) => {
+          Notification.requestPermission((p) => resolve(p));
+        });
+      }
+      return perm as NotificationPermissionStatus;
     }
-    return perm as NotificationPermissionStatus;
+    return "default";
   } catch (err) {
     console.warn("Error requesting notification permission:", err);
-    return Notification.permission as NotificationPermissionStatus;
+    return getNotificationPermission();
   }
 }
 
@@ -87,7 +112,7 @@ export function playAttendanceChime(): void {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, now + index * 0.08);
 
-      gain.gain.setValueAtTime(0.2, now + index * 0.08);
+      gain.gain.setValueAtTime(0.25, now + index * 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.08 + 0.35);
 
       osc.connect(gain);
@@ -112,48 +137,56 @@ export interface BrowserNotificationOptions {
 
 /**
  * Show a native browser push notification.
+ * Works seamlessly across Android Chrome, iOS WebKit PWA, desktop browsers, and ServiceWorker.
  */
 export async function showBrowserNotification(
   title: string,
   options: BrowserNotificationOptions
 ): Promise<Notification | null> {
   if (!isNotificationSupported()) return null;
-  if (Notification.permission !== "granted") return null;
+  if (getNotificationPermission() !== "granted") return null;
 
-  try {
-    const defaultIcon = "/icon.png";
-    const notifOptions: NotificationOptions = {
-      body: options.body,
-      icon: options.icon || defaultIcon,
-      badge: options.badge || defaultIcon,
-      tag: options.tag || `codebreakers-attendance-${Date.now()}`,
-      requireInteraction: options.requireInteraction ?? false,
-      data: options.data,
-    };
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const defaultIcon = origin ? `${origin}/assets/logo.png` : "/assets/logo.png";
+  const notifOptions: NotificationOptions = {
+    body: options.body,
+    icon: options.icon ? (options.icon.startsWith("http") ? options.icon : `${origin}${options.icon}`) : defaultIcon,
+    badge: options.badge ? (options.badge.startsWith("http") ? options.badge : `${origin}${options.badge}`) : defaultIcon,
+    tag: options.tag || `codebreakers-att-${Date.now()}`,
+    requireInteraction: options.requireInteraction ?? false,
+    data: options.data || { url: "/dashboard" },
+    ...(typeof navigator !== "undefined" && "vibrate" in navigator ? { vibrate: [200, 100, 200] } : {}),
+  };
 
-    // ServiceWorker notification for progressive web apps
-    if (typeof navigator !== "undefined" && "serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        if (reg && reg.showNotification) {
-          await reg.showNotification(title, notifOptions);
-          return null;
-        }
-      } catch {
-        // Fallback to standard constructor
+  // 1. Primary path: ServiceWorker Registration (Required for Android & mobile PWA)
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    try {
+      let reg: ServiceWorkerRegistration | null | undefined = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await registerServiceWorker();
       }
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, notifOptions);
+        return null;
+      }
+    } catch (swErr) {
+      console.warn("ServiceWorker showNotification failed, trying fallback:", swErr);
     }
-
-    const notification = new Notification(title, notifOptions);
-
-    notification.onclick = function () {
-      window.focus();
-      notification.close();
-    };
-
-    return notification;
-  } catch (err) {
-    console.warn("Could not display native notification:", err);
-    return null;
   }
+
+  // 2. Fallback path: standard window.Notification constructor (for desktop browsers)
+  try {
+    if (typeof Notification !== "undefined") {
+      const notification = new Notification(title, notifOptions);
+      notification.onclick = function () {
+        window.focus();
+        notification.close();
+      };
+      return notification;
+    }
+  } catch (err) {
+    console.warn("Window Notification constructor unavailable on this device:", err);
+  }
+
+  return null;
 }

@@ -35,20 +35,14 @@ export function getSocket(): Socket | null {
     });
 
     socketInstance.on("connect", () => {
-      console.log("🔌 Socket.IO connected:", socketInstance?.id);
       // Re-join all active rooms on connect or reconnection
       activeRooms.forEach((room) => {
         socketInstance?.emit("join-room", room);
       });
     });
 
-    socketInstance.on("disconnect", (reason) => {
-      console.log("🔌 Socket.IO disconnected:", reason);
-    });
-
-    socketInstance.on("connect_error", (err) => {
-      console.warn("🔌 Socket.IO connection error:", err.message);
-    });
+    socketInstance.on("disconnect", () => {});
+    socketInstance.on("connect_error", () => {});
   }
 
   return socketInstance;

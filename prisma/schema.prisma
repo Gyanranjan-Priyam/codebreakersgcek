@@ -50,8 +50,12 @@ model User {
   block           String?
   pinCode         String?
   
-  // Profile completion status
-  profileComplete Boolean         @default(false)
+  // Profile completion & Onboarding status
+  profileComplete         Boolean         @default(false)
+  hasLoggedIn             Boolean         @default(false)
+  hasCompletedOnboarding  Boolean         @default(false)
+  loginCount              Int             @default(0)
+  lastLoginAt             DateTime?
   
   // Linked Accounts
   githubUsername  String?

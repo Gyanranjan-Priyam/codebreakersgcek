@@ -6,6 +6,7 @@ import LenisProvider from "@/components/providers/lenis-provider";
 import { Analytics } from "@vercel/analytics/next";
 import CapacitorProvider from "@/components/providers/capacitor-provider";
 import { MobileRedirect } from "@/components/mobile-redirect";
+import { RealtimeAttendanceListener } from "@/components/realtime/realtime-attendance-listener";
 
 const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
@@ -199,6 +200,7 @@ export default function RootLayout({
           <MobileRedirect />
           <LenisProvider>{children}</LenisProvider>
         </CapacitorProvider>
+        <RealtimeAttendanceListener />
         <Toaster position="top-right" richColors closeButton />
         <Analytics />
       </body>

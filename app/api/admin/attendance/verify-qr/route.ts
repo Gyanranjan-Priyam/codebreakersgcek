@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { emitSocketEvent } from "@/lib/socket-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -123,6 +124,39 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
+    // Realtime broadcast via Socket.IO
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { id: true, name: true, cbUserId: true },
+      });
+
+      const realtimePayload = {
+        type: "attendance-marked",
+        sessionId: qrRecord.sessionId,
+        sessionTitle: qrRecord.session.title,
+        sessionNumber: qrRecord.session.sessionNumber,
+        userId: session.user.id,
+        userName: user?.name || session.user.name,
+        cbUserId: user?.cbUserId,
+        points: attendance.points,
+        status: "present",
+        timestamp: new Date().toISOString(),
+        message: `Your attendance for "${qrRecord.session.title}" (Session #${qrRecord.session.sessionNumber}) has been marked Present (+${attendance.points} points)!`,
+      };
+
+      await emitSocketEvent(`user-${session.user.id}`, "attendance-marked", realtimePayload);
+      await emitSocketEvent(`user:${session.user.id}`, "attendance-marked", realtimePayload);
+      if (user?.cbUserId) {
+        await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", realtimePayload);
+        await emitSocketEvent(`user:${user.cbUserId}`, "attendance-marked", realtimePayload);
+      }
+      await emitSocketEvent(`attendance-session-${qrRecord.sessionId}`, "attendance-updated", realtimePayload);
+      await emitSocketEvent("leaderboard", "leaderboard-updated", realtimePayload);
+    } catch (broadcastErr) {
+      console.warn("Could not broadcast verify-qr socket event:", broadcastErr);
+    }
 
     return NextResponse.json({
       success: true,

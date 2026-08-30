@@ -659,6 +659,10 @@ export async function revokeSessionAndProceed(targetSessionId: string) {
       where: { id: targetSessionId },
     });
 
+    revalidatePath("/device-limit");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
+
     return {
       status: "success" as const,
       message: "Selected device logged out. Redirecting to dashboard...",

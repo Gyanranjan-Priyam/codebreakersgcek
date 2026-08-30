@@ -8,7 +8,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { RealtimeAttendanceListener } from "@/components/realtime/realtime-attendance-listener";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Ensure user is authenticated
@@ -49,11 +48,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <SidebarInset>
         <SiteHeader user={userData} />
         {children}
-        <RealtimeAttendanceListener
-          userId={userData.id}
-          cbUserId={(userData as any).cbUserId || null}
-          userName={userData.name || undefined}
-        />
       </SidebarInset>
     </SidebarProvider>
   )

@@ -16,7 +16,15 @@ export async function GET() {
     // Verify that the logged in user actually exists in database (pre-added by admin) and is not banned
     const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { id: true, role: true, banned: true, profileComplete: true, emailVerified: true },
+        select: {
+            id: true,
+            role: true,
+            banned: true,
+            profileComplete: true,
+            emailVerified: true,
+            hasLoggedIn: true,
+            hasCompletedOnboarding: true,
+        },
     });
 
     if (!dbUser) {
@@ -29,17 +37,18 @@ export async function GET() {
         return redirect("/login?error=banned");
     }
 
-    // Switch member status from Pending to Active upon successful login
-    if (!dbUser.profileComplete || !dbUser.emailVerified) {
-        await prisma.user.update({
-            where: { id: dbUser.id },
-            data: {
-                profileComplete: true,
-                emailVerified: true,
-                updatedAt: new Date(),
-            },
-        });
-    }
+    // Switch member status from Pending to Active upon successful login and record login activity
+    await prisma.user.update({
+        where: { id: dbUser.id },
+        data: {
+            hasLoggedIn: true,
+            emailVerified: true,
+            profileComplete: true,
+            lastLoginAt: new Date(),
+            loginCount: { increment: 1 },
+            updatedAt: new Date(),
+        },
+    });
 
     // Auto-save GitHub username if user logged in with GitHub
     try {

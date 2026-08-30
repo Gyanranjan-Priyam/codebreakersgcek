@@ -266,6 +266,10 @@ export async function getUserDashboardData() {
         socialLinks: true,
         customLinks: true,
         profileComplete: true,
+        hasCompletedOnboarding: true,
+        hasLoggedIn: true,
+        lastLoginAt: true,
+        loginCount: true,
         batch: {
           select: {
             id: true,
@@ -319,6 +323,10 @@ export async function getUserDashboardData() {
           socialLinks: null,
           customLinks: null,
           profileComplete: false,
+          hasCompletedOnboarding: false,
+          hasLoggedIn: true,
+          lastLoginAt: null,
+          loginCount: 0,
           batch: null,
         },
       },
@@ -328,6 +336,42 @@ export async function getUserDashboardData() {
     return {
       status: "error" as const,
       message: "Failed to fetch dashboard data",
+    };
+  }
+}
+
+export async function completeUserOnboarding() {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized. Please log in first.",
+      };
+    }
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        hasCompletedOnboarding: true,
+        hasLoggedIn: true,
+        updatedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/dashboard");
+    return {
+      status: "success" as const,
+      message: "Onboarding completed successfully",
+    };
+  } catch (error) {
+    console.error("Error completing onboarding:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update onboarding status.",
     };
   }
 }
@@ -351,11 +395,15 @@ export async function saveUserSpecializedDomain(domains: string[]) {
       where: { id: session.user.id },
       data: {
         specializedDomain: serialized,
+        hasCompletedOnboarding: true,
+        hasLoggedIn: true,
+        updatedAt: new Date(),
       },
       select: {
         id: true,
         specializedDomain: true,
         profileComplete: true,
+        hasCompletedOnboarding: true,
       },
     });
 
@@ -374,4 +422,4 @@ export async function saveUserSpecializedDomain(domains: string[]) {
       message: "Failed to save domain preferences. Please try again.",
     };
   }
-}
+}

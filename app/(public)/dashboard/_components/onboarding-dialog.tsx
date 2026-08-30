@@ -36,7 +36,8 @@ import {
   Layers,
 } from "lucide-react";
 import { PREDEFINED_DOMAINS, parseSpecializedDomains } from "@/lib/specialized-domains";
-import { saveUserSpecializedDomain } from "../actions";
+import { isSystemAdminRole } from "@/lib/member-roles";
+import { saveUserSpecializedDomain, completeUserOnboarding } from "../actions";
 import { toast } from "sonner";
 
 interface OnboardingDialogProps {
@@ -46,6 +47,9 @@ interface OnboardingDialogProps {
     email: string;
     specializedDomain?: string | null;
     profileComplete?: boolean;
+    hasCompletedOnboarding?: boolean;
+    hasLoggedIn?: boolean;
+    role?: string | null;
     registration?: string | null;
     branch?: string | null;
   };
@@ -137,36 +141,35 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
   const [customDomainInput, setCustomDomainInput] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  // Exclude users who already completed onboarding or are system administrators
+  const isExcluded = Boolean(user?.hasCompletedOnboarding || isSystemAdminRole(user?.role));
+
   // Check whether onboarding should be displayed
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || isExcluded) return;
 
-    // If profile is already complete/active, never show onboarding
-    if (user.profileComplete) {
-      setIsOpen(false);
-      return;
-    }
+    // Show onboarding only for first-time users who have not completed onboarding
+    const timer = setTimeout(() => {
+      setIsOpen(true);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [user?.id, isExcluded]);
 
-    const storageKey = `cb_onboarding_completed_${user.id}`;
-    const isDismissed = localStorage.getItem(storageKey);
-
-    // Auto open for pending profile users (first time login until active)
-    if (!isDismissed) {
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [user?.id, user?.profileComplete]);
-
-  // If user profile is already active/completed, don't render anything
-  if (user?.profileComplete) {
+  // If user already completed onboarding or is admin, never render anything
+  if (isExcluded) {
     return null;
   }
 
   const handleClose = () => {
     if (user?.id) {
-      localStorage.setItem(`cb_onboarding_completed_${user.id}`, "true");
+      // Mark onboarding as completed in database asynchronously
+      startTransition(async () => {
+        try {
+          await completeUserOnboarding();
+        } catch (err) {
+          console.error("Failed to mark onboarding completed:", err);
+        }
+      });
     }
     setIsOpen(false);
   };
@@ -205,9 +208,6 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
         const result = await saveUserSpecializedDomain(selectedDomains);
         if (result.status === "success") {
           toast.success("Domain preferences saved successfully!");
-          if (user?.id) {
-            localStorage.setItem(`cb_onboarding_completed_${user.id}`, "true");
-          }
           setCurrentStep(3);
         } else {
           toast.error(result.message || "Failed to save domain preferences");

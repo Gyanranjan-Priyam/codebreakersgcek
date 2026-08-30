@@ -330,6 +330,11 @@ export async function markAttendance(
         };
 
         await emitSocketEvent(`user-${userId}`, "attendance-marked", realtimePayload);
+        await emitSocketEvent(`user:${userId}`, "attendance-marked", realtimePayload);
+        if (user.cbUserId) {
+          await emitSocketEvent(`user-${user.cbUserId}`, "attendance-marked", realtimePayload);
+          await emitSocketEvent(`user:${user.cbUserId}`, "attendance-marked", realtimePayload);
+        }
         await emitSocketEvent(`attendance-session-${sessionId}`, "attendance-updated", realtimePayload);
         await emitSocketEvent("leaderboard", "leaderboard-updated", realtimePayload);
       }

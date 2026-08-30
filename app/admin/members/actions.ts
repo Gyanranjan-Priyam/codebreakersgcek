@@ -229,6 +229,9 @@ export async function createMember(input: {
             role: assignedRoles,
             emailVerified: false,
             profileComplete: false,
+            hasLoggedIn: false,
+            hasCompletedOnboarding: false,
+            loginCount: 0,
           },
           select: {
             id: true,
@@ -1712,6 +1715,9 @@ export async function bulkCreateMembersFromExcel(input: {
                 role: serializedRoles,
                 emailVerified: false,
                 profileComplete: false,
+                hasLoggedIn: false,
+                hasCompletedOnboarding: false,
+                loginCount: 0,
               },
               select: {
                 id: true,

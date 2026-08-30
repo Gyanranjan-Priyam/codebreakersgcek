@@ -51,35 +51,39 @@ export function DeviceLimitClient({
 }: DeviceLimitClientProps) {
   const router = useRouter();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleRevokeAndContinue = (targetSessionId: string) => {
+  const handleRevokeAndContinue = async (targetSessionId: string) => {
+    if (isProcessing) return;
     setSelectedSessionId(targetSessionId);
-    startTransition(async () => {
-      try {
-        const res = await revokeSessionAndProceed(targetSessionId);
-        if (res.status === "success") {
-          toast.success(res.message);
-          router.push("/dashboard");
-          router.refresh();
-        } else {
-          toast.error(res.message);
-          setSelectedSessionId(null);
-        }
-      } catch (err) {
-        console.error("Error revoking session:", err);
-        toast.error("Failed to revoke device session. Please try again.");
+    setIsProcessing(true);
+
+    try {
+      toast.loading("Logging out device and entering dashboard...", { id: "revoke-device-toast" });
+      const res = await revokeSessionAndProceed(targetSessionId);
+      if (res.status === "success") {
+        toast.success("Device logged out successfully! Entering dashboard...", { id: "revoke-device-toast" });
+        // Smoothly and immediately navigate to dashboard without page hanging
+        window.location.replace("/dashboard");
+      } else {
+        toast.error(res.message || "Failed to log out device", { id: "revoke-device-toast" });
         setSelectedSessionId(null);
+        setIsProcessing(false);
       }
-    });
+    } catch (err) {
+      console.error("Error revoking session:", err);
+      toast.error("Failed to revoke device session. Please try again.", { id: "revoke-device-toast" });
+      setSelectedSessionId(null);
+      setIsProcessing(false);
+    }
   };
 
   const handleCancel = async () => {
     try {
       await authClient.signOut();
-      router.push("/login");
+      window.location.replace("/login");
     } catch {
-      router.push("/login");
+      window.location.replace("/login");
     }
   };
 
@@ -164,7 +168,7 @@ export function DeviceLimitClient({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={isPending}
+                  disabled={isProcessing}
                   onClick={() => handleRevokeAndContinue(session.id)}
                   className="h-8 text-xs font-medium shrink-0 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5"
                 >
@@ -205,7 +209,7 @@ export function DeviceLimitClient({
             variant="ghost"
             size="sm"
             onClick={handleCancel}
-            disabled={isPending}
+            disabled={isProcessing}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             Cancel & Return to Login

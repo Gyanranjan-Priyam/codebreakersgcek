@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { initSocket, joinRoom, onSocketEvent } from "@/lib/socket-client";
+import { useSession } from "@/lib/auth-client";
 import {
   getNotificationPermission,
   requestNotificationPermission,
+  registerServiceWorker,
   showBrowserNotification,
   playAttendanceChime,
   isNotificationSupported,
@@ -30,20 +32,33 @@ export interface AttendanceMarkedPayload {
 }
 
 interface RealtimeAttendanceListenerProps {
-  userId: string;
+  userId?: string | null;
   cbUserId?: string | null;
-  userName?: string;
+  userName?: string | null;
 }
 
 export function RealtimeAttendanceListener({
-  userId,
-  cbUserId,
-  userName,
+  userId: propUserId,
+  cbUserId: propCbUserId,
+  userName: propUserName,
 }: RealtimeAttendanceListenerProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const { data: session } = useSession();
+
+  const userId = propUserId || session?.user?.id || null;
+  const userName = propUserName || session?.user?.name || null;
+  const cbUserId = propCbUserId || (session?.user as any)?.cbUserId || null;
+
   const [permission, setPermission] = useState<NotificationPermissionStatus>("unsupported");
   const [showPromptBanner, setShowPromptBanner] = useState(false);
+
+  // Register service worker on client mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      registerServiceWorker().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -53,7 +68,7 @@ export function RealtimeAttendanceListener({
       const currentPerm = getNotificationPermission();
       setPermission(currentPerm);
 
-      // If permission is default and user hasn't dismissed before, ask or show subtle banner
+      // If permission is default and user hasn't dismissed before, show prompt banner
       if (currentPerm === "default") {
         const dismissed = localStorage.getItem("cb_notif_prompt_dismissed");
         if (!dismissed) {
@@ -62,13 +77,13 @@ export function RealtimeAttendanceListener({
       }
     }
 
-    // Initialize Socket.IO connection and join personal rooms
+    // Initialize Socket.IO connection and join personal user rooms
     const cleanupFns: Array<() => void> = [];
 
     initSocket().then((socket) => {
       if (!socket) return;
 
-      // Join primary user room and alias rooms
+      // Join all user room aliases
       cleanupFns.push(joinRoom(`user-${userId}`));
       cleanupFns.push(joinRoom(`user:${userId}`));
       if (cbUserId) {
@@ -79,22 +94,25 @@ export function RealtimeAttendanceListener({
       // Handle Attendance Marked
       const attCleanup = onSocketEvent("attendance-marked", async (data: AttendanceMarkedPayload) => {
         if (!data) return;
-        // Verify destination
+
+        // Verify target user destination if specified
         if (data.userId && data.userId !== userId && cbUserId && data.cbUserId !== cbUserId) {
           return;
         }
 
-        // 1. Play audio chime
+        // 1. Play audio chime on device
         playAttendanceChime();
 
-        // 2. Display native browser push notification
+        // 2. Display native OS/browser/device push notification
         const sessionDisplay = data.sessionTitle || "Attendance Session";
+        const pointsEarned = data.points || 10;
         await showBrowserNotification("Attendance Marked Present! ✅", {
-          body: `Hi ${data.userName || userName || "Member"}! You have been marked Present for "${sessionDisplay}". +${data.points || 10} Points added to your dashboard.`,
-          icon: "/favicon.ico",
-          badge: "/favicon.ico",
+          body: `Hi ${data.userName || userName || "Member"}! Your attendance for "${sessionDisplay}" has been marked Present (+${pointsEarned} Points added).`,
+          icon: "/assets/logo.png",
+          badge: "/assets/logo.png",
           tag: `att-${data.sessionId}-${Date.now()}`,
           requireInteraction: false,
+          data: { url: "/dashboard" },
         });
 
         // 3. Show rich Sonner toast
@@ -105,13 +123,13 @@ export function RealtimeAttendanceListener({
             </div>
             <div className="space-y-1 flex-1 min-w-0">
               <p className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                <span>Attendance Marked!</span>
+                <span>Attendance Marked Present!</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
-                  +{data.points || 10} PTS
+                  +{pointsEarned} PTS
                 </span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {sessionDisplay} • Real-time update applied.
+                {sessionDisplay} • Live update applied.
               </p>
             </div>
           </div>,
@@ -121,7 +139,7 @@ export function RealtimeAttendanceListener({
           }
         );
 
-        // 4. Silently refresh all Server Components on the dashboard
+        // 4. Silently refresh Server Components on the page
         startTransition(() => {
           router.refresh();
         });
@@ -136,7 +154,9 @@ export function RealtimeAttendanceListener({
         playAttendanceChime();
         await showBrowserNotification("Task Submission Evaluated! 📝", {
           body: `Task #${data.taskNumber || ""}: "${data.taskTitle || "Task"}" has been ${data.status} (+${data.points || 0} pts).`,
-          icon: "/favicon.ico",
+          icon: "/assets/logo.png",
+          badge: "/assets/logo.png",
+          data: { url: "/dashboard" },
         });
 
         toast.info(

@@ -2,53 +2,63 @@
 import type { Server as SocketIOServer } from "socket.io";
 
 /**
- * Get the Socket.IO server instance from the global scope.
- * This is set by the /api/socketio endpoint when the server initializes.
+ * Get the Socket.IO server instance from the global scope if present in current thread.
  */
 function getIO(): SocketIOServer | null {
   return (globalThis as any).__socketio || null;
 }
 
+function getCandidateUrls(): string[] {
+  const urls = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    `http://127.0.0.1:${process.env.PORT || 3000}`,
+    `http://localhost:${process.env.PORT || 3000}`,
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+  ].filter(Boolean) as string[];
+
+  return Array.from(new Set(urls.map((u) => u.replace(/\/$/, ""))));
+}
+
 /**
  * Emit a Socket.IO event to a specific room (channel).
- * This is the server-side equivalent of Pusher's triggerPusherEvent.
+ * Works reliably from Next.js App Router, Server Actions, Route Handlers, and background jobs.
  *
- * @param room - The room/channel to emit to (e.g., "quiz-abc123", "system-SYS-123456")
- * @param event - The event name (e.g., "system-updated", "quiz-started")
+ * @param room - The room/channel to emit to (e.g., "user-abc123", "leaderboard")
+ * @param event - The event name (e.g., "attendance-marked", "task-evaluated")
  * @param data - The event payload
  */
 export async function emitSocketEvent(room: string, event: string, data: any): Promise<void> {
   try {
-    let io = getIO();
+    let emitted = false;
+    const io = getIO();
     if (io) {
       io.to(room).emit(event, data);
-      return;
+      emitted = true;
     }
 
-    // Fallback: if the Socket.IO server hasn't been initialized yet via the API route,
-    // try to initialize it by making an internal request, then retry
-    const fallbackUrls = [
-      process.env.NEXT_PUBLIC_APP_URL,
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-    ].filter(Boolean) as string[];
-
-    for (const url of fallbackUrls) {
+    // Always attempt the HTTP broadcast bridge to guarantee delivery across isolated Next.js worker scopes
+    const candidateUrls = getCandidateUrls();
+    for (const url of candidateUrls) {
       try {
-        const cleanUrl = url.replace(/\/$/, "");
-        await fetch(`${cleanUrl}/api/socketio`, { cache: "no-store" });
-        io = getIO();
-        if (io) {
-          io.to(room).emit(event, data);
-          return;
+        const res = await fetch(`${url}/api/socket/emit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ room, event, data }),
+          cache: "no-store",
+        });
+        if (res.ok) {
+          emitted = true;
+          break;
         }
       } catch {
-        // Try next fallback
+        // Try next candidate URL
       }
     }
 
-    // Silent fallback
-    console.warn(`⚠️ Socket.IO server not available. Event "${event}" to room "${room}" was not sent.`);
+    if (!emitted) {
+      console.warn(`⚠️ Socket.IO broadcast warning: Event "${event}" for room "${room}" could not be bridged.`);
+    }
   } catch (error: any) {
     console.error("Socket.IO emit error:", error?.message || error);
   }
@@ -56,20 +66,44 @@ export async function emitSocketEvent(room: string, event: string, data: any): P
 
 /**
  * Emit events to multiple rooms at once (batch emit).
- * Useful for startAllSystems where we need to notify each system individually.
  */
 export async function emitSocketEventToRooms(
   rooms: string[],
   event: string,
   data: any
 ): Promise<void> {
-  const io = getIO();
-  if (!io) {
-    console.warn(`⚠️ Socket.IO server not available for batch emit.`);
-    return;
-  }
+  try {
+    let emitted = false;
+    const io = getIO();
+    if (io) {
+      for (const room of rooms) {
+        io.to(room).emit(event, data);
+      }
+      emitted = true;
+    }
 
-  for (const room of rooms) {
-    io.to(room).emit(event, data);
+    const candidateUrls = getCandidateUrls();
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(`${url}/api/socket/emit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rooms, event, data }),
+          cache: "no-store",
+        });
+        if (res.ok) {
+          emitted = true;
+          break;
+        }
+      } catch {
+        // Try next candidate URL
+      }
+    }
+
+    if (!emitted) {
+      console.warn(`⚠️ Socket.IO batch emit warning for event "${event}".`);
+    }
+  } catch (error: any) {
+    console.error("Socket.IO batch emit error:", error?.message || error);
   }
 }
