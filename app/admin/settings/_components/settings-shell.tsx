@@ -8,7 +8,10 @@ import { LinkedAccountsSection } from "./linked-accounts-section";
 import { RegistrationToggle } from "./registration-toggle";
 import { GitHubOrgSettings } from "./github-org-settings";
 import { DataCleanup } from "./data-cleanup";
+import { GoogleDriveSettingsCard } from "./google-drive-settings-card";
 import { UserSocialLinksForm } from "@/app/(public)/dashboard/settings/_components/user-social-links-form";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
 
 import {
@@ -63,6 +66,10 @@ interface SettingsShellProps {
   };
   isRegistrationEnabled: boolean;
   githubOrgName: string;
+  googleDriveStatus?: {
+    isConnected: boolean;
+    email?: string;
+  };
 }
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -77,23 +84,35 @@ export function SettingsShell({
   userProfile,
   isRegistrationEnabled,
   githubOrgName,
+  googleDriveStatus,
 }: SettingsShellProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("profile");
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams?.get("tab") as Tab) || (searchParams?.get("gdrive") ? "security" : "profile");
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab") as Tab;
+    if (tabParam && ["profile", "social", "security", "notifications", "system"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    } else if (searchParams?.get("gdrive") || searchParams?.get("error")?.startsWith("gdrive_")) {
+      setActiveTab("security");
+    }
+  }, [searchParams]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 mt-4">
+    <div className="w-full max-w-5xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
       {/* ── Page Header ────────────────────────────────────── */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
           Manage your account profile, security credentials, notification preferences, and system configuration.
         </p>
       </div>
 
       {/* ── Top Navbar Style Tabs ───────────────────────────── */}
-      <div className="border-b border-border -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div className="border-b border-border -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto overscroll-x-contain scrollbar-none">
         <nav
-          className="flex items-center gap-1 sm:gap-2  no-scrollbar scroll-smooth"
+          className="flex items-center gap-1 sm:gap-2 min-w-max no-scrollbar scroll-smooth"
           aria-label="Settings Tabs"
         >
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
@@ -187,6 +206,17 @@ export function SettingsShell({
                   month: "long",
                   year: "numeric",
                 })}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Google Drive Integration */}
+            <div className="space-y-3">
+              <SectionHeading>Google Drive Storage</SectionHeading>
+              <GoogleDriveSettingsCard
+                initialConnected={googleDriveStatus?.isConnected}
+                initialEmail={googleDriveStatus?.email}
               />
             </div>
 

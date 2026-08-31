@@ -36,6 +36,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -60,6 +68,10 @@ import {
   Loader2,
   Inbox,
   FileSpreadsheet,
+  Download,
+  HardDrive,
+  ImageIcon,
+  ExternalLink,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
@@ -116,7 +128,13 @@ function extractAnswerValue(
     return "—";
   }
 
-  if (Array.isArray(raw)) return raw.length > 0 ? raw.join(", ") : "—";
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return "—";
+    if (typeof raw[0] === "object" && raw[0] !== null && "storedFileName" in raw[0]) {
+      return raw.map((f: any) => f.storedFileName || f.originalFileName).join(", ");
+    }
+    return raw.join(", ");
+  }
   if (typeof raw === "object") {
     const pairs: string[] = [];
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -180,7 +198,34 @@ function exportResponsesToExcel(form: FormDetail, responses: FormResponseSummary
     sortedFields.forEach((f) => {
       if (f.type === "button" || f.type === "payment") return;
 
-      if (f.type === "multi_input" && f.subQuestions && f.subQuestions.length > 0) {
+      if (f.type === "file_upload") {
+        columns.push({
+          header: f.label || "File Upload (Google Drive)",
+          getValue: (r) => {
+            const filesForField = (r.files || []).filter((file) => file.fieldId === f.id);
+            if (filesForField.length > 0) {
+              return filesForField
+                .map((file) => file.googleDriveWebViewLink || file.googleDriveDownloadLink || file.storedFileName)
+                .filter(Boolean)
+                .join(", ");
+            }
+            const raw = (r.answers as Record<string, unknown>)?.[f.id];
+            if (Array.isArray(raw) && raw.length > 0) {
+              return (
+                raw
+                  .map((item: any) =>
+                    typeof item === "object" && item !== null
+                      ? item.webViewLink || item.downloadLink || item.storedFileName || item.originalFileName || ""
+                      : String(item)
+                  )
+                  .filter(Boolean)
+                  .join(", ") || "—"
+              );
+            }
+            return "—";
+          },
+        });
+      } else if (f.type === "multi_input" && f.subQuestions && f.subQuestions.length > 0) {
         f.subQuestions.forEach((sub) => {
           const headerLabel = f.label ? `${f.label} - ${sub.label}` : sub.label;
           columns.push({
@@ -246,6 +291,7 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "verified" | "rejected" | "pending">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewingResponse, setViewingResponse] = useState<FormResponseSummary | null>(null);
+  const [viewingFile, setViewingFile] = useState<any | null>(null);
   const [singleDeleteId, setSingleDeleteId] = useState<string | null>(null);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -662,6 +708,72 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
                     })}
                   </div>
                 </div>
+
+                {/* Attached Files Section */}
+                {viewingResponse.files && viewingResponse.files.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                      <HardDrive className="h-3.5 w-3.5 text-primary" />
+                      Attached Files ({viewingResponse.files.length})
+                    </p>
+                    <div className="space-y-2">
+                      {viewingResponse.files.map((file) => (
+                        <div
+                          key={file.id}
+                          className="rounded-xl border border-border/80 bg-background p-3 flex items-center justify-between gap-3 shadow-xs"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              {file.mimeType.startsWith("image/") ? (
+                                <ImageIcon className="h-4 w-4" />
+                              ) : (
+                                <FileText className="h-4 w-4" />
+                              )}
+                            </div>
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="text-xs font-semibold text-foreground font-mono truncate">
+                                {file.storedFileName}
+                              </p>
+                              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <span className="truncate max-w-[140px]">{file.originalFileName}</span>
+                                <span>•</span>
+                                <span>{(file.fileSize / 1024).toFixed(0)} KB</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setViewingFile(file)}
+                              className="h-8 text-xs gap-1.5 rounded-lg"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() =>
+                                window.open(
+                                  `/api/admin/forms/${form.formId}/files/${file.id}?download=true`,
+                                  "_blank"
+                                )
+                              }
+                              className="h-8 text-xs gap-1.5 rounded-lg"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -724,6 +836,77 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Interactive File Preview Dialog */}
+      <Dialog open={Boolean(viewingFile)} onOpenChange={(open) => { if (!open) setViewingFile(null); }}>
+        <DialogContent className="max-w-2xl sm:max-w-3xl p-0 overflow-hidden rounded-2xl border bg-background shadow-2xl">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b">
+            <div className="flex items-center justify-between pr-6">
+              <div>
+                <DialogTitle className="text-base font-semibold font-mono">
+                  {viewingFile?.storedFileName}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground pt-0.5">
+                  Original: {viewingFile?.originalFileName} • {viewingFile ? (viewingFile.fileSize / 1024).toFixed(0) : 0} KB
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="p-4 bg-muted/20 flex items-center justify-center min-h-[320px] max-h-[68vh] overflow-auto">
+            {viewingFile && viewingFile.mimeType?.startsWith("image/") ? (
+              // eslint-disable-next-html-img-element
+              <img
+                src={`/api/admin/forms/${form.formId}/files/${viewingFile.id}`}
+                alt={viewingFile.originalFileName}
+                className="max-h-[60vh] w-auto max-w-full object-contain rounded-xl shadow-md border bg-background"
+              />
+            ) : viewingFile ? (
+              <iframe
+                src={`/api/admin/forms/${form.formId}/files/${viewingFile.id}`}
+                className="w-full h-[60vh] rounded-xl border bg-background shadow-md"
+                title={viewingFile.storedFileName}
+              />
+            ) : null}
+          </div>
+
+          <DialogFooter className="px-6 py-3.5 border-t bg-background flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground font-mono">
+              Format: {viewingFile?.mimeType || "image"}
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {viewingFile?.googleDriveWebViewLink && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(viewingFile.googleDriveWebViewLink!, "_blank")}
+                  className="text-xs gap-1.5 rounded-xl h-9 flex-1 sm:flex-initial"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in Google Drive
+                </Button>
+              )}
+              {viewingFile && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() =>
+                    window.open(
+                      `/api/admin/forms/${form.formId}/files/${viewingFile.id}?download=true`,
+                      "_blank"
+                    )
+                  }
+                  className="text-xs gap-1.5 rounded-xl h-9 flex-1 sm:flex-initial"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download
+                </Button>
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

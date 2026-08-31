@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
@@ -57,7 +58,6 @@ import {
   Star,
   ImageIcon,
   FileText,
-  Printer,
   CheckSquare,
   ChevronDown,
   Circle,
@@ -69,7 +69,6 @@ import {
   ArrowLeft,
   Link2,
   Settings2,
-  BarChart3,
   HelpCircle,
   Globe,
   Lock,
@@ -77,19 +76,15 @@ import {
   LayoutTemplate,
   Layers,
   Check,
-  MoreVertical,
-  Search,
-  Filter,
   SlidersHorizontal,
+  HardDrive,
 } from "lucide-react";
 import {
   createForm,
   updateForm,
   toggleFormPublish,
   updateFormResponseStatus,
-  updateFormResponsesStatus,
   deleteFormResponse,
-  deleteFormResponses,
   type FormDetail,
   type FormResponseSummary,
 } from "../actions";
@@ -210,7 +205,18 @@ function emptyField(type: FormFieldType, order: number): FormFieldDefinition {
   return {
     id: createId("field"),
     type,
-    label: type === "button" ? "Button Link" : type === "payment" ? "Payment Block" : type === "linear_scale" ? "Rating Scale" : type === "multi_input" ? "Multiple Input Questions" : "Untitled Question",
+    label:
+      type === "button"
+        ? "Button Link"
+        : type === "payment"
+        ? "Payment Block"
+        : type === "linear_scale"
+        ? "Rating Scale"
+        : type === "multi_input"
+        ? "Multiple Input Questions"
+        : type === "file_upload"
+        ? "Upload File"
+        : "Untitled Question",
     description: "",
     placeholder: "",
     required: false,
@@ -231,6 +237,10 @@ function emptyField(type: FormFieldType, order: number): FormFieldDefinition {
       { id: createId("sub"), label: "Sub-question 1", placeholder: "Enter answer...", required: false },
       { id: createId("sub"), label: "Sub-question 2", placeholder: "Enter answer...", required: false },
     ] : undefined,
+    allowedFileTypes: ["jpg", "jpeg", "png", "webp", "pdf"],
+    maxFiles: 1,
+    imageOnly: false,
+    multipleFiles: false,
   };
 }
 
@@ -244,6 +254,7 @@ const FIELD_TYPE_OPTIONS: Array<{ value: FormFieldType; label: string; icon: Rea
   { value: "checkbox", label: "Checkboxes", icon: <CheckSquare className="h-4 w-4" /> },
   { value: "dropdown", label: "Drop-down", icon: <ChevronDown className="h-4 w-4" /> },
   { value: "linear_scale", label: "Linear scale", icon: <SlidersHorizontal className="h-4 w-4" /> },
+  { value: "file_upload", label: "File Upload", icon: <HardDrive className="h-4 w-4" /> },
   { value: "date", label: "Date", icon: <CalendarIcon className="h-4 w-4" /> },
   { value: "email", label: "Email", icon: <AlignLeft className="h-4 w-4" /> },
   { value: "number", label: "Number", icon: <AlignLeft className="h-4 w-4" /> },
@@ -407,6 +418,7 @@ function QuestionCard({
   sectionId,
   field,
   isActive,
+  isGoogleDriveConnected,
   onSelect,
   onUpdate,
   onDelete,
@@ -415,6 +427,7 @@ function QuestionCard({
   sectionId: string;
   field: FormFieldDefinition;
   isActive: boolean;
+  isGoogleDriveConnected?: boolean | null;
   onSelect: () => void;
   onUpdate: (patch: Partial<FormFieldDefinition>) => void;
   onDelete: () => void;
@@ -800,6 +813,144 @@ function QuestionCard({
                     ))}
                   </div>
                 </div>
+              ) : field.type === "file_upload" ? (
+                <div className="space-y-4 rounded-xl bg-muted/30 p-4 border border-border/50">
+                  {/* Google Drive Status Indicator */}
+                  {isGoogleDriveConnected ? (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-2.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-500 shrink-0 mt-0.5" />
+                      <div className="text-xs space-y-0.5">
+                        <p className="font-semibold text-emerald-700 dark:text-emerald-400">✓ Google Drive Connected</p>
+                        <p className="text-muted-foreground text-[11px] leading-relaxed">
+                          Uploaded files will be compressed to a maximum of 300 KB and stored securely in Google Drive.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+                        <div className="text-xs space-y-0.5">
+                          <p className="font-semibold text-amber-800 dark:text-amber-300">⚠ Google Drive Not Connected</p>
+                          <p className="text-amber-800/80 dark:text-amber-400 text-[11px] leading-relaxed">
+                            Google Drive must be connected before this file upload field can be used.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open("/admin/settings?tab=security", "_blank")}
+                        className="text-xs shrink-0 h-8 gap-1.5 border-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 font-medium"
+                      >
+                        <HardDrive className="h-3.5 w-3.5" />
+                        Configure Google Drive
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* File Upload Field Configuration */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground font-medium">Allowed File Types</Label>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {["JPG", "PNG", "WEBP", "PDF"].map((ext) => {
+                          const currentTypes = field.allowedFileTypes || ["jpg", "jpeg", "png", "webp", "pdf"];
+                          const isChecked = currentTypes.some((t) => t.toLowerCase().includes(ext.toLowerCase()));
+                          return (
+                            <Badge
+                              key={ext}
+                              variant={isChecked ? "default" : "outline"}
+                              className={`cursor-pointer text-xs px-2.5 py-1 select-none transition-all ${
+                                isChecked ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:border-primary/50"
+                              }`}
+                              onClick={() => {
+                                let updated: string[];
+                                if (isChecked) {
+                                  updated = currentTypes.filter((t) => !t.toLowerCase().includes(ext.toLowerCase()));
+                                } else {
+                                  updated = [...currentTypes, ext.toLowerCase()];
+                                }
+                                onUpdate({ allowedFileTypes: updated });
+                              }}
+                            >
+                              {isChecked && <Check className="mr-1 h-3 w-3" />}
+                              {ext}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground font-medium">File Size Limits</Label>
+                      <div className="p-2.5 rounded-lg bg-background border border-border/60 text-xs space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Max Upload Size:</span>
+                          <span className="font-semibold text-foreground">1 MB</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] text-muted-foreground">
+                          <span>Target in Drive:</span>
+                          <span className="font-mono font-medium text-primary">≤ 300 KB</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 pt-1">
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border/60">
+                      <div className="space-y-0.5">
+                        <Label className="text-xs font-medium text-foreground">Multiple Files</Label>
+                        <p className="text-[10px] text-muted-foreground">Allow uploading more than 1 file</p>
+                      </div>
+                      <Switch
+                        checked={Boolean(field.multipleFiles)}
+                        onCheckedChange={(checked) => onUpdate({ multipleFiles: checked, maxFiles: checked ? 3 : 1 })}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border/60">
+                      <div className="space-y-0.5">
+                        <Label className="text-xs font-medium text-foreground">Image-Only Mode</Label>
+                        <p className="text-[10px] text-muted-foreground">Restricts uploads strictly to images</p>
+                      </div>
+                      <Switch
+                        checked={Boolean(field.imageOnly)}
+                        onCheckedChange={(checked) =>
+                          onUpdate({
+                            imageOnly: checked,
+                            allowedFileTypes: checked ? ["jpg", "jpeg", "png", "webp"] : ["jpg", "jpeg", "png", "webp", "pdf"],
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {field.multipleFiles && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground font-medium">Maximum Number of Files</Label>
+                      <Select
+                        value={String(field.maxFiles ?? 3)}
+                        onValueChange={(v) => onUpdate({ maxFiles: Number(v) })}
+                      >
+                        <SelectTrigger className="h-9 bg-background rounded-lg text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="2" className="text-xs">2 files</SelectItem>
+                          <SelectItem value="3" className="text-xs">3 files</SelectItem>
+                          <SelectItem value="5" className="text-xs">5 files</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-background/60 border border-border/40 text-[11px] text-muted-foreground">
+                    <span>Compression Requirement</span>
+                    <span className="font-semibold font-mono text-primary">Maximum 300 KB</span>
+                  </div>
+                </div>
               ) : null}
             </div>
 
@@ -883,6 +1034,17 @@ function QuestionCard({
                   </div>
                 ) : field.type === "button" ? <Button variant="outline" size="sm" type="button" className="text-primary border-primary/30 text-xs h-7 rounded-lg"><ExternalLink className="mr-1.5 h-3 w-3" />{field.buttonLabel || "Open link"}</Button>
                 : field.type === "payment" ? <div className="inline-flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1.5 rounded-lg"><CreditCard className="h-3.5 w-3.5" />Payment enabled</div>
+                : field.type === "file_upload" ? (
+                  <div className="border border-dashed border-border/80 rounded-xl p-3 bg-muted/10 flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <HardDrive className="h-4 w-4 text-primary" />
+                      <span>File Upload (Compressed to ≤ 300 KB in Google Drive)</span>
+                    </div>
+                    <span className="font-mono text-[10px] bg-muted px-2 py-0.5 rounded">
+                      {field.multipleFiles ? `Up to ${field.maxFiles || 3} files` : "Single file"}
+                    </span>
+                  </div>
+                )
                 : null}
             </div>
           </div>
@@ -907,12 +1069,32 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState<boolean | null>(null);
+  const [showPublishGuardDialog, setShowPublishGuardDialog] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [isBannerSidebarOpen, setIsBannerSidebarOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "error">("saved");
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const isFirstRender = useRef(true);
   const debouncedTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check Google Drive connection status
+  useEffect(() => {
+    async function checkDrive() {
+      try {
+        const res = await fetch("/api/settings/google-drive/status");
+        const json = await res.json();
+        if (json.success && json.data) {
+          setIsGoogleDriveConnected(Boolean(json.data.isConnected));
+        } else {
+          setIsGoogleDriveConnected(false);
+        }
+      } catch {
+        setIsGoogleDriveConnected(false);
+      }
+    }
+    checkDrive();
+  }, []);
 
   /* ─── Responses sidebar state (for detail sheet) ─── */
   const [viewingResponse, setViewingResponse] = useState<FormResponseSummary | null>(null);
@@ -1064,8 +1246,20 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
 
   const handlePublishToggle = async () => {
     if (!initialForm) { toast.error("Save form first before publishing"); return; }
+
+    const willPublish = !initialForm.isPublished;
+    if (willPublish) {
+      const hasFileUpload = definition.sections.some((s) =>
+        s.fields.some((f) => f.type === "file_upload")
+      );
+      if (hasFileUpload && !isGoogleDriveConnected) {
+        setShowPublishGuardDialog(true);
+        return;
+      }
+    }
+
     setIsPublishing(true);
-    const result = await toggleFormPublish(initialForm.formId, !initialForm.isPublished);
+    const result = await toggleFormPublish(initialForm.formId, willPublish);
     if (result.status === "success") { toast.success(result.message); router.refresh(); } else { toast.error(result.message); }
     setIsPublishing(false);
   };
@@ -1428,6 +1622,7 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
                         sectionId={currentSection.id}
                         field={field}
                         isActive={activeFieldId === field.id}
+                        isGoogleDriveConnected={isGoogleDriveConnected}
                         onSelect={() => setActiveFieldId(field.id)}
                         onUpdate={(patch) => updateField(field.id, patch)}
                         onDelete={() => deleteField(field.id)}
@@ -1456,6 +1651,7 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
                   { type: "short_text" as FormFieldType, icon: Type, label: "Short answer" },
                   { type: "checkbox" as FormFieldType, icon: CheckSquare, label: "Checkboxes" },
                   { type: "linear_scale" as FormFieldType, icon: SlidersHorizontal, label: "Linear scale rating" },
+                  { type: "file_upload" as FormFieldType, icon: HardDrive, label: "File upload (Google Drive)" },
                   { type: "payment" as FormFieldType, icon: CreditCard, label: "Payment" },
                   { type: "button" as FormFieldType, icon: ExternalLink, label: "Link button" },
                 ] as Array<{ type: FormFieldType; icon: React.ElementType; label: string }>).map(({ type, icon: Icon, label }) => (
@@ -1474,6 +1670,35 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
             </div>
           </div>
         )}
+
+        {/* ═══ PUBLISH GUARD DIALOG (GOOGLE DRIVE NOT CONNECTED) ═══ */}
+        <AlertDialog open={showPublishGuardDialog} onOpenChange={setShowPublishGuardDialog}>
+          <AlertDialogContent className="rounded-2xl max-w-md">
+            <AlertDialogHeader>
+              <div className="flex items-center gap-2.5 text-amber-600">
+                <AlertCircle className="h-5 w-5" />
+                <AlertDialogTitle className="text-base font-semibold">Configuration Required</AlertDialogTitle>
+              </div>
+              <AlertDialogDescription className="text-xs text-muted-foreground pt-1.5 leading-relaxed">
+                This form contains a file upload field, but Google Drive is not connected.
+                <br /><br />
+                Connect Google Drive before publishing this form.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel className="rounded-xl text-xs">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowPublishGuardDialog(false);
+                  window.open("/admin/settings?tab=security", "_blank");
+                }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl text-xs font-medium"
+              >
+                Go to Google Drive Settings
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
 
         {/* ─── SETTINGS TAB ─── */}

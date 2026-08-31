@@ -277,10 +277,10 @@ export function NotificationPermissionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleDismiss()}>
-      <DialogContent className="max-w-md sm:max-w-lg p-0 overflow-hidden border-border/80 bg-card shadow-2xl rounded-2xl">
+      <DialogContent className="max-w-md sm:max-w-lg p-0 max-h-[88dvh] flex flex-col overflow-hidden border-border/80 bg-card shadow-2xl rounded-2xl">
         {/* ── Top Visual Header ── */}
         <div
-          className={`p-6 text-center border-b border-border/40 relative ${
+          className={`p-4 sm:p-6 text-center border-b border-border/40 shrink-0 relative ${
             justGranted
               ? "bg-emerald-500/15"
               : isBlocked
@@ -288,25 +288,25 @@ export function NotificationPermissionDialog({
               : "bg-primary/10"
           }`}
         >
-          <div className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center relative mb-3 shadow-md transition-all">
+          <div className="mx-auto w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center relative mb-2.5 sm:mb-3 shadow-md transition-all">
             {justGranted ? (
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center animate-in zoom-in-50">
-                <CheckCircle2 className="w-8 h-8" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center animate-in zoom-in-50">
+                <CheckCircle2 className="w-7 h-7 sm:w-8 sm:h-8" />
               </div>
             ) : isBlocked ? (
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <ShieldAlert className="w-7 h-7" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                <ShieldAlert className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
             ) : (
-              <div className="w-14 h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center relative">
-                <BellRing className="w-7 h-7" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center relative">
+                <BellRing className="w-6 h-6 sm:w-7 sm:h-7" />
                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-card" />
               </div>
             )}
           </div>
 
           <DialogHeader className="space-y-1">
-            <DialogTitle className="text-xl font-bold tracking-tight text-foreground font-mono">
+            <DialogTitle className="text-lg sm:text-xl font-bold tracking-tight text-foreground font-mono">
               {justGranted
                 ? "Notifications Active! 🎉"
                 : isBlocked
@@ -323,7 +323,7 @@ export function NotificationPermissionDialog({
           </DialogHeader>
 
           {isBlocked && (
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-mono font-semibold">
+            <div className="mt-2.5 sm:mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] sm:text-xs font-mono font-semibold">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span>Action Required: Unblock in Browser</span>
             </div>
@@ -331,7 +331,7 @@ export function NotificationPermissionDialog({
         </div>
 
         {/* ── Body Content ── */}
-        <div className="p-5 sm:p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
           {/* CASE 1: PERMISSION IS DEFAULT (Prompt with 1-Click Allow) */}
           {!isBlocked && !justGranted && (
             <div className="space-y-4">

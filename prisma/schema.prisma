@@ -5,7 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
@@ -15,10 +15,10 @@ datasource db {
 }
 
 model User {
-  id              String          @id
+  id              String  @id
   name            String
   email           String
-  emailVerified   Boolean         @default(false)
+  emailVerified   Boolean @default(false)
   image           String?
   mobileNumber    String?
   whatsappNumber  String?
@@ -29,65 +29,64 @@ model User {
   district        String?
   collegeName     String?
   collegeAddress  String?
-  
+
   // Personal Details (Extended)
-  username        String?         @unique
-  cbUserId        String?         @unique
-  firstName       String?
-  middleName      String?
-  lastName        String?
-  
+  username   String? @unique
+  cbUserId   String? @unique
+  firstName  String?
+  middleName String?
+  lastName   String?
+
   // Academic Details
-  registration    String?
-  rollNumber      String?
-  branch          String?
-  admissionYear   String?
-  
+  registration  String?
+  rollNumber    String?
+  branch        String?
+  admissionYear String?
+
   // Address Details (Detailed)
-  address         String?
-  postOffice      String?
-  policeStation   String?
-  block           String?
-  pinCode         String?
-  
+  address       String?
+  postOffice    String?
+  policeStation String?
+  block         String?
+  pinCode       String?
+
   // Profile completion & Onboarding status
-  profileComplete         Boolean         @default(false)
-  hasLoggedIn             Boolean         @default(false)
-  hasCompletedOnboarding  Boolean         @default(false)
-  loginCount              Int             @default(0)
-  lastLoginAt             DateTime?
-  
+  profileComplete        Boolean   @default(false)
+  hasLoggedIn            Boolean   @default(false)
+  hasCompletedOnboarding Boolean   @default(false)
+  loginCount             Int       @default(0)
+  lastLoginAt            DateTime?
+
   // Linked Accounts
-  githubUsername  String?
-  
+  githubUsername String?
+
   // Batch Assignment
-  batchId         String?
-  batch           Batch?          @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  batchId String?
+  batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   // Specialized Domain (assigned by admin)
   specializedDomain String?
 
   // Social & Custom Links
-  socialLinks     Json?
-  customLinks     Json?
-  
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @default(now()) @updatedAt
-  role            String?
-  banned          Boolean?        @default(false)
-  banReason       String?
-  banExpires      DateTime?
-  sessions        Session[]
-  accounts        Account[]
-  publishedProjects PublishedProject[]
-  projectReviews  ProjectReview[]
-  resourceFolders ResourceFolder[]  @relation("ResourceFolderCreator")
-  resources       Resource[]        @relation("ResourceUploader")
-  createdForms    Form[]            @relation("FormCreator")
-  formResponsesSubmitted FormResponse[] @relation("FormResponseSubmitter")
-  formResponsesVerified FormResponse[] @relation("FormResponseVerifier")
-  resumes         Resume[]
-  roadmapProgress UserRoadmapProgress[]
+  socialLinks Json?
+  customLinks Json?
+
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @default(now()) @updatedAt
+  role                   String?
+  banned                 Boolean?               @default(false)
+  banReason              String?
+  banExpires             DateTime?
+  sessions               Session[]
+  accounts               Account[]
+  publishedProjects      PublishedProject[]
+  projectReviews         ProjectReview[]
+  createdForms           Form[]                 @relation("FormCreator")
+  formResponsesSubmitted FormResponse[]         @relation("FormResponseSubmitter")
+  formResponsesVerified  FormResponse[]         @relation("FormResponseVerifier")
+  resumes                Resume[]
+  roadmapProgress        UserRoadmapProgress[]
+  googleDriveConnection  GoogleDriveConnection?
 
   @@unique([email])
   @@map("user")
@@ -151,63 +150,44 @@ model SystemSettings {
 }
 
 model Batch {
-  id            String              @id @default(cuid())
-  name          String              @unique
-  code          String              @unique
+  id            String   @id @default(cuid())
+  name          String   @unique
+  code          String   @unique
   description   String?
   admissionYear String?
-  isActive      Boolean             @default(true)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  
-  members       User[]
-  
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  members User[]
+
   @@map("batch")
 }
 
 model AttendanceSession {
-  id             String         @id @default(cuid())
+  id             String       @id @default(cuid())
   sessionNumber  Int
   title          String
   date           DateTime
   day            String
-  targetBatchIds String[]       @default([]) // Empty array means available to all batches
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  createdBy      String         // Admin user ID who created this
+  targetBatchIds String[]     @default([]) // Empty array means available to all batches
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  createdBy      String // Admin user ID who created this
   attendances    Attendance[]
-  qrCodes        AttendanceQR[] // QR codes generated for this session
 
   @@unique([sessionNumber])
   @@map("attendance_session")
-}
-
-model AttendanceQR {
-  id            String   @id @default(cuid())
-  sessionId     String
-  qrToken       String   @unique // Unique token embedded in QR code
-  expiresAt     DateTime // QR code expiration time (5 minutes from creation)
-  createdAt     DateTime @default(now())
-  createdBy     String   // Admin user ID who generated this
-  isActive      Boolean  @default(true) // Can be manually deactivated
-  scanCount     Int      @default(0) // Track how many times scanned
-  
-  session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([qrToken])
-  @@index([sessionId])
-  @@index([expiresAt])
-  @@map("attendance_qr")
 }
 
 model Attendance {
   id        String   @id @default(cuid())
   sessionId String
   userId    String
-  status    String   // "pending", "present", "absent"
+  status    String // "pending", "present", "absent"
   points    Int      @default(0) // Points awarded for attendance
   markedAt  DateTime @default(now())
-  markedBy  String   // Admin user ID who marked the attendance or "qr-scan" for QR-based
+  markedBy  String // Admin user ID who marked the attendance or "qr-scan" for QR-based
   method    String   @default("manual") // "manual" or "qr-scan"
   updatedAt DateTime @updatedAt
 
@@ -228,7 +208,7 @@ model Task {
   targetBatchIds String[]         @default([]) // Empty array means available to all batches
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  createdBy      String           // Admin user ID who created this
+  createdBy      String // Admin user ID who created this
   submissions    TaskSubmission[]
 
   @@unique([taskNumber])
@@ -236,19 +216,19 @@ model Task {
 }
 
 model TaskSubmission {
-  id             String    @id @default(cuid())
-  taskId         String
-  userId         String
-  status         String    // "pending", "submitted", "approved", "rejected"
-  projectUrl     String?   // GitHub repository or project URL
-  screenshotKey  String?   // S3 key for screenshot (max 100kb)
-  submittedAt    DateTime?
-  evaluatedAt    DateTime?
-  evaluatedBy    String?   // Admin user ID who evaluated
-  pointsAwarded  Int       @default(0)
-  feedback       String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  taskId        String
+  userId        String
+  status        String // "pending", "submitted", "approved", "rejected"
+  projectUrl    String? // GitHub repository or project URL
+  screenshotKey String? // S3 key for screenshot (max 100kb)
+  submittedAt   DateTime?
+  evaluatedAt   DateTime?
+  evaluatedBy   String? // Admin user ID who evaluated
+  pointsAwarded Int       @default(0)
+  feedback      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
@@ -257,15 +237,15 @@ model TaskSubmission {
 }
 
 model EventPoint {
-  id          String   @id @default(cuid())
-  eventNumber Int
-  title       String
-  description String?
-  eventDate   DateTime
-  points      Int      @default(0) // Points awarded for event participation
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   String   // Admin user ID who created this
+  id             String               @id @default(cuid())
+  eventNumber    Int
+  title          String
+  description    String?
+  eventDate      DateTime
+  points         Int                  @default(0) // Points awarded for event participation
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  createdBy      String // Admin user ID who created this
   participations EventParticipation[]
 
   @@unique([eventNumber])
@@ -276,10 +256,10 @@ model EventParticipation {
   id             String    @id @default(cuid())
   eventId        String
   userId         String
-  status         String    // "pending", "participated", "approved", "rejected"
+  status         String // "pending", "participated", "approved", "rejected"
   participatedAt DateTime?
   evaluatedAt    DateTime?
-  evaluatedBy    String?   // Admin user ID who evaluated
+  evaluatedBy    String? // Admin user ID who evaluated
   pointsAwarded  Int       @default(0)
   feedback       String?
   createdAt      DateTime  @default(now())
@@ -300,23 +280,23 @@ model Quiz {
   shifts            Int?                 @default(1) // Number of shifts (1-10)
   shiftsJson        String?              @db.Text // Shift configuration JSON (shift name, assigned set, status)
   activeShift       Int?                 @default(1) // Currently active shift number
-  duration          Int                  // Duration in minutes
+  duration          Int // Duration in minutes
   pointsPerQuestion Float                @default(1) // Points awarded per correct answer
-  startDateTime     DateTime?            // Quiz start date and time
-  endDateTime       DateTime?            // Quiz end date and time
+  startDateTime     DateTime? // Quiz start date and time
+  endDateTime       DateTime? // Quiz end date and time
   questionsJson     String               @db.Text // JSON string of questions
   isActive          Boolean              @default(true)
   targetAudience    String               @default("INTERNAL") // "INTERNAL" | "EXTERNAL"
   targetBatchIds    String[]             @default([]) // Empty array means all batches for internal quizzes
-  accessCode        String?              // 6-digit access code for external quiz
-  formId            String?              // Linked registration form ID
-  feedbackFormId    String?              // Optional feedback form ID
+  accessCode        String? // 6-digit access code for external quiz
+  formId            String? // Linked registration form ID
+  feedbackFormId    String? // Optional feedback form ID
   cutoffMarks       Float?               @default(50) // Minimum marks or percentage to pass
   cutoffType        String?              @default("PERCENTAGE") // "PERCENTAGE" | "MARKS" | "TOP_N"
-  topSelectCount    Int?                 // Number of top students to select (for TOP_N mode)
+  topSelectCount    Int? // Number of top students to select (for TOP_N mode)
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
-  createdBy         String               // Admin user ID who created this
+  createdBy         String // Admin user ID who created this
   attempts          QuizAttempt[]
   setAssignments    QuizSetAssignment[]
   externalSystems   ExternalQuizSystem[]
@@ -325,22 +305,22 @@ model Quiz {
 }
 
 model ExternalQuizSystem {
-  id                  String    @id @default(cuid())
-  quizId              String
-  systemNumber        String    // e.g., "SYS-001", "System 1"
-  systemCode          String    @unique // Unique identifier token for kiosk session
-  assignedResponseId  String?   // FormResponse.id
-  assignedStudentName String?
+  id                   String    @id @default(cuid())
+  quizId               String
+  systemNumber         String // e.g., "SYS-001", "System 1"
+  systemCode           String    @unique // Unique identifier token for kiosk session
+  assignedResponseId   String? // FormResponse.id
+  assignedStudentName  String?
   assignedStudentEmail String?
-  assignedSet         String?   // A, B, C, etc.
-  assignedShift       Int?      @default(1) // Shift number (1, 2, 3, etc.)
-  assignedShiftName   String?   // "Shift 1", "Shift 2", etc.
-  status              String    @default("REGISTERED") // "REGISTERED" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
-  attemptId           String?
-  startedAt           DateTime?
-  completedAt         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  assignedSet          String? // A, B, C, etc.
+  assignedShift        Int?      @default(1) // Shift number (1, 2, 3, etc.)
+  assignedShiftName    String? // "Shift 1", "Shift 2", etc.
+  status               String    @default("REGISTERED") // "REGISTERED" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
+  attemptId            String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
@@ -352,11 +332,11 @@ model QuizSetAssignment {
   id          String   @id @default(cuid())
   quizId      String
   userId      String
-  assignedSet String   // The set letter (A, B, C, etc.)
+  assignedSet String // The set letter (A, B, C, etc.)
   assignedAt  DateTime @default(now())
-  
+
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  
+
   @@unique([quizId, userId])
   @@map("quiz_set_assignment")
 }
@@ -364,13 +344,13 @@ model QuizSetAssignment {
 model QuizAttempt {
   id               String    @id @default(cuid())
   quizId           String
-  userId           String    // User ID for internal or identifier (e.g., ext_id) for external participants
-  participantName  String?   // For external participants
-  participantEmail String?   // For external participants
-  externalSystemId String?   // Linked ExternalQuizSystem ID
-  setNumber        Int       // Which set (1 for A, 2 for B, etc.)
-  shiftNumber      Int?      // Which shift (1, 2, 3, etc.)
-  shiftName        String?   // "Shift 1", "Shift 2", etc.
+  userId           String // User ID for internal or identifier (e.g., ext_id) for external participants
+  participantName  String? // For external participants
+  participantEmail String? // For external participants
+  externalSystemId String? // Linked ExternalQuizSystem ID
+  setNumber        Int // Which set (1 for A, 2 for B, etc.)
+  shiftNumber      Int? // Which shift (1, 2, 3, etc.)
+  shiftName        String? // "Shift 1", "Shift 2", etc.
   score            Float     @default(0)
   totalQuestions   Int
   correctAnswers   Int       @default(0)
@@ -390,15 +370,15 @@ model QuizAttempt {
 }
 
 model QuizBlock {
-  id              String   @id @default(cuid())
-  quizId          String
-  userId          String
-  reason          String   @db.Text // Reason for blocking (e.g., "Multiple violations detected")
-  violationType   String   // Type of violation (e.g., "TAB_SWITCH", "FULLSCREEN_EXIT")
-  violationCount  Int      @default(0) // Number of violations before block
-  blockedAt       DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  quizId         String
+  userId         String
+  reason         String   @db.Text // Reason for blocking (e.g., "Multiple violations detected")
+  violationType  String // Type of violation (e.g., "TAB_SWITCH", "FULLSCREEN_EXIT")
+  violationCount Int      @default(0) // Number of violations before block
+  blockedAt      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([quizId, userId])
   @@index([userId])
@@ -407,37 +387,37 @@ model QuizBlock {
 }
 
 model PublishedProject {
-  id              String   @id @default(cuid())
-  githubRepoId    Int      @unique // GitHub repository ID
-  title           String
-  description     String   @db.Text
-  techStack       String[] // Array of technologies
-  projectUrl      String?  // Optional live project URL
-  thumbnailKey    String   // S3 key for thumbnail image
-  publishedById   String   // Admin who published
-  publishedBy     User     @relation(fields: [publishedById], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String   @id @default(cuid())
+  githubRepoId  Int      @unique // GitHub repository ID
+  title         String
+  description   String   @db.Text
+  techStack     String[] // Array of technologies
+  projectUrl    String? // Optional live project URL
+  thumbnailKey  String // S3 key for thumbnail image
+  publishedById String // Admin who published
+  publishedBy   User     @relation(fields: [publishedById], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([publishedById])
   @@map("published_project")
 }
 
 model ProjectReview {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  repoName        String
-  repoUrl         String
-  description     String   @db.Text
-  reviewType      String   // "review", "collaboration", "publish"
-  explanation     String   @db.Text
-  liveUrl         String?
-  whatsappNumber  String?
-  status          String   @default("pending") // "pending", "approved", "rejected"
-  adminResponse   String?  @db.Text
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repoName       String
+  repoUrl        String
+  description    String   @db.Text
+  reviewType     String // "review", "collaboration", "publish"
+  explanation    String   @db.Text
+  liveUrl        String?
+  whatsappNumber String?
+  status         String   @default("pending") // "pending", "approved", "rejected"
+  adminResponse  String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -445,89 +425,87 @@ model ProjectReview {
   @@map("project_review")
 }
 
-model ResourceFolder {
-  id          String   @id @default(cuid())
-  name        String
-  description String?  @db.Text
-  icon        String?  // Icon name or emoji
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdById String
-  createdBy   User     @relation("ResourceFolderCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  resources   Resource[]
-
-  @@index([createdById])
-  @@index([order])
-  @@map("resource_folder")
-}
-
-model Resource {
-  id          String         @id @default(cuid())
-  folderId    String
-  folder      ResourceFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  title       String
-  description String?        @db.Text
-  type        String         // "pdf", "image", "video", "document", "link"
-  url         String         // Google Drive link, YouTube link, or direct URL
-  thumbnailUrl String?       // Optional thumbnail for videos/images
-  fileSize    String?        // File size (e.g., "2.5 MB")
-  duration    String?        // For videos (e.g., "5:30")
-  tags        String[]       // Array of tags for filtering
-  order       Int            @default(0)
-  isActive    Boolean        @default(true)
-  downloadable Boolean       @default(true)
-  uploadedById String
-  uploadedBy  User           @relation("ResourceUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  @@index([folderId])
-  @@index([uploadedById])
-  @@index([type])
-  @@index([order])
-  @@map("resource")
-}
-
 model Form {
-  id                 String        @id
-  formId             String        @unique
-  title              String
-  description        String?
-  definition         Json
-  isPublished        Boolean       @default(false)
-  acceptingResponses Boolean       @default(true)
-  publishedAt        DateTime?
-  createdById        String?
-  createdBy          User?         @relation("FormCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  responses          FormResponse[]
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @default(now()) @updatedAt
+  id                  String         @id
+  formId              String         @unique
+  title               String
+  description         String?
+  definition          Json
+  isPublished         Boolean        @default(false)
+  acceptingResponses  Boolean        @default(true)
+  publishedAt         DateTime?
+  googleDriveFolderId String?
+  createdById         String?
+  createdBy           User?          @relation("FormCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  responses           FormResponse[]
+  files               FormFile[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @default(now()) @updatedAt
 
   @@index([isPublished])
   @@map("form")
 }
 
 model FormResponse {
-  id            String   @id
+  id            String     @id
   formId        String
-  form          Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  form          Form       @relation(fields: [formId], references: [id], onDelete: Cascade)
   answers       Json
   transactionId String?
-  paymentStatus String   @default("pending")
+  paymentStatus String     @default("pending")
   verifiedAt    DateTime?
   verifiedById  String?
-  verifiedBy    User?    @relation("FormResponseVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedBy    User?      @relation("FormResponseVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
   submittedById String?
-  submittedBy   User?    @relation("FormResponseSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  submittedBy   User?      @relation("FormResponseSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  files         FormFile[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
 
   @@index([formId])
   @@index([paymentStatus])
   @@map("form_response")
+}
+
+model GoogleDriveConnection {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email        String
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  scope        String?
+  tokenType    String?  @default("Bearer")
+  expiresAt    DateTime
+  rootFolderId String? // ID of parent "Forms" folder in Google Drive
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@map("google_drive_connection")
+}
+
+model FormFile {
+  id                      String       @id @default(cuid())
+  formId                  String
+  form                    Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  responseId              String
+  response                FormResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  fieldId                 String
+  originalFileName        String
+  storedFileName          String
+  mimeType                String
+  fileSize                Int
+  googleDriveFileId       String
+  googleDriveFolderId     String
+  googleDriveWebViewLink  String?
+  googleDriveDownloadLink String?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @default(now()) @updatedAt
+
+  @@index([formId])
+  @@index([responseId])
+  @@index([googleDriveFileId])
+  @@map("form_file")
 }
 
 model SmtpUsageTracker {
@@ -564,7 +542,7 @@ model Roadmap {
   slug        String   @unique // e.g. "frontend-developer", "backend-developer"
   title       String
   description String   @db.Text
-  category    String   // "web-dev", "systems", "cloud-devops", "ai-ml", "cybersecurity", "dsa"
+  category    String // "web-dev", "systems", "cloud-devops", "ai-ml", "cybersecurity", "dsa"
   badgeText   String?  @default("Core Track")
   iconName    String?  @default("Compass")
   nodesJson   String   @db.Text // JSON Array of nodes & positions

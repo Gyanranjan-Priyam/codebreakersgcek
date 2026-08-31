@@ -39,6 +39,7 @@ import BulletList from "@tiptap/extension-bullet-list";
 import OrderedList from "@tiptap/extension-ordered-list";
 import TextAlign from "@tiptap/extension-text-align";
 import parse from "html-react-parser";
+import { FormFileUploader, ProcessedFormFile } from "./form-file-uploader";
 
 interface PublicFormProps {
   form: PublishedFormResponse;
@@ -899,6 +900,10 @@ export default function PublicForm({ form }: PublicFormProps) {
     if (!field.required) return true;
     if (field.type === "payment") return Boolean(transactionId.trim());
     if (field.type === "button") return true;
+    if (field.type === "file_upload") {
+      const files = answers[field.id];
+      return Array.isArray(files) && files.length > 0;
+    }
     const val = answers[field.id];
     if (Array.isArray(val)) return val.length > 0;
     return Boolean(typeof val === "string" && val.trim());
@@ -1807,6 +1812,30 @@ export default function PublicForm({ form }: PublicFormProps) {
             </Popover>
             {fieldError && (
               <p className="mf-error-msg">This field is required</p>
+            )}
+          </div>
+        )}
+
+        {/* File Upload */}
+        {field.type === "file_upload" && (
+          <div>
+            <FormFileUploader
+              fieldId={field.id}
+              label={field.label}
+              description={field.description}
+              required={field.required}
+              allowedFileTypes={field.allowedFileTypes}
+              maxFiles={field.maxFiles}
+              imageOnly={field.imageOnly}
+              multipleFiles={field.multipleFiles}
+              value={(answers[field.id] as unknown as ProcessedFormFile[]) || []}
+              onChange={(files) => updateAnswer(field.id, files as any)}
+              disabled={isSubmitting}
+            />
+            {fieldError && (
+              <p className="mf-error-msg" style={{ marginTop: 6 }}>
+                This field is required
+              </p>
             )}
           </div>
         )}

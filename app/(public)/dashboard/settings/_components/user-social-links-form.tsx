@@ -270,14 +270,14 @@ export function UserSocialLinksForm({
       </div>
 
       {/* Custom Links Section */}
-      <div className="space-y-5 pt-3 border-t">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 pt-3 border-t">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <CustomLinkIcon className="w-4.5 h-4.5" />
+              <CustomLinkIcon className="w-4.5 h-4.5 shrink-0" />
               <span>Custom Links (Blogs, Projects, Resume)</span>
             </h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Add custom external links to showcase on your public member profile.
             </p>
           </div>
@@ -288,7 +288,7 @@ export function UserSocialLinksForm({
             size="sm"
             onClick={handleAddCustomLink}
             disabled={isSaving || customLinks.length >= 6}
-            className="text-xs h-9 gap-1.5 px-3"
+            className="text-xs h-9 gap-1.5 px-3 self-start sm:self-auto shrink-0"
           >
             <Plus className="h-4 w-4" />
             <span>Add Link</span>

@@ -584,3 +584,26 @@ export async function updateGitHubOrgSetting(organizationName: string) {
     };
   }
 }
+
+export async function getGoogleDriveStatusAction() {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    const { GoogleDriveService } = await import("@/lib/google-drive-service");
+    const status = await GoogleDriveService.getConnectionStatus(session?.user?.id);
+
+    return {
+      status: 'success' as const,
+      data: status,
+    };
+  } catch (error) {
+    console.error('Error getting Google Drive status:', error);
+    return {
+      status: 'error' as const,
+      message: 'Failed to get Google Drive status',
+      data: { isConnected: false },
+    };
+  }
+}

@@ -169,7 +169,6 @@ async function fetchDatabaseSummary() {
     console.log(`Quizzes: ${summary.totalQuizzes}`);
     console.log(`Published Projects: ${summary.totalPublishedProjects}`);
     console.log(`Project Reviews: ${summary.totalProjectReviews}`);
-    console.log(`Resource Folders: ${summary.totalResourceFolders}`);
 
     console.log("\n=== System Settings ===");
     systemSettings.forEach((setting) => {

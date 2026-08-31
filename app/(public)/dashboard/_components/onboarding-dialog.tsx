@@ -229,11 +229,11 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
-        className="max-w-2xl w-full p-0 overflow-hidden border-border bg-card shadow-2xl rounded-2xl sm:rounded-2xl"
+        className="max-w-2xl w-full p-0 max-h-[86dvh] sm:max-h-[90dvh] flex flex-col overflow-hidden border-border bg-card shadow-2xl rounded-2xl"
         data-lenis-prevent
       >
         {/* Progress Bar Top Indicator */}
-        <div className="w-full bg-muted h-1.5 flex">
+        <div className="w-full bg-muted h-1.5 flex shrink-0">
           <div
             className="bg-primary h-full transition-all duration-300 ease-out"
             style={{
@@ -247,16 +247,16 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
             STEP 1: WELCOME & GREETING
            ───────────────────────────────────────────────────────────── */}
         {currentStep === 1 && (
-          <div className="p-6 sm:p-8 space-y-6">
-            <DialogHeader className="space-y-4 text-center sm:text-left">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-7 space-y-4 sm:space-y-5">
+            <DialogHeader className="space-y-3 text-center sm:text-left">
               <div className="flex items-center justify-between">
-                <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <div className="size-10 sm:size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <Image
                     src="/assets/logo.png"
                     alt="CodeBreakers Logo"
-                    width={32}
-                    height={32}
-                    className="size-8 object-contain"
+                    width={28}
+                    height={28}
+                    className="size-7 sm:size-8 object-contain"
                   />
                 </div>
                 <Badge
@@ -267,21 +267,21 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
                 </Badge>
               </div>
 
-              <div className="space-y-1.5">
-                <DialogTitle className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <div className="space-y-1">
+                <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                   Welcome to CodeBreakers, {firstName}! 👋
                 </DialogTitle>
-                <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
+                <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                   We are extremely happy to have you on board! CodeBreakers is your collaborative learning and development platform at GCEK.
                 </DialogDescription>
               </div>
             </DialogHeader>
 
             {/* Quick onboarding perks card */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-xl bg-muted/40 border border-border/80 space-y-1.5">
-                <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <Sparkles className="size-4" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+              <div className="p-3 rounded-xl bg-muted/40 border border-border/80 space-y-1">
+                <div className="size-6 sm:size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <Sparkles className="size-3.5 sm:size-4" />
                 </div>
                 <h4 className="text-xs font-semibold text-foreground">Choose Domains</h4>
                 <p className="text-[11px] text-muted-foreground leading-snug">
@@ -289,9 +289,9 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-muted/40 border border-border/80 space-y-1.5">
-                <div className="size-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <UserCheck className="size-4" />
+              <div className="p-3 rounded-xl bg-muted/40 border border-border/80 space-y-1">
+                <div className="size-6 sm:size-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <UserCheck className="size-3.5 sm:size-4" />
                 </div>
                 <h4 className="text-xs font-semibold text-foreground">Complete Profile</h4>
                 <p className="text-[11px] text-muted-foreground leading-snug">
@@ -299,9 +299,9 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-muted/40 border border-border/80 space-y-1.5">
-                <div className="size-7 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                  <Settings className="size-4" />
+              <div className="p-3 rounded-xl bg-muted/40 border border-border/80 space-y-1">
+                <div className="size-6 sm:size-7 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <Settings className="size-3.5 sm:size-4" />
                 </div>
                 <h4 className="text-xs font-semibold text-foreground">Sync Anytime</h4>
                 <p className="text-[11px] text-muted-foreground leading-snug">
@@ -311,25 +311,23 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
             </div>
 
             {/* Actions */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border">
+            <div className="pt-2 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5 border-t border-border">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleRedirectToSettings}
-                className="w-full sm:w-auto text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                className="w-full sm:w-auto text-xs text-muted-foreground hover:text-foreground cursor-pointer h-8"
               >
                 Skip to Profile Settings
               </Button>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={() => setCurrentStep(2)}
-                  className="w-full sm:w-auto gap-2 text-xs font-medium cursor-pointer shadow-sm"
-                >
-                  <span>Choose Interested Domains</span>
-                  <ArrowRight className="size-3.5" />
-                </Button>
-              </div>
+              <Button
+                onClick={() => setCurrentStep(2)}
+                className="w-full sm:w-auto gap-2 text-xs font-medium cursor-pointer shadow-sm h-9"
+              >
+                <span>Choose Interested Domains</span>
+                <ArrowRight className="size-3.5" />
+              </Button>
             </div>
           </div>
         )}
@@ -338,7 +336,7 @@ export function OnboardingDialog({ user }: OnboardingDialogProps) {
             STEP 2: DOMAIN SELECTION
            ───────────────────────────────────────────────────────────── */}
         {currentStep === 2 && (
-          <div className="p-6 sm:p-8 space-y-5">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-7 space-y-4">
             <DialogHeader className="space-y-2 text-left">
               <div className="flex items-center justify-between">
                 <Badge

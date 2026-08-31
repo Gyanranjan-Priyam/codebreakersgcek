@@ -86,10 +86,12 @@ export async function submitFormResponse(input: {
       where: { formId: input.formId },
       select: {
         id: true,
+        formId: true,
         title: true,
         definition: true,
         isPublished: true,
         acceptingResponses: true,
+        googleDriveFolderId: true,
       },
     });
 
@@ -175,14 +177,160 @@ export async function submitFormResponse(input: {
       };
     }
 
+    // Generate Response IDs
+    const responseRecordId = randomUUID();
+    const shortResponseId = responseRecordId.replace(/-/g, "").slice(0, 8).toUpperCase();
+
+    // ─── Process & Upload Form Files to Google Drive ───
+    const cleanedAnswers = { ...input.answers };
+    const uploadedFilesToCreate: Array<{
+      fieldId: string;
+      originalFileName: string;
+      storedFileName: string;
+      mimeType: string;
+      fileSize: number;
+      googleDriveFileId: string;
+      googleDriveFolderId: string;
+      googleDriveWebViewLink?: string;
+      googleDriveDownloadLink?: string;
+    }> = [];
+
+    // Check if any answers contain file uploads with base64 data
+    const hasFiles = Object.values(input.answers).some((val) =>
+      Array.isArray(val) && val.some((item) => item && typeof item === "object" && "base64Data" in item)
+    );
+
+    if (hasFiles) {
+      const { GoogleDriveService } = await import("@/lib/google-drive-service");
+      let accessToken = "";
+      let connectionId = "";
+
+      try {
+        const tokenRes = await GoogleDriveService.getValidAccessToken();
+        accessToken = tokenRes.accessToken;
+        connectionId = tokenRes.connectionId;
+      } catch (err: any) {
+        console.error("Google Drive connection error during submit:", err);
+        return {
+          status: "error" as const,
+          message: "Google Drive is not connected. File uploads for this form are temporarily unavailable.",
+        };
+      }
+
+      // Get or create parent Forms folder
+      const rootFolderId = await GoogleDriveService.getOrCreateFormsFolder(accessToken, connectionId);
+
+      // Get or create form-specific folder CB-FRM-{FORM_ID}
+      const formFolderId = await GoogleDriveService.getOrCreateFormFolder({
+        formId: form.formId,
+        accessToken,
+        rootFolderId,
+      });
+
+      // Track extension counts for collision-safe naming: 830981B9.jpg, 830981B9-2.jpg, etc.
+      const extensionCountMap: Record<string, number> = {};
+      const allFilesList: Array<{ fieldId: string; fileObj: any; ext: string }> = [];
+
+      for (const [fieldId, val] of Object.entries(input.answers)) {
+        if (Array.isArray(val)) {
+          for (const item of val) {
+            if (item && typeof item === "object" && "base64Data" in item) {
+              const fileName = item.compressedName || item.originalName || "file";
+              const dotIdx = fileName.lastIndexOf(".");
+              const ext = dotIdx !== -1 ? fileName.slice(dotIdx + 1).toLowerCase() : "bin";
+              extensionCountMap[ext] = (extensionCountMap[ext] || 0) + 1;
+              allFilesList.push({ fieldId, fileObj: item, ext });
+            }
+          }
+        }
+      }
+
+      const extensionIndexMap: Record<string, number> = {};
+
+      for (const { fieldId, fileObj, ext } of allFilesList) {
+        extensionIndexMap[ext] = (extensionIndexMap[ext] || 0) + 1;
+        const totalWithExt = extensionCountMap[ext] || 1;
+        const storedFileName =
+          totalWithExt > 1
+            ? `${shortResponseId}-${extensionIndexMap[ext]}.${ext}`
+            : `${shortResponseId}.${ext}`;
+
+        const base64Clean = fileObj.base64Data.replace(/^data:[^;]+;base64,/, "");
+        const fileBuffer = Buffer.from(base64Clean, "base64");
+
+        // Validate buffer size strictly <= 300 KB
+        const MAX_BYTES = 300 * 1024;
+        if (fileBuffer.byteLength > MAX_BYTES) {
+          return {
+            status: "error" as const,
+            message: `File "${fileObj.originalName}" exceeds the maximum compressed limit of 300 KB (${(
+              fileBuffer.byteLength / 1024
+            ).toFixed(1)} KB). Please choose a smaller file.`,
+          };
+        }
+
+        const driveResult = await GoogleDriveService.uploadFile({
+          formFolderId,
+          fileName: storedFileName,
+          mimeType: fileObj.mimeType || "application/octet-stream",
+          buffer: fileBuffer,
+          accessToken,
+        });
+
+        uploadedFilesToCreate.push({
+          fieldId,
+          originalFileName: fileObj.originalName,
+          storedFileName,
+          mimeType: fileObj.mimeType || driveResult.mimeType,
+          fileSize: driveResult.size,
+          googleDriveFileId: driveResult.id,
+          googleDriveFolderId: formFolderId,
+          googleDriveWebViewLink: driveResult.webViewLink,
+          googleDriveDownloadLink: driveResult.webContentLink,
+        });
+      }
+
+      // Replace base64 data in cleanedAnswers with clean metadata
+      for (const [fieldId, val] of Object.entries(cleanedAnswers)) {
+        if (Array.isArray(val)) {
+          const fieldUploads = uploadedFilesToCreate.filter((f) => f.fieldId === fieldId);
+          if (fieldUploads.length > 0) {
+            cleanedAnswers[fieldId] = fieldUploads.map((f) => ({
+              storedFileName: f.storedFileName,
+              originalFileName: f.originalFileName,
+              mimeType: f.mimeType,
+              fileSize: f.fileSize,
+              googleDriveFileId: f.googleDriveFileId,
+              webViewLink: f.googleDriveWebViewLink,
+              downloadLink: f.googleDriveDownloadLink,
+            }));
+          }
+        }
+      }
+    }
+
     const response = await prisma.formResponse.create({
       data: {
-        id: randomUUID(),
+        id: responseRecordId,
         formId: form.id,
-        answers: input.answers as unknown as import("@prisma/client").Prisma.InputJsonValue,
+        answers: cleanedAnswers as unknown as import("@prisma/client").Prisma.InputJsonValue,
         transactionId: input.transactionId?.trim() || null,
         paymentStatus: hasPaymentField(formDef) ? "pending" : "submitted",
         submittedById: session?.user?.id || null,
+        files: {
+          create: uploadedFilesToCreate.map((f) => ({
+            formId: form.id,
+            fieldId: f.fieldId,
+            originalFileName: f.originalFileName,
+            storedFileName: f.storedFileName,
+            mimeType: f.mimeType,
+            fileSize: f.fileSize,
+            googleDriveFileId: f.googleDriveFileId,
+            googleDriveFolderId: f.googleDriveFolderId,
+            googleDriveWebViewLink: f.googleDriveWebViewLink,
+            googleDriveDownloadLink: f.googleDriveDownloadLink,
+          })),
+        },
       },
     });
 
@@ -193,7 +341,7 @@ export async function submitFormResponse(input: {
     let recipientEmail = "";
     let recipientName = "";
 
-    const ansRecord = (input.answers || {}) as Record<string, unknown>;
+    const ansRecord = (cleanedAnswers || {}) as Record<string, unknown>;
     for (const [k, v] of Object.entries(ansRecord)) {
       if (typeof v === "string") {
         const valStr = v.trim();
@@ -234,8 +382,8 @@ export async function submitFormResponse(input: {
       message: "Response submitted successfully",
       data: response,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error submitting form response:", error);
-    return { status: "error" as const, message: "Failed to submit response" };
+    return { status: "error" as const, message: error.message || "Failed to submit response" };
   }
 }

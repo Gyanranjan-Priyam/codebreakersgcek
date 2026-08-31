@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Medal, Award, Radio } from "lucide-react";
+import { Trophy, Medal, Award } from "lucide-react";
 import { LeaderboardEntry, getOverallLeaderboard } from "../actions";
 import { initSocket, joinRoom, onSocketEvent } from "@/lib/socket-client";
 

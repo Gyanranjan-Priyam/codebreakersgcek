@@ -38,7 +38,7 @@ export async function getUserAttendanceHistory() {
 
     const stats = {
       total: attendances.length,
-      present: attendances.filter(a => a.status === "present").length,
+      present: attendances.filter((a) => a.status === "present").length,
       totalPoints: attendances.reduce((sum, a) => sum + a.points, 0),
     };
 
@@ -52,6 +52,53 @@ export async function getUserAttendanceHistory() {
     return {
       success: false,
       error: "Failed to fetch attendance history",
+    };
+  }
+}
+
+export async function getUserProfileForAttendancePass() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session?.user) {
+    return {
+      success: false,
+      error: "Unauthorized",
+    };
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        cbUserId: true,
+        registration: true,
+        rollNumber: true,
+        branch: true,
+        admissionYear: true,
+        role: true,
+        batch: {
+          select: {
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      user,
+    };
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return {
+      success: false,
+      error: "Failed to fetch user profile",
     };
   }
 }

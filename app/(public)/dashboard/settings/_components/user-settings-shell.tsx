@@ -75,21 +75,21 @@ export function UserSettingsShell({ userData }: UserSettingsShellProps) {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6">
+    <div className="w-full max-w-5xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
       {/* ── Page Header ────────────────────────────────────── */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
           Settings
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
           Manage your personal details, credentials, and notification preferences. Changes sync across your event registrations.
         </p>
       </div>
 
       {/* ── Top Navbar Style Tabs ───────────────────────────── */}
-      <div className="border-b border-border -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div className="border-b border-border -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto overscroll-x-contain scrollbar-none">
         <nav
-          className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth"
+          className="flex items-center gap-1 sm:gap-2 min-w-max no-scrollbar scroll-smooth"
           aria-label="Settings Tabs"
         >
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {

@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
         _count: {
           select: {
             attendances: true,
-            qrCodes: true,
           },
         },
       },

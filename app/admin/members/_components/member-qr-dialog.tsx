@@ -37,9 +37,10 @@ export default function MemberQRDialog({
 
     setIsGenerating(true);
     try {
+      const qrWidth = typeof window !== "undefined" && window.innerWidth < 640 ? 210 : 260;
       await QRCode.toCanvas(canvasRef.current, profileUrl, {
         errorCorrectionLevel: "H",
-        width: 280,
+        width: qrWidth,
         margin: 2,
         color: {
           dark: "#000000",

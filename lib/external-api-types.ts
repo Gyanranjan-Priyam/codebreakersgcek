@@ -50,7 +50,6 @@ export type Resource =
   | 'quizzes'
   | 'projects'
   | 'reviews'
-  | 'resources'
   | 'all';
 
 // ==================== User Types ====================
@@ -253,35 +252,6 @@ export interface ProjectReviewSummary {
   createdAt: string;
 }
 
-// ==================== Resource Types ====================
-
-export interface ResourceFolder {
-  id: string;
-  name: string;
-  description: string | null;
-  icon: string | null;
-  order: number;
-  createdById: string;
-  createdAt: string;
-  resources?: ResourceItem[];
-}
-
-export interface ResourceItem {
-  id: string;
-  title: string;
-  description: string | null;
-  type: string;
-  url: string;
-  thumbnailUrl: string | null;
-  fileSize: string | null;
-  duration: string | null;
-  tags: string[];
-  order: number;
-  downloadable: boolean;
-  uploadedById: string;
-  createdAt: string;
-}
-
 // ==================== All Resource Summary ====================
 
 export interface AllDataSummary {
@@ -293,7 +263,6 @@ export interface AllDataSummary {
     totalQuizzes: number;
     totalPublishedProjects: number;
     totalProjectReviews: number;
-    totalResourceFolders: number;
   };
   systemSettings: SystemSetting[];
   message: string;

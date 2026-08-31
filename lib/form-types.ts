@@ -10,7 +10,8 @@ export type FormFieldType =
   | "payment"
   | "button"
   | "linear_scale"
-  | "multi_input";
+  | "multi_input"
+  | "file_upload";
 
 export interface SubQuestionDefinition {
   id: string;
@@ -45,6 +46,11 @@ export interface FormFieldDefinition {
   scaleMaxLabel?: string;
   /** Multiple input box / sub-questions */
   subQuestions?: SubQuestionDefinition[];
+  /** File Upload settings */
+  allowedFileTypes?: string[];
+  maxFiles?: number;
+  imageOnly?: boolean;
+  multipleFiles?: boolean;
 }
 
 export interface FormSectionDefinition {

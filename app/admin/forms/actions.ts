@@ -23,6 +23,20 @@ export interface FormSummary {
   };
 }
 
+export interface FormFileSummary {
+  id: string;
+  fieldId: string;
+  originalFileName: string;
+  storedFileName: string;
+  mimeType: string;
+  fileSize: number;
+  googleDriveFileId: string;
+  googleDriveFolderId: string;
+  googleDriveWebViewLink: string | null;
+  googleDriveDownloadLink: string | null;
+  createdAt: Date;
+}
+
 export interface FormResponseSummary {
   id: string;
   answers: unknown;
@@ -31,6 +45,7 @@ export interface FormResponseSummary {
   verifiedAt: Date | null;
   createdAt: Date;
   submittedById: string | null;
+  files?: FormFileSummary[];
 }
 
 export interface FormDetail {
@@ -166,6 +181,21 @@ export async function getFormByFormId(formId: string) {
             verifiedAt: true,
             createdAt: true,
             submittedById: true,
+            files: {
+              select: {
+                id: true,
+                fieldId: true,
+                originalFileName: true,
+                storedFileName: true,
+                mimeType: true,
+                fileSize: true,
+                googleDriveFileId: true,
+                googleDriveFolderId: true,
+                googleDriveWebViewLink: true,
+                googleDriveDownloadLink: true,
+                createdAt: true,
+              },
+            },
           },
         },
       },
@@ -193,7 +223,7 @@ export async function createForm(input: {
   description?: string;
   definition: FormDefinition;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   try {
     const formId = await ensureUniqueFormId();
@@ -205,6 +235,7 @@ export async function createForm(input: {
         description: input.description || null,
         definition: toJsonValue(input.definition),
         isPublished: false,
+        createdById: session?.user?.id || null,
       },
       select: {
         id: true,
@@ -265,6 +296,33 @@ export async function toggleFormPublish(formId: string, isPublished: boolean) {
   await requireAdmin();
 
   try {
+    const existingForm = await prisma.form.findUnique({
+      where: { formId },
+      select: { definition: true },
+    });
+
+    if (!existingForm) {
+      return { status: "error" as const, message: "Form not found" };
+    }
+
+    if (isPublished) {
+      const formDef = existingForm.definition as unknown as FormDefinition;
+      const hasFileUpload = (formDef?.sections || []).some((s) =>
+        (s.fields || []).some((f) => f.type === "file_upload")
+      );
+
+      if (hasFileUpload) {
+        const { GoogleDriveService } = await import("@/lib/google-drive-service");
+        const status = await GoogleDriveService.getConnectionStatus();
+        if (!status.isConnected) {
+          return {
+            status: "error" as const,
+            message: "This form contains a file upload field, but Google Drive is not connected. Connect Google Drive before publishing this form.",
+          };
+        }
+      }
+    }
+
     const form = await prisma.form.update({
       where: { formId },
       data: {
@@ -316,6 +374,21 @@ export async function deleteForm(formId: string) {
   await requireAdmin();
 
   try {
+    const form = await prisma.form.findUnique({
+      where: { formId },
+      select: { id: true, googleDriveFolderId: true },
+    });
+
+    if (form?.googleDriveFolderId) {
+      try {
+        const { GoogleDriveService } = await import("@/lib/google-drive-service");
+        const { accessToken } = await GoogleDriveService.getValidAccessToken();
+        await GoogleDriveService.deleteFormFolder(form.googleDriveFolderId, accessToken);
+      } catch (driveErr) {
+        console.warn("Could not delete Google Drive folder for form:", driveErr);
+      }
+    }
+
     await prisma.form.delete({
       where: { formId },
     });
@@ -507,6 +580,26 @@ export async function deleteFormResponse(responseId: string) {
   await requireAdmin();
 
   try {
+    // Find associated files to delete from Google Drive
+    const files = await prisma.formFile.findMany({
+      where: { responseId },
+      select: { googleDriveFileId: true },
+    });
+
+    if (files.length > 0) {
+      try {
+        const { GoogleDriveService } = await import("@/lib/google-drive-service");
+        const { accessToken } = await GoogleDriveService.getValidAccessToken();
+        for (const f of files) {
+          if (f.googleDriveFileId) {
+            await GoogleDriveService.deleteFile(f.googleDriveFileId, accessToken);
+          }
+        }
+      } catch (driveErr) {
+        console.warn("Could not delete files from Google Drive:", driveErr);
+      }
+    }
+
     await prisma.formResponse.delete({
       where: { id: responseId },
     });
@@ -524,6 +617,26 @@ export async function deleteFormResponses(responseIds: string[]) {
   await requireAdmin();
 
   try {
+    // Find associated files to delete from Google Drive
+    const files = await prisma.formFile.findMany({
+      where: { responseId: { in: responseIds } },
+      select: { googleDriveFileId: true },
+    });
+
+    if (files.length > 0) {
+      try {
+        const { GoogleDriveService } = await import("@/lib/google-drive-service");
+        const { accessToken } = await GoogleDriveService.getValidAccessToken();
+        for (const f of files) {
+          if (f.googleDriveFileId) {
+            await GoogleDriveService.deleteFile(f.googleDriveFileId, accessToken);
+          }
+        }
+      } catch (driveErr) {
+        console.warn("Could not bulk delete files from Google Drive:", driveErr);
+      }
+    }
+
     await prisma.formResponse.deleteMany({
       where: { id: { in: responseIds } },
     });

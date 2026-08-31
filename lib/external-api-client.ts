@@ -33,7 +33,6 @@ import type {
   Quiz,
   PublishedProject,
   ProjectReview,
-  ResourceFolder,
   AllDataSummary,
   ExternalAPIConfig,
   UserQueryParams,
@@ -273,24 +272,6 @@ export class ExternalAPIClient {
      */
     byType: async (type: string, limit = 100): Promise<APIResponse<ProjectReview[]>> => {
       return this.fetch<ProjectReview[]>('reviews', { reviewType: type, limit });
-    },
-  };
-
-  // ==================== Resource Methods ====================
-
-  public resources = {
-    /**
-     * Fetch resource folders
-     */
-    list: async (params?: Omit<BaseQueryParams, 'resource'>): Promise<APIResponse<ResourceFolder[]>> => {
-      return this.fetch<ResourceFolder[]>('resources', params);
-    },
-
-    /**
-     * Fetch resources with items
-     */
-    withItems: async (limit = 100): Promise<APIResponse<ResourceFolder[]>> => {
-      return this.fetch<ResourceFolder[]>('resources', { includeRelations: true, limit });
     },
   };
 

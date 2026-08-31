@@ -41,13 +41,21 @@ export default async function PointsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Points Management
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Manage member points across attendance, tasks, quizzes, and events
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Points Management
+          </h1>
+          <p className="text-muted-foreground mt-2 text-xs sm:text-sm">
+            Manage member points across attendance, tasks, quizzes, and events
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 self-start sm:self-auto font-mono text-xs">
+          <Link href="/admin/leaderboard">
+            <Trophy className="w-3.5 h-3.5" />
+            <span>View Student Leaderboard</span>
+          </Link>
+        </Button>
       </div>
 
       <Tabs defaultValue="attendance" className="w-full">

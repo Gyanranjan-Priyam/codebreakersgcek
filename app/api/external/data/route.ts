@@ -142,11 +142,6 @@ export async function GET(request: NextRequest) {
         });
         break;
 
-      case "resources":
-        data = await fetchResources(searchParams, limit, offset, includeRelations);
-        totalCount = await prisma.resource.count();
-        break;
-
       case "all":
         data = await fetchAllData(limit, offset, includeRelations);
         totalCount = -1; // Not applicable for 'all'
@@ -487,47 +482,6 @@ async function fetchProjectReviews(searchParams: URLSearchParams, limit: number,
   return reviews;
 }
 
-async function fetchResources(searchParams: URLSearchParams, limit: number, offset: number, includeRelations: boolean) {
-  const folders = await prisma.resourceFolder.findMany({
-    where: { isActive: true },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      icon: true,
-      order: true,
-      createdById: true,
-      createdAt: true,
-      ...(includeRelations && {
-        resources: {
-          where: { isActive: true },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            type: true,
-            url: true,
-            thumbnailUrl: true,
-            fileSize: true,
-            duration: true,
-            tags: true,
-            order: true,
-            downloadable: true,
-            uploadedById: true,
-            createdAt: true,
-          },
-          orderBy: { order: 'asc' }
-        }
-      }),
-    },
-    take: limit,
-    skip: offset,
-    orderBy: { order: 'asc' }
-  });
-
-  return folders;
-}
-
 async function fetchAllData(limit: number, offset: number, includeRelations: boolean) {
   // For 'all', we'll fetch a summary of each resource with limited data
   const [
@@ -538,7 +492,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
     quizzes,
     projects,
     reviews,
-    resourceFolders,
     systemSettings,
   ] = await Promise.all([
     prisma.user.count(),
@@ -548,7 +501,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
     prisma.quiz.count(),
     prisma.publishedProject.count(),
     prisma.projectReview.count(),
-    prisma.resourceFolder.count(),
     prisma.systemSettings.findMany({
       select: {
         key: true,
@@ -568,7 +520,6 @@ async function fetchAllData(limit: number, offset: number, includeRelations: boo
       totalQuizzes: quizzes,
       totalPublishedProjects: projects,
       totalProjectReviews: reviews,
-      totalResourceFolders: resourceFolders,
     },
     systemSettings,
     message: "To fetch detailed data, use specific resource endpoints like ?resource=users or ?resource=quizzes"

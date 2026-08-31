@@ -50,6 +50,15 @@ export function UserQRDialog({
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const formatMemberId = (rawId?: string | null) => {
+    if (!rawId) return "CB-MEMBER";
+    const clean = rawId.trim();
+    if (clean.toUpperCase().startsWith("CB-") || clean.toUpperCase().startsWith("GCEK-")) {
+      return clean;
+    }
+    return `CB-${clean}`;
+  };
+
   const identifier = user.cbUserId || user.registration || user.email;
   const profileUrl = typeof window !== "undefined"
     ? `${window.location.origin}/member/${encodeURIComponent(identifier)}`
@@ -60,9 +69,10 @@ export function UserQRDialog({
 
     setIsGenerating(true);
     try {
+      const qrWidth = typeof window !== "undefined" && window.innerWidth < 640 ? 210 : 240;
       await QRCode.toCanvas(canvasRef.current, profileUrl, {
         errorCorrectionLevel: "H",
-        width: 260,
+        width: qrWidth,
         margin: 2,
         color: {
           dark: "#000000",
@@ -114,7 +124,7 @@ export function UserQRDialog({
     ctx.fillStyle = "#71717a";
     ctx.font = "bold 13px monospace";
     ctx.fillText(
-      user.cbUserId ? `CB-${user.cbUserId}` : user.registration || "MEMBER PASS",
+      formatMemberId(user.cbUserId || user.registration),
       totalWidth / 2,
       padding + 44
     );
@@ -150,29 +160,25 @@ export function UserQRDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="max-w-xs sm:max-w-sm p-6 overflow-hidden border border-border/80 bg-card rounded-2xl shadow-2xl">
-        <DialogHeader className="space-y-1.5 text-center">
-          <div className="mx-auto p-2.5 w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-1">
-            <QrCode className="w-6 h-6" />
+      <DialogContent className="max-w-xs sm:max-w-sm p-4 sm:p-6 max-h-[88dvh] overflow-y-auto overscroll-contain border border-border/80 bg-card rounded-2xl shadow-2xl">
+        <DialogHeader className="space-y-1 text-center">
+          <div className="mx-auto p-2 w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-0.5">
+            <QrCode className="w-5 h-5" />
           </div>
-          <DialogTitle className="text-lg font-bold font-mono tracking-tight text-foreground text-center">
+          <DialogTitle className="text-base sm:text-lg font-bold font-mono tracking-tight text-foreground text-center">
             {user.name || "Member QR"}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground font-mono text-center">
-            {user.cbUserId ? (
-              <span className="font-bold text-foreground">CB-{user.cbUserId}</span>
-            ) : user.registration ? (
-              <span>Reg: {user.registration}</span>
-            ) : (
-              <span>Verified Attendance Pass</span>
-            )}
+            <span className="font-bold text-foreground">
+              {formatMemberId(user.cbUserId || user.registration)}
+            </span>
             {user.batch?.name ? ` • ${user.batch.name}` : ""}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col items-center gap-4 py-2">
+        <div className="flex flex-col items-center gap-3 py-1">
           {/* QR Canvas Frame */}
-          <div className="p-3.5 rounded-2xl border-2 border-border/80 bg-white shadow-inner flex items-center justify-center relative min-h-[220px] min-w-[220px]">
+          <div className="p-2.5 sm:p-3 rounded-2xl border-2 border-border/80 bg-white shadow-inner flex items-center justify-center relative min-h-[190px] min-w-[190px] max-w-full">
             {isGenerating && (
               <div className="absolute inset-0 flex items-center justify-center bg-white rounded-2xl">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

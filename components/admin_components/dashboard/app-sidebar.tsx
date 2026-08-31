@@ -9,6 +9,7 @@ import {
   Users,
   Layers,
   Trophy,
+  Award,
   ListChecks,
   QrCode,
   Receipt,
@@ -74,9 +75,14 @@ const data = {
       icon: ListChecks,
     },
     {
+      title: "Leaderboard",
+      url: "/admin/leaderboard",
+      icon: Trophy,
+    },
+    {
       title: "Points Management",
       url: "/admin/points",
-      icon: Trophy,
+      icon: Award,
     },
     {
       title: "Forms",
