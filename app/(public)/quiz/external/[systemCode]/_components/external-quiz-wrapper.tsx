@@ -2,9 +2,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import QuizProctorInterface from "@/app/(public)/quiz/[quizId]/[identifier]/_components/quiz-proctor-interface";
 import { submitExternalQuizAttemptFromInterface } from "../actions";
-import { getSystemState, setSystemAttemptingAction } from "@/app/admin/quizzes/actions";
+import {
+  getSystemState,
+  setSystemAttemptingAction,
+} from "@/app/admin/quizzes/actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ShieldAlert, FileText } from "lucide-react";
@@ -88,8 +92,16 @@ export default function ExternalQuizWrapper({
 
     const leaveRoomFns: Array<() => void> = [];
     let handleUnblocked: (() => void) | null = null;
-    let handleStatusChanged: ((data: { status?: string; shiftCompleted?: number; nextActiveShift?: number }) => void) | null = null;
-    let handleShiftCompleted: ((data?: { shiftCompleted?: number; nextActiveShift?: number }) => void) | null = null;
+    let handleStatusChanged:
+      | ((data: {
+          status?: string;
+          shiftCompleted?: number;
+          nextActiveShift?: number;
+        }) => void)
+      | null = null;
+    let handleShiftCompleted:
+      | ((data?: { shiftCompleted?: number; nextActiveShift?: number }) => void)
+      | null = null;
     let handleShiftChanged: ((data?: any) => void) | null = null;
     let handleConnect: (() => void) | null = null;
 
@@ -114,11 +126,17 @@ export default function ExternalQuizWrapper({
       handleConnect = async () => {
         const res = await getSystemState(systemCode);
         if (res.status === "success" && res.data) {
-          if (res.data.status === "REGISTERED" || res.data.status === "ASSIGNED") {
+          if (
+            res.data.status === "REGISTERED" ||
+            res.data.status === "ASSIGNED"
+          ) {
             cleanupAndRedirect();
           } else if (res.data.status === "BLOCKED") {
             setLiveIsBlocked(true);
-          } else if (res.data.status === "ATTEMPTING" || res.data.status === "IN_PROGRESS") {
+          } else if (
+            res.data.status === "ATTEMPTING" ||
+            res.data.status === "IN_PROGRESS"
+          ) {
             setLiveIsBlocked(false);
           }
         }
@@ -126,13 +144,22 @@ export default function ExternalQuizWrapper({
 
       handleUnblocked = () => {
         setLiveIsBlocked(false);
-        toast.success("You have been unblocked by the administrator! Resuming exam...");
+        toast.success(
+          "You have been unblocked by the administrator! Resuming exam...",
+        );
       };
 
       handleStatusChanged = (data) => {
-        if (data?.status === "REGISTERED" || data?.status === "ASSIGNED" || data?.shiftCompleted) {
+        if (
+          data?.status === "REGISTERED" ||
+          data?.status === "ASSIGNED" ||
+          data?.shiftCompleted
+        ) {
           cleanupAndRedirect();
-        } else if (data?.status === "ATTEMPTING" || data?.status === "IN_PROGRESS") {
+        } else if (
+          data?.status === "ATTEMPTING" ||
+          data?.status === "IN_PROGRESS"
+        ) {
           setLiveIsBlocked(false);
         } else if (data?.status === "BLOCKED") {
           setLiveIsBlocked(true);
@@ -140,7 +167,9 @@ export default function ExternalQuizWrapper({
       };
 
       handleShiftCompleted = (data) => {
-        toast.info(`Shift ${data?.shiftCompleted || ""} completed. Resetting for next shift...`);
+        toast.info(
+          `Shift ${data?.shiftCompleted || ""} completed. Resetting for next shift...`,
+        );
         cleanupAndRedirect();
       };
 
@@ -159,9 +188,15 @@ export default function ExternalQuizWrapper({
     const pollTimer = setInterval(async () => {
       const res = await getSystemState(systemCode);
       if (res.status === "success" && res.data) {
-        if (res.data.status === "REGISTERED" || res.data.status === "ASSIGNED") {
+        if (
+          res.data.status === "REGISTERED" ||
+          res.data.status === "ASSIGNED"
+        ) {
           cleanupAndRedirect();
-        } else if (res.data.status === "ATTEMPTING" || res.data.status === "IN_PROGRESS") {
+        } else if (
+          res.data.status === "ATTEMPTING" ||
+          res.data.status === "IN_PROGRESS"
+        ) {
           setLiveIsBlocked(false);
         } else if (res.data.status === "BLOCKED") {
           setLiveIsBlocked(true);
@@ -175,8 +210,10 @@ export default function ExternalQuizWrapper({
       if (socket) {
         if (handleConnect) socket.off("connect", handleConnect);
         if (handleUnblocked) socket.off("unblocked", handleUnblocked);
-        if (handleStatusChanged) socket.off("status-changed", handleStatusChanged);
-        if (handleShiftCompleted) socket.off("shift-completed", handleShiftCompleted);
+        if (handleStatusChanged)
+          socket.off("status-changed", handleStatusChanged);
+        if (handleShiftCompleted)
+          socket.off("shift-completed", handleShiftCompleted);
         if (handleShiftChanged) socket.off("shift-changed", handleShiftChanged);
       }
       clearInterval(pollTimer);
@@ -191,9 +228,12 @@ export default function ExternalQuizWrapper({
           <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
             <ShieldAlert className="h-8 w-8 text-destructive" />
           </div>
-          <h1 className="text-2xl font-bold text-destructive">Quiz Access Blocked</h1>
+          <h1 className="text-2xl font-bold text-destructive">
+            Quiz Access Blocked
+          </h1>
           <p className="text-muted-foreground text-sm">
-            Access to this quiz has been blocked for system <strong>{user.registration || systemCode}</strong>.
+            Access to this quiz has been blocked for system{" "}
+            <strong>{user.registration || systemCode}</strong>.
           </p>
           <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive text-left font-mono">
             Reason: {blockReason || "Multiple proctoring violations detected"}
@@ -203,7 +243,8 @@ export default function ExternalQuizWrapper({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
             </span>
-            Waiting for administrator unblock... Screen will update automatically once unblocked.
+            Waiting for administrator unblock... Screen will update
+            automatically once unblocked.
           </div>
         </div>
       </div>
@@ -215,22 +256,45 @@ export default function ExternalQuizWrapper({
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <div className="max-w-md w-full space-y-4 text-center p-6 border rounded-xl bg-card shadow-lg">
+          {/* CodeBreakers Branding */}
+          <div className="flex flex-col items-center">
+            <div className="w-14 h-14 p-2 flex items-center justify-center mb-2">
+              <Image
+                src="/assets/logo.png"
+                alt="CodeBreakers Logo"
+                width={48}
+                height={48}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </div>
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">
+              CodeBreakers
+            </span>
+          </div>
+
           <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
             <CheckCircle2 className="h-8 w-8 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold">Quiz Already Submitted</h1>
           <p className="text-muted-foreground text-sm">
-            Your responses have already been submitted and recorded for system <strong>{user.registration || systemCode}</strong>.
+            Your responses have already been submitted and recorded for system{" "}
+            <strong>{user.registration || systemCode}</strong>.
           </p>
           <p className="text-xs text-muted-foreground">
-            Official scorecard will be emailed to <strong>{user.email}</strong> once published by administrator.
+            Official scorecard will be emailed to <strong>{user.email}</strong>{" "}
+            once published by administrator.
           </p>
           {quiz.feedbackFormId && (
             <Button
               asChild
               className="w-full mt-4 font-bold bg-primary text-primary-foreground hover:opacity-90 rounded-xl"
             >
-              <a href={`/forms/${quiz.feedbackFormId}`} target="_blank" rel="noopener noreferrer">
+              <a
+                href={`/forms/${quiz.feedbackFormId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <FileText className="h-4 w-4 mr-2" />
                 Fill Feedback Form
               </a>
@@ -262,11 +326,13 @@ export default function ExternalQuizWrapper({
 
   const afterSubmitContent = (
     <div className="space-y-4 w-full">
-      <Alert>
-        <CheckCircle2 className="h-4 w-4 text-green-600" />
-        <AlertDescription className="text-xs">
-          Your results will be reviewed and published by the administrator. An official scorecard will be emailed to{" "}
-          <strong>{user.email}</strong> once released.
+      <Alert className="flex w-full items-start gap-2 text-left">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+        <AlertDescription className="text-xs leading-5 text-left">
+          Your results will be reviewed and published by the administrator. An
+          official scorecard will be emailed to{" "}
+          <strong className="font-bold wrap-break-words">{user.email}</strong>{" "}
+          once released.
         </AlertDescription>
       </Alert>
       {quiz.feedbackFormId && (
@@ -274,12 +340,26 @@ export default function ExternalQuizWrapper({
           asChild
           className="w-full font-bold bg-primary text-primary-foreground hover:opacity-90 rounded-xl"
         >
-          <a href={`/forms/${quiz.feedbackFormId}`} target="_blank" rel="noopener noreferrer">
+          <a
+            href={`/forms/${quiz.feedbackFormId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <FileText className="h-4 w-4 mr-2" />
             Fill Feedback Form
           </a>
         </Button>
       )}
+      <div className="flex items-center justify-center gap-1.5 pt-2 text-[11px] text-muted-foreground font-medium">
+        <Image
+          src="/assets/logo.png"
+          alt="CodeBreakers Logo"
+          width={24}
+          height={24}
+          className="h-6 w-6 object-contain"
+        />
+        <span className="text-sm font-semibold text-black">Powered by CodeBreakers</span>
+      </div>
     </div>
   );
 
@@ -292,7 +372,9 @@ export default function ExternalQuizWrapper({
       onSubmit={handleExternalSubmit}
       afterSubmitContent={afterSubmitContent}
       systemCode={systemCode}
-      initialStep={isAttempting || !liveIsBlocked ? "quiz-started" : "user-info"}
+      initialStep={
+        isAttempting || !liveIsBlocked ? "quiz-started" : "user-info"
+      }
     />
   );
 }

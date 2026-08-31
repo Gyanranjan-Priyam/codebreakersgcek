@@ -22,9 +22,12 @@ import {
   Sparkles,
   Search,
   UserCheck,
+  SwitchCamera,
+  Upload,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getUserProfileImageUrl } from "@/lib/image-utils";
+import { initSocket, joinRoom, onSocketEvent } from "@/lib/socket-client";
 
 interface ScannedUser {
   id: string;
@@ -71,6 +74,141 @@ export default function StudentQRScanner({
   } | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [historySearch, setHistorySearch] = useState("");
+
+  // Fetch initial scanned students for this session & sync
+  const fetchSessionRecords = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(`/api/admin/attendance/records?sessionId=${sessionId}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.attendances)) {
+        const items: ScanHistoryItem[] = data.attendances.map((att: any) => ({
+          id: att.id,
+          user: {
+            id: att.user.id || att.id,
+            name: att.user.name,
+            email: att.user.email,
+            cbUserId: att.user.cbUserId || null,
+            registration: att.user.registration || null,
+            rollNumber: att.user.rollNumber || null,
+            branch: att.user.branch || null,
+            profileImageKey: att.user.profileImageKey || null,
+            image: att.user.image || null,
+            role: null,
+          },
+          timestamp: new Date(att.markedAt),
+          status: "success",
+          message: `Marked Present: ${att.user.name}`,
+        }));
+
+        setScanHistory((prev) => {
+          // Merge preserving any instant socket items
+          const existingIds = new Set(prev.map((p) => p.user.id));
+          const newItems = items.filter((it) => !existingIds.has(it.user.id));
+          if (newItems.length === 0 && prev.length > 0) return prev;
+          return [...prev, ...newItems].slice(0, 100);
+        });
+
+        // Set lastScanned if not set yet
+        if (items.length > 0) {
+          setLastScanned((current) => {
+            if (current) return current;
+            return {
+              user: items[0].user,
+              status: "success",
+              message: items[0].message,
+              timestamp: items[0].timestamp,
+            };
+          });
+        }
+      }
+    } catch {
+      // Silent background fetch error
+    }
+  }, [sessionId]);
+
+  // Initial fetch and 3-second sync poll
+  useEffect(() => {
+    fetchSessionRecords();
+    const interval = setInterval(fetchSessionRecords, 3000);
+    return () => clearInterval(interval);
+  }, [fetchSessionRecords]);
+
+  // Socket.IO — Listen to live scans for this session in real-time
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const cleanupFns: (() => void)[] = [];
+
+    initSocket().then((socket) => {
+      if (!socket) return;
+
+      const room = `attendance-session-${sessionId}`;
+      const cleanupRoom = joinRoom(room);
+      cleanupFns.push(cleanupRoom);
+
+      const handleAttendanceUpdated = (data: any) => {
+        console.log("⚡ [AdminScanner] Real-time scan received:", data);
+
+        const scannedUser: ScannedUser = {
+          id: data.userId,
+          name: data.userName,
+          email: data.userEmail || "",
+          cbUserId: data.cbUserId || null,
+          registration: data.registration || null,
+          rollNumber: data.rollNumber || null,
+          branch: data.branch || null,
+          profileImageKey: data.profileImageKey || null,
+          image: data.image || null,
+          role: null,
+        };
+
+        const isAlready = !!data.alreadyMarked;
+
+        const historyItem: ScanHistoryItem = {
+          id: `${data.userId}-${data.timestamp || Date.now()}`,
+          user: scannedUser,
+          timestamp: new Date(data.timestamp || Date.now()),
+          status: isAlready ? "already_marked" : "success",
+          message: data.message || `Marked Present: ${data.userName}`,
+        };
+
+        setScanHistory((prev) => {
+          const exists = prev.some((s) => s.user.id === data.userId);
+          if (exists) return prev;
+          return [historyItem, ...prev].slice(0, 100);
+        });
+
+        setLastScanned({
+          user: scannedUser,
+          status: isAlready ? "already_marked" : "success",
+          message: historyItem.message,
+          timestamp: historyItem.timestamp,
+        });
+
+        if (!isAlready) {
+          playSuccessSound("success");
+          toast.success(historyItem.message);
+        } else {
+          playSuccessSound("already");
+          toast.info(historyItem.message);
+        }
+
+        // Notify parent page to update attendance count
+        onScanSuccess?.();
+      };
+
+      const cleanupListener = onSocketEvent(
+        "attendance-updated",
+        handleAttendanceUpdated
+      );
+      cleanupFns.push(cleanupListener);
+    });
+
+    return () => {
+      cleanupFns.forEach((fn) => fn());
+    };
+  }, [sessionId, onScanSuccess]);
 
   const qrCodeRef = useRef<Html5Qrcode | null>(null);
   const lastScannedTextRef = useRef<string>("");
@@ -191,7 +329,15 @@ export default function StudentQRScanner({
     }
   }, [sessionId, onScanSuccess, playSuccessSound]);
 
-  const startCamera = async () => {
+  const [availableCameras, setAvailableCameras] = useState<
+    { id: string; label: string }[]
+  >([]);
+  const [currentFacingMode, setCurrentFacingMode] = useState<"environment" | "user">(
+    "environment"
+  );
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+
+  const startCamera = async (facingOrId?: string) => {
     setCameraError("");
     setIsScanning(true);
 
@@ -203,8 +349,23 @@ export default function StudentQRScanner({
           throw new Error("Scanner container not found in DOM");
         }
 
+        if (qrCodeRef.current) {
+          try {
+            await qrCodeRef.current.stop();
+            qrCodeRef.current.clear();
+          } catch {}
+          qrCodeRef.current = null;
+        }
+
         const html5QrCode = new Html5Qrcode("admin-qr-reader");
         qrCodeRef.current = html5QrCode;
+
+        try {
+          const cameras = await Html5Qrcode.getCameras();
+          if (cameras && cameras.length > 0) {
+            setAvailableCameras(cameras);
+          }
+        } catch {}
 
         const config = {
           fps: 15,
@@ -212,24 +373,80 @@ export default function StudentQRScanner({
           aspectRatio: 1.0,
         };
 
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            processScannedCode(decodedText);
-          },
-          () => {
-            // Ignore scan parse frame misses
+        const target = facingOrId || selectedCameraId || currentFacingMode;
+
+        try {
+          if (target && target.length > 20) {
+            await html5QrCode.start(
+              target,
+              config,
+              (decodedText) => processScannedCode(decodedText),
+              () => {}
+            );
+          } else {
+            await html5QrCode.start(
+              { facingMode: target === "user" ? "user" : "environment" },
+              config,
+              (decodedText) => processScannedCode(decodedText),
+              () => {}
+            );
           }
-        );
+        } catch (firstErr) {
+          console.warn("Back camera failed, trying front/default camera...", firstErr);
+          const fallbackFacing = target === "user" ? "environment" : "user";
+          setCurrentFacingMode(fallbackFacing);
+          await html5QrCode.start(
+            { facingMode: fallbackFacing },
+            config,
+            (decodedText) => processScannedCode(decodedText),
+            () => {}
+          );
+        }
       } catch (err: any) {
         console.error("Error starting camera scanner:", err);
-        setCameraError(
-          err?.message || "Could not access camera. Please check browser permissions."
-        );
+        let errorMsg = err?.message || "Could not access camera. Please check browser permissions.";
+        if (
+          typeof window !== "undefined" &&
+          window.location.protocol !== "https:" &&
+          window.location.hostname !== "localhost" &&
+          window.location.hostname !== "127.0.0.1"
+        ) {
+          errorMsg = "Camera access requires HTTPS or localhost. If you are accessing via local IP (e.g. http://192.168.x.x:3000), open chrome://flags/#unsafely-treat-insecure-origin-as-secure in Chrome and add your URL.";
+        }
+        setCameraError(errorMsg);
         setIsScanning(false);
       }
-    }, 100);
+    }, 150);
+  };
+
+  const toggleCameraFacing = async () => {
+    const nextFacing = currentFacingMode === "environment" ? "user" : "environment";
+    setCurrentFacingMode(nextFacing);
+    setSelectedCameraId("");
+    if (isScanning) {
+      await stopCamera();
+      await startCamera(nextFacing);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      const tempScanner = new Html5Qrcode("admin-qr-file-helper");
+      const decoded = await tempScanner.scanFile(file, true);
+      tempScanner.clear();
+      if (decoded) {
+        processScannedCode(decoded);
+      }
+    } catch (err: any) {
+      toast.error("Could not read QR code from image: " + (err?.message || "Invalid QR"));
+    } finally {
+      setIsProcessing(false);
+      e.target.value = "";
+    }
   };
 
   const stopCamera = async () => {
@@ -354,30 +571,97 @@ export default function StudentQRScanner({
               )}
             </div>
 
-            {/* Camera Control Buttons */}
-            <div className="flex gap-2">
-              {isScanning ? (
-                <Button
-                  variant="destructive"
-                  onClick={stopCamera}
-                  className="w-full"
-                  size="lg"
-                >
-                  <CameraOff className="h-4 w-4 mr-2" />
-                  Stop Camera Scanner
-                </Button>
-              ) : (
-                <Button
-                  onClick={startCamera}
-                  disabled={!sessionId}
-                  className="w-full"
-                  size="lg"
-                >
-                  <Camera className="h-4 w-4 mr-2" />
-                  Start Camera Scanner
-                </Button>
-              )}
-            </div>
+                {/* Hidden container for file scan */}
+                <div id="admin-qr-file-helper" className="hidden" />
+
+                {/* Camera Control Buttons */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    {isScanning ? (
+                      <Button
+                        variant="destructive"
+                        onClick={stopCamera}
+                        className="flex-1"
+                        size="lg"
+                      >
+                        <CameraOff className="h-4 w-4 mr-2" />
+                        Stop Camera Scanner
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => startCamera()}
+                        disabled={!sessionId}
+                        className="flex-1"
+                        size="lg"
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        Start Camera Scanner
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={toggleCameraFacing}
+                      disabled={!sessionId}
+                      title={`Switch to ${currentFacingMode === "environment" ? "Front" : "Back"} Camera`}
+                      className="px-3"
+                    >
+                      <SwitchCamera className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Secondary options: Camera switcher dropdown & Upload Image QR */}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    {availableCameras.length > 1 ? (
+                      <select
+                        aria-label="Select Camera"
+                        value={selectedCameraId}
+                        onChange={(e) => {
+                          setSelectedCameraId(e.target.value);
+                          if (isScanning) {
+                            stopCamera().then(() => startCamera(e.target.value));
+                          }
+                        }}
+                        className="text-xs bg-muted/60 border rounded px-2 py-1.5 max-w-[200px] truncate"
+                      >
+                        <option value="">Default Camera ({currentFacingMode})</option>
+                        {availableCameras.map((cam, idx) => (
+                          <option key={cam.id} value={cam.id}>
+                            {cam.label || `Camera ${idx + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        Camera: <span className="capitalize font-medium text-foreground">{currentFacingMode}</span>
+                      </span>
+                    )}
+
+                    <label className={!sessionId ? "pointer-events-none opacity-50" : "cursor-pointer"}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={!sessionId}
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={!sessionId}
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                        asChild
+                      >
+                        <span>
+                          <Upload className="h-3 w-3 mr-1" />
+                          Scan Image
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+                </div>
 
             {/* Manual ID Input Fallback */}
             <div className="pt-3 border-t">

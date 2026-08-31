@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -283,18 +284,34 @@ export default function SystemRegisterPage() {
 
     return (
       <div className="light min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-slate-50 to-slate-200 text-slate-900">
-        <Card className="max-w-lg w-full bg-white text-slate-900 border-slate-200 shadow-md">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl">{activeSession.systemNumber}</CardTitle>
-                <CardDescription className="mt-1">
-                  Registered for: <strong>{activeSession.quizTitle}</strong>
-                </CardDescription>
+        <Card className="max-w-lg w-full bg-white text-slate-900 border-slate-200 shadow-md overflow-hidden">
+          <div className="px-6 py-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0">
+                <Image
+                  src="/assets/logo.png"
+                  alt="CodeBreakers Logo"
+                  width={28}
+                  height={28}
+                  className="w-full h-full object-contain"
+                  priority
+                />
               </div>
-              <Badge variant="default" className="bg-green-600 text-white text-xs">
-                ✓ Connected
-              </Badge>
+              <div>
+                <span className="text-3xl font-bold tracking-tight text-slate-900 block leading-tight">CodeBreakers</span>
+              </div>
+            </div>
+            <Badge variant="default" className="bg-green-600 text-white text-xs">
+              ✓ Connected
+            </Badge>
+          </div>
+
+          <CardHeader>
+            <div>
+              <CardTitle className="text-2xl font-bold text-slate-900">System No: {activeSession.systemNumber}</CardTitle>
+              <CardDescription className="mt-1">
+                Registered for: <strong>{activeSession.quizTitle}</strong>
+              </CardDescription>
             </div>
           </CardHeader>
 
@@ -385,13 +402,29 @@ export default function SystemRegisterPage() {
   // ── Registration Form ──
   return (
     <div className="light min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-slate-50 to-slate-200 text-slate-900">
-      <Card className="max-w-md w-full bg-white text-slate-900 border-slate-200 shadow-md">
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center gap-2">
-            <Monitor className="h-6 w-6" />
-            External Exam System Registration
+      <Card className="max-w-md w-full bg-white text-slate-900 border-slate-200 shadow-md overflow-hidden">
+        <div className="p-1 flex flex-col items-center text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2.5">
+            <Image
+              src="/assets/logo.png"
+              alt="CodeBreakers Logo"
+              width={54}
+              height={54}
+              className="w-full h-full object-contain"
+              priority
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold tracking-tight text-slate-900">CodeBreakers</span>
+          </div>
+        </div>
+
+        <CardHeader className="pt-1 pb-2">
+          <CardTitle className="text-xl flex items-center justify-center gap-2">
+            <Monitor className="h-5 w-5 text-primary" />
+            System Registration
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-center text-xs">
             Enter the 6-digit quiz access code and your system/desk number to connect this computer to the exam.
           </CardDescription>
         </CardHeader>

@@ -2,11 +2,31 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Image from "next/image";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Clock, AlertTriangle, Eye, EyeOff, User as UserIcon, Mail, IdCard, BookOpen, Award, Timer, CheckCircle2, FileText } from "lucide-react";
+import {
+  Clock,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  User as UserIcon,
+  Mail,
+  IdCard,
+  BookOpen,
+  Award,
+  Timer,
+  CheckCircle2,
+  FileText,
+} from "lucide-react";
 import { submitExternalQuizAttempt } from "@/app/admin/quizzes/actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -50,7 +70,11 @@ interface ExternalQuizInterfaceProps {
   isCompleted?: boolean;
 }
 
-type QuizStep = "user-info" | "quiz-details" | "quiz-started" | "quiz-submitted";
+type QuizStep =
+  | "user-info"
+  | "quiz-details"
+  | "quiz-started"
+  | "quiz-submitted";
 
 export default function ExternalQuizInterface({
   quiz,
@@ -60,7 +84,9 @@ export default function ExternalQuizInterface({
   isCompleted = false,
 }: ExternalQuizInterfaceProps) {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState<QuizStep>(isCompleted ? "quiz-submitted" : "user-info");
+  const [currentStep, setCurrentStep] = useState<QuizStep>(
+    isCompleted ? "quiz-submitted" : "user-info",
+  );
   const [selectedSet] = useState<string>(assignedSet);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tabSwitches, setTabSwitches] = useState(0);
@@ -85,14 +111,22 @@ export default function ExternalQuizInterface({
   } | null>(null);
 
   const getQuestionCount = (set: string) => {
-    const list = getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, set);
+    const list = getQuestionsForShiftAndSet(
+      quiz.questionsJson,
+      quiz.shift || 1,
+      set,
+    );
     return Array.isArray(list) ? list.length : 0;
   };
 
   // Load questions for the assigned shift and set when quiz starts
   useEffect(() => {
     if (currentStep === "quiz-started" && selectedSet) {
-      const questionsForSet = getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, selectedSet);
+      const questionsForSet = getQuestionsForShiftAndSet(
+        quiz.questionsJson,
+        quiz.shift || 1,
+        selectedSet,
+      );
       if (Array.isArray(questionsForSet)) {
         setQuestions(questionsForSet as Question[]);
       }
@@ -139,7 +173,14 @@ export default function ExternalQuizInterface({
     setIsSubmitting(true);
 
     try {
-      const currentQuestions = questions.length > 0 ? questions : getQuestionsForShiftAndSet(quiz.questionsJson, quiz.shift || 1, selectedSet);
+      const currentQuestions =
+        questions.length > 0
+          ? questions
+          : getQuestionsForShiftAndSet(
+              quiz.questionsJson,
+              quiz.shift || 1,
+              selectedSet,
+            );
       let correctCount = 0;
 
       // Build answer map: questionIndex -> selected option string
@@ -183,7 +224,9 @@ export default function ExternalQuizInterface({
       }
     } catch (error) {
       console.error("Error submitting quiz:", error);
-      toast.error("An error occurred while submitting the quiz. Please try again.");
+      toast.error(
+        "An error occurred while submitting the quiz. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -289,7 +332,12 @@ export default function ExternalQuizInterface({
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
 
-      if (!document.fullscreenElement && currentStep === "quiz-started" && !isBlocked && !showFullscreenWarning) {
+      if (
+        !document.fullscreenElement &&
+        currentStep === "quiz-started" &&
+        !isBlocked &&
+        !showFullscreenWarning
+      ) {
         setShowFullscreenWarning(true);
         setFullscreenWarningTimer(10);
       } else if (document.fullscreenElement && showFullscreenWarning) {
@@ -303,7 +351,8 @@ export default function ExternalQuizInterface({
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [currentStep, isBlocked, showFullscreenWarning]);
 
   // Fullscreen warning countdown
@@ -375,8 +424,25 @@ export default function ExternalQuizInterface({
       <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
         <Card className="max-w-2xl w-full">
           <CardHeader>
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-10 h-10 p-1 flex items-center justify-center shrink-0 shadow-xs">
+                <Image
+                  src="/assets/logo.png"
+                  alt="CodeBreakers Logo"
+                  width={32}
+                  height={32}
+                  className="object-contain"
+                  priority
+                />
+              </div>
+              <span className="text-xs font-bold text-primary uppercase tracking-widest">
+                CodeBreakers
+              </span>
+            </div>
             <CardTitle className="text-2xl">Verify Your Information</CardTitle>
-            <CardDescription>Please confirm your details before proceeding to the quiz</CardDescription>
+            <CardDescription>
+              Please confirm your details before proceeding to the quiz
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
@@ -400,7 +466,9 @@ export default function ExternalQuizInterface({
                 <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                   <IdCard className="h-5 w-5 text-muted-foreground shrink-0" />
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Assigned System / Kiosk</p>
+                    <p className="text-xs text-muted-foreground">
+                      Assigned System / Kiosk
+                    </p>
                     <p className="font-medium">{user.registration}</p>
                   </div>
                 </div>
@@ -410,7 +478,8 @@ export default function ExternalQuizInterface({
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                If any of the above information is incorrect, please contact your administrator before proceeding.
+                If any of the above information is incorrect, please contact
+                your administrator before proceeding.
               </AlertDescription>
             </Alert>
 
@@ -433,24 +502,49 @@ export default function ExternalQuizInterface({
       <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
         <Card className="max-w-3xl w-full">
           <CardHeader>
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-10 h-10 p-1 flex items-center justify-center shrink-0 shadow-xs">
+                <Image
+                  src="/assets/logo.png"
+                  alt="CodeBreakers Logo"
+                  width={32}
+                  height={32}
+                  className="object-contain"
+                  priority
+                />
+              </div>
+              <span className="text-xs font-bold text-primary uppercase tracking-widest">
+                CodeBreakers
+              </span>
+            </div>
             <CardTitle className="text-2xl">{quiz.title}</CardTitle>
             <CardDescription>{quiz.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                <Clock className="h-5 w-5 text-primary shrink-0" />
+              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg border border-primary/20">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Clock className="h-5 w-5 text-primary" />
+                </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="font-semibold">{quiz.duration} minutes</p>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Duration
+                  </p>
+                  <p className="font-bold text-foreground">
+                    {quiz.duration} minutes
+                  </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <Award className="h-5 w-5 text-primary shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Points per Question</p>
-                  <p className="font-semibold">{quiz.pointsPerQuestion} points</p>
+                  <p className="text-xs text-muted-foreground">
+                    Points per Question
+                  </p>
+                  <p className="font-semibold">
+                    {quiz.pointsPerQuestion} points
+                  </p>
                 </div>
               </div>
 
@@ -466,7 +560,9 @@ export default function ExternalQuizInterface({
                 <IdCard className="h-5 w-5 text-primary shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Questions</p>
-                  <p className="font-semibold">{getQuestionCount(selectedSet)} questions</p>
+                  <p className="font-semibold">
+                    {getQuestionCount(selectedSet)} questions
+                  </p>
                 </div>
               </div>
             </div>
@@ -476,19 +572,26 @@ export default function ExternalQuizInterface({
               <label className="text-sm font-medium">Your Assigned Set</label>
               <div className="p-6 border-2 border-primary bg-primary/10 rounded-lg">
                 <div className="text-center">
-                  <div className="text-3xl font-bold mb-2">Set {selectedSet}</div>
+                  <div className="text-3xl font-bold mb-2">
+                    Set {selectedSet}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     This set has been assigned to you by the administrator
                   </p>
                   <div className="text-xs text-muted-foreground mt-2">
-                    {getQuestionCount(selectedSet)} question{getQuestionCount(selectedSet) !== 1 ? "s" : ""}
+                    {getQuestionCount(selectedSet)} question
+                    {getQuestionCount(selectedSet) !== 1 ? "s" : ""}
                   </div>
                 </div>
               </div>
               <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                 <p className="text-sm">
-                  <strong>Total Points:</strong> {getQuestionCount(selectedSet)} questions × {quiz.pointsPerQuestion} points ={" "}
-                  <strong>{getQuestionCount(selectedSet) * quiz.pointsPerQuestion} points</strong>
+                  <strong>Total Points:</strong> {getQuestionCount(selectedSet)}{" "}
+                  questions × {quiz.pointsPerQuestion} points ={" "}
+                  <strong>
+                    {getQuestionCount(selectedSet) * quiz.pointsPerQuestion}{" "}
+                    points
+                  </strong>
                 </p>
               </div>
             </div>
@@ -538,7 +641,22 @@ export default function ExternalQuizInterface({
         <div className="container mx-auto max-w-4xl space-y-6">
           <Card>
             <CardHeader className="text-center">
-              <div className="flex justify-center mb-4">
+              <div className="flex flex-col items-center mb-2">
+                <div className="w-14 h-14 rounded-2xl bg-muted/60 p-2 border flex items-center justify-center mb-2">
+                  <Image
+                    src="/assets/logo.png"
+                    alt="CodeBreakers Logo"
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-contain"
+                    priority
+                  />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-widest text-primary">
+                  CodeBreakers
+                </span>
+              </div>
+              <div className="flex justify-center mb-3">
                 <div className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center">
                   <CheckCircle2 className="h-10 w-10 text-white" />
                 </div>
@@ -557,19 +675,27 @@ export default function ExternalQuizInterface({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="text-center p-4 bg-background rounded-lg">
                     <p className="text-sm text-muted-foreground">Score</p>
-                    <p className="text-3xl font-bold text-primary">{submissionResult.score}%</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {submissionResult.score}%
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-background rounded-lg">
                     <p className="text-sm text-muted-foreground">Correct</p>
-                    <p className="text-3xl font-bold text-green-600">{submissionResult.correctAnswers}</p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {submissionResult.correctAnswers}
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-background rounded-lg">
                     <p className="text-sm text-muted-foreground">Total</p>
-                    <p className="text-3xl font-bold">{submissionResult.totalQuestions}</p>
+                    <p className="text-3xl font-bold">
+                      {submissionResult.totalQuestions}
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-background rounded-lg">
                     <p className="text-sm text-muted-foreground">Points</p>
-                    <p className="text-3xl font-bold text-primary">{submissionResult.pointsEarned}</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {submissionResult.pointsEarned}
+                    </p>
                   </div>
                 </div>
 
@@ -577,7 +703,9 @@ export default function ExternalQuizInterface({
                   <Alert variant="destructive" className="mt-4">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>Note:</strong> {submissionResult.tabSwitches} violation{submissionResult.tabSwitches !== 1 ? "s" : ""} detected during the quiz.
+                      <strong>Note:</strong> {submissionResult.tabSwitches}{" "}
+                      violation{submissionResult.tabSwitches !== 1 ? "s" : ""}{" "}
+                      detected during the quiz.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -598,7 +726,9 @@ export default function ExternalQuizInterface({
                 </div>
                 <div className="flex items-center justify-between text-sm p-3 bg-muted rounded-lg">
                   <span className="text-muted-foreground">Submitted:</span>
-                  <span className="font-medium">{new Date().toLocaleString()}</span>
+                  <span className="font-medium">
+                    {new Date().toLocaleString()}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -607,8 +737,13 @@ export default function ExternalQuizInterface({
           <Card>
             <CardContent className="p-6 space-y-4">
               <Alert>
-                <AlertDescription>
-                  Your results will be reviewed and published by the administrator. An official scorecard will be emailed to <strong>{user.email}</strong> once released.
+                <AlertDescription className="mx-auto max-w-lg text-sm leading-6 text-center">
+                  <span>
+                    Your results will be reviewed and published by the
+                    administrator. An official scorecard will be emailed to{" "}
+                    <strong className="font-semibold">{user.email}</strong> once
+                    released.
+                  </span>
                 </AlertDescription>
               </Alert>
               {quiz.feedbackFormId && (
@@ -616,7 +751,11 @@ export default function ExternalQuizInterface({
                   asChild
                   className="w-full font-bold bg-primary text-primary-foreground hover:opacity-90 rounded-xl"
                 >
-                  <a href={`/forms/${quiz.feedbackFormId}`} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={`/forms/${quiz.feedbackFormId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <FileText className="h-4 w-4 mr-2" />
                     Fill Feedback Form
                   </a>
@@ -640,14 +779,19 @@ export default function ExternalQuizInterface({
             </div>
             <CardTitle className="text-2xl">Quiz Already Submitted</CardTitle>
             <p className="text-muted-foreground text-sm">
-              Your responses have been recorded. Results will be published by the administrator.
+              Your responses have been recorded. Results will be published by
+              the administrator.
             </p>
             {quiz.feedbackFormId && (
               <Button
                 asChild
                 className="w-full mt-4 font-bold bg-primary text-primary-foreground hover:opacity-90 rounded-xl"
               >
-                <a href={`/forms/${quiz.feedbackFormId}`} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={`/forms/${quiz.feedbackFormId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <FileText className="h-4 w-4 mr-2" />
                   Fill Feedback Form
                 </a>
@@ -669,7 +813,9 @@ export default function ExternalQuizInterface({
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3 text-destructive">
                 <AlertTriangle className="h-6 w-6 animate-pulse" />
-                <CardTitle className="text-lg">Fullscreen Mode Exited!</CardTitle>
+                <CardTitle className="text-lg">
+                  Fullscreen Mode Exited!
+                </CardTitle>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -691,7 +837,9 @@ export default function ExternalQuizInterface({
               </Alert>
 
               <div className="p-3 bg-muted rounded-lg text-xs space-y-1">
-                <p className="font-semibold text-destructive">⚠️ If timer reaches 0:</p>
+                <p className="font-semibold text-destructive">
+                  ⚠️ If timer reaches 0:
+                </p>
                 <ul className="list-disc list-inside space-y-0.5 text-muted-foreground ml-2">
                   <li>Quiz will be blocked immediately</li>
                   <li>Violation reported to admin</li>
@@ -709,7 +857,10 @@ export default function ExternalQuizInterface({
               </Button>
 
               <p className="text-center text-xs text-muted-foreground">
-                Or press <kbd className="px-1.5 py-0.5 bg-muted rounded border text-xs">F11</kbd>
+                Or press{" "}
+                <kbd className="px-1.5 py-0.5 bg-muted rounded border text-xs">
+                  F11
+                </kbd>
               </p>
             </CardContent>
           </Card>
@@ -737,7 +888,9 @@ export default function ExternalQuizInterface({
               <div className="space-y-2">
                 <p className="font-semibold">Violation Details:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                  <li>Failed to return to fullscreen mode within the allowed time</li>
+                  <li>
+                    Failed to return to fullscreen mode within the allowed time
+                  </li>
                   <li>Total violations recorded: {tabSwitches}</li>
                   <li>The violation has been reported to administrators</li>
                 </ul>
@@ -748,15 +901,20 @@ export default function ExternalQuizInterface({
                   <strong>What happens now?</strong>
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Your quiz attempt has been terminated. The violation has been recorded.
-                  Please contact the exam administrator to resolve this issue.
+                  Your quiz attempt has been terminated. The violation has been
+                  recorded. Please contact the exam administrator to resolve
+                  this issue.
                 </p>
               </div>
 
               <Alert className="border-primary">
                 <Clock className="h-4 w-4" />
                 <AlertDescription className="text-sm">
-                  Returning to registration page in <strong>{blockedMessageTimer} second{blockedMessageTimer !== 1 ? "s" : ""}</strong>
+                  Returning to registration page in{" "}
+                  <strong>
+                    {blockedMessageTimer} second
+                    {blockedMessageTimer !== 1 ? "s" : ""}
+                  </strong>
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -766,37 +924,84 @@ export default function ExternalQuizInterface({
 
       {/* Warning Banner */}
       {showWarning && !isBlocked && (
-        <Alert variant="destructive" className="fixed top-4 left-1/2 -translate-x-1/2 w-auto max-w-md z-50">
+        <Alert
+          variant="destructive"
+          className="fixed top-4 left-1/2 -translate-x-1/2 w-auto max-w-md z-50"
+        >
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            {tabSwitches === 1 && "Warning 1/3: Tab switch detected! Two more violations will block the quiz."}
-            {tabSwitches === 2 && "Warning 2/3: Second violation! One more and the quiz will be blocked."}
-            {timeRemaining === 300 && tabSwitches === 0 && "5 minutes remaining! Please complete your quiz."}
+            {tabSwitches === 1 &&
+              "Warning 1/3: Tab switch detected! Two more violations will block the quiz."}
+            {tabSwitches === 2 &&
+              "Warning 2/3: Second violation! One more and the quiz will be blocked."}
+            {timeRemaining === 300 &&
+              tabSwitches === 0 &&
+              "5 minutes remaining! Please complete your quiz."}
           </AlertDescription>
         </Alert>
       )}
 
       {/* Quiz Header */}
-      <div className="border-b bg-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-xl font-bold">{quiz.title}</h1>
-              <p className="text-sm text-muted-foreground">{user.name} — Set {selectedSet}</p>
+      <div className="border-b bg-card sticky top-0 z-40 shadow-xs">
+        <div className="container mx-auto px-4 py-3 sm:py-3.5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            {/* Left: CodeBreakers Logo & Quiz Info */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 p-1 shrink-0 flex items-center justify-center shadow-xs">
+                <Image
+                  src="/assets/logo.png"
+                  alt="CodeBreakers Logo"
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-contain"
+                  priority
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-primary tracking-wider uppercase">
+                    CodeBreakers
+                  </span>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <h1 className="text-base sm:text-lg font-bold truncate max-w-[180px] sm:max-w-md">
+                    {quiz.title}
+                  </h1>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {user.name} — Set {selectedSet}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Timer */}
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 ${
-                isTimeLow ? "border-destructive bg-destructive/10" : "border-primary bg-primary/10"
-              }`}>
-                <Timer className={`h-5 w-5 ${isTimeLow ? "text-destructive" : "text-primary"}`} />
-                <span className={`text-lg font-bold ${isTimeLow ? "text-destructive" : "text-primary"}`}>
-                  {formatTime(timeRemaining)}
-                </span>
+
+            {/* Right: Quiz Duration & Remaining Timer + Controls */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Quiz Duration Section with Live Countdown */}
+              <div
+                className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg border-2 ${
+                  isTimeLow
+                    ? "border-destructive bg-destructive/10"
+                    : "border-primary/40 bg-primary/10"
+                }`}
+              >
+                <div className="flex flex-col items-end text-right">
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Timer
+                      className={`h-4 w-4 ${isTimeLow ? "text-destructive animate-pulse" : "text-primary"}`}
+                    />
+                    <span
+                      className={`text-base sm:text-lg font-bold font-mono leading-none ${isTimeLow ? "text-destructive" : "text-primary"}`}
+                    >
+                      {formatTime(timeRemaining)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {tabSwitches > 0 && (
-                <Badge variant="destructive" className="flex items-center gap-1">
+                <Badge
+                  variant="destructive"
+                  className="flex items-center gap-1"
+                >
                   <AlertTriangle className="h-3 w-3" />
                   {tabSwitches === 1 && "Warning 1/3"}
                   {tabSwitches === 2 && "Warning 2/3"}
@@ -811,9 +1016,15 @@ export default function ExternalQuizInterface({
                 className="cursor-pointer"
               >
                 {isFullscreen ? (
-                  <><EyeOff className="h-4 w-4 mr-2" />Exit Fullscreen</>
+                  <>
+                    <EyeOff className="h-4 w-4 mr-2" />
+                    Exit Fullscreen
+                  </>
                 ) : (
-                  <><Eye className="h-4 w-4 mr-2" />Enter Fullscreen</>
+                  <>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Enter Fullscreen
+                  </>
                 )}
               </Button>
             </div>
@@ -827,7 +1038,9 @@ export default function ExternalQuizInterface({
           <Card>
             <CardContent className="p-8">
               <div className="text-center">
-                <h2 className="text-2xl font-bold mb-4">Loading Questions...</h2>
+                <h2 className="text-2xl font-bold mb-4">
+                  Loading Questions...
+                </h2>
                 <p className="text-muted-foreground">
                   Please wait while we load your quiz questions.
                 </p>
@@ -844,16 +1057,28 @@ export default function ExternalQuizInterface({
                   <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center gap-4">
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Question: </span>
-                        <span className="font-semibold">{currentQuestionIndex + 1} of {questions.length}</span>
+                        <span className="text-muted-foreground">
+                          Question:{" "}
+                        </span>
+                        <span className="font-semibold">
+                          {currentQuestionIndex + 1} of {questions.length}
+                        </span>
                       </div>
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Answered: </span>
-                        <span className="font-semibold">{Object.keys(answers).length}/{questions.length}</span>
+                        <span className="text-muted-foreground">
+                          Answered:{" "}
+                        </span>
+                        <span className="font-semibold">
+                          {Object.keys(answers).length}/{questions.length}
+                        </span>
                       </div>
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Points per Question: </span>
-                        <span className="font-semibold">{quiz.pointsPerQuestion}</span>
+                        <span className="text-muted-foreground">
+                          Points per Question:{" "}
+                        </span>
+                        <span className="font-semibold">
+                          {quiz.pointsPerQuestion}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -862,20 +1087,30 @@ export default function ExternalQuizInterface({
 
               {/* Current Question */}
               {currentQuestion && (
-                <Card className={answers[currentQuestionIndex] !== undefined ? "border-primary" : ""}>
+                <Card
+                  className={
+                    answers[currentQuestionIndex] !== undefined
+                      ? "border-primary"
+                      : ""
+                  }
+                >
                   <CardHeader>
                     <CardTitle className="text-xl">
                       Question {currentQuestionIndex + 1}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <p className="text-lg font-medium leading-relaxed">{currentQuestion.question}</p>
+                    <p className="text-lg font-medium leading-relaxed">
+                      {currentQuestion.question}
+                    </p>
 
                     <div className="space-y-3">
                       {currentQuestion.options.map((option, oIndex) => (
                         <button
                           key={oIndex}
-                          onClick={() => handleAnswerSelect(currentQuestionIndex, oIndex)}
+                          onClick={() =>
+                            handleAnswerSelect(currentQuestionIndex, oIndex)
+                          }
                           className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                             answers[currentQuestionIndex] === oIndex
                               ? "border-primary bg-primary/10"
@@ -883,11 +1118,13 @@ export default function ExternalQuizInterface({
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              answers[currentQuestionIndex] === oIndex
-                                ? "border-primary bg-primary"
-                                : "border-muted-foreground"
-                            }`}>
+                            <div
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                answers[currentQuestionIndex] === oIndex
+                                  ? "border-primary bg-primary"
+                                  : "border-muted-foreground"
+                              }`}
+                            >
                               {answers[currentQuestionIndex] === oIndex && (
                                 <div className="w-3 h-3 rounded-full bg-white" />
                               )}
@@ -900,7 +1137,10 @@ export default function ExternalQuizInterface({
 
                     {answers[currentQuestionIndex] !== undefined && (
                       <div className="flex items-center gap-2 text-sm text-green-600">
-                        <Badge variant="outline" className="border-green-600 text-green-600">
+                        <Badge
+                          variant="outline"
+                          className="border-green-600 text-green-600"
+                        >
                           Answered
                         </Badge>
                       </div>
@@ -930,7 +1170,10 @@ export default function ExternalQuizInterface({
                     {currentQuestionIndex === questions.length - 1 ? (
                       <Button
                         onClick={handleSubmitQuiz}
-                        disabled={Object.keys(answers).length !== questions.length || isSubmitting}
+                        disabled={
+                          Object.keys(answers).length !== questions.length ||
+                          isSubmitting
+                        }
                         size="lg"
                         className="bg-green-600 hover:bg-green-700 cursor-pointer"
                       >
@@ -967,11 +1210,12 @@ export default function ExternalQuizInterface({
                         onClick={() => handleJumpToQuestion(index)}
                         className={`
                           aspect-square rounded-lg border-2 font-semibold text-sm transition-all
-                          ${currentQuestionIndex === index
-                            ? "border-primary bg-primary text-primary-foreground cursor-pointer"
-                            : answers[index] !== undefined
-                            ? "border-green-600 bg-green-600/10 text-green-600 cursor-pointer"
-                            : "border-muted hover:border-muted-foreground/50 cursor-pointer"
+                          ${
+                            currentQuestionIndex === index
+                              ? "border-primary bg-primary text-primary-foreground cursor-pointer"
+                              : answers[index] !== undefined
+                                ? "border-green-600 bg-green-600/10 text-green-600 cursor-pointer"
+                                : "border-muted hover:border-muted-foreground/50 cursor-pointer"
                           }
                         `}
                       >
@@ -998,7 +1242,10 @@ export default function ExternalQuizInterface({
                   <div className="mt-4 pt-4 border-t">
                     <Button
                       onClick={handleSubmitQuiz}
-                      disabled={Object.keys(answers).length !== questions.length || isSubmitting}
+                      disabled={
+                        Object.keys(answers).length !== questions.length ||
+                        isSubmitting
+                      }
                       className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
                       size="sm"
                     >
@@ -1006,7 +1253,8 @@ export default function ExternalQuizInterface({
                     </Button>
                     {Object.keys(answers).length !== questions.length && (
                       <p className="text-xs text-muted-foreground text-center mt-2">
-                        {questions.length - Object.keys(answers).length} remaining
+                        {questions.length - Object.keys(answers).length}{" "}
+                        remaining
                       </p>
                     )}
                   </div>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer } from "socket.io";
 import type { Server as HTTPServer } from "http";
 
 interface SocketNextApiResponse extends NextApiResponse {
@@ -17,11 +17,39 @@ export default async function handler(req: NextApiRequest, res: SocketNextApiRes
   }
 
   try {
-    const io: SocketIOServer | undefined = res.socket.server.io || (globalThis as any).__socketio;
+    let io: SocketIOServer | undefined = res.socket.server.io || (globalThis as any).__socketio;
 
     if (!io) {
-      console.warn("⚠️ Socket.IO server instance not found on HTTP server.");
-      return res.status(503).json({ error: "Socket.IO server not ready" });
+      console.log("🔌 Initializing Socket.IO from /api/socket/emit bridge...");
+      io = new SocketIOServer(res.socket.server, {
+        path: "/api/socketio",
+        addTrailingSlash: false,
+        cors: {
+          origin: "*",
+          methods: ["GET", "POST"],
+        },
+        pingTimeout: 60000,
+        pingInterval: 25000,
+        connectTimeout: 45000,
+        maxHttpBufferSize: 1e6,
+        transports: ["websocket", "polling"],
+        allowUpgrades: true,
+      });
+
+      io.on("connection", (socket) => {
+        socket.on("join-room", (room: string) => {
+          socket.join(room);
+        });
+        socket.on("leave-room", (room: string) => {
+          socket.leave(room);
+        });
+        socket.on("join-rooms", (rooms: string[]) => {
+          rooms.forEach((r) => socket.join(r));
+        });
+      });
+
+      res.socket.server.io = io;
+      (globalThis as any).__socketio = io;
     }
 
     const { room, rooms, event, data } = req.body || {};

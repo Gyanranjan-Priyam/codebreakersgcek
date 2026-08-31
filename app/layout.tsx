@@ -4,8 +4,6 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import LenisProvider from "@/components/providers/lenis-provider";
 import { Analytics } from "@vercel/analytics/next";
-import CapacitorProvider from "@/components/providers/capacitor-provider";
-import { MobileRedirect } from "@/components/mobile-redirect";
 import { RealtimeAttendanceListener } from "@/components/realtime/realtime-attendance-listener";
 
 const sourceCodePro = Source_Code_Pro({
@@ -196,10 +194,7 @@ export default function RootLayout({
         />
       </head>
       <body className={` ${sourceCodePro.variable} antialiased`}>
-        <CapacitorProvider>
-          <MobileRedirect />
-          <LenisProvider>{children}</LenisProvider>
-        </CapacitorProvider>
+        <LenisProvider>{children}</LenisProvider>
         <RealtimeAttendanceListener />
         <Toaster position="top-right" richColors closeButton />
         <Analytics />

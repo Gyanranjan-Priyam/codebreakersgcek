@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -15,13 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Users, ListChecks } from "lucide-react";
+import { Users, ListChecks, Radio, QrCode } from "lucide-react";
 import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
 import CreateSessionDialog from "./_components/create-session-dialog";
 import SessionsTable from "./_components/sessions-table";
 import StudentQRScanner from "./_components/student-qr-scanner";
+import DelegatedScannerSheet from "./_components/delegated-scanner-sheet";
 
 interface AttendanceSession {
   id: string;
@@ -37,10 +39,13 @@ interface AttendanceSession {
 export default function AttendanceQRPage() {
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>("");
+  const [activeDelegateCodes, setActiveDelegateCodes] = useState<string[]>([]);
+  const [isDelegateSheetOpen, setIsDelegateSheetOpen] = useState(false);
 
   // Fetch attendance sessions on mount
   useEffect(() => {
     fetchSessions();
+    fetchDelegateCodes();
   }, []);
 
   const fetchSessions = async () => {
@@ -68,6 +73,20 @@ export default function AttendanceQRPage() {
     }
   };
 
+  const fetchDelegateCodes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/attendance/delegate-code");
+      const data = await res.json();
+      if (data.success) {
+        setActiveDelegateCodes(
+          data.codes.map((c: { code: string }) => c.code)
+        );
+      }
+    } catch {
+      // Silent fail
+    }
+  }, []);
+
   const selectedSessionData = sessions.find((s) => s.id === selectedSession);
 
   return (
@@ -80,8 +99,38 @@ export default function AttendanceQRPage() {
             Scan student QR codes to mark attendance as present and manage sessions
           </p>
         </div>
-        <CreateSessionDialog onSessionCreated={fetchSessions} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => setIsDelegateSheetOpen(true)}
+            className="border-primary/30 hover:border-primary/60 hover:bg-primary/5 gap-2 shadow-xs"
+          >
+            <Radio className="h-4 w-4 text-primary animate-pulse" />
+            <span>Delegated Scanning</span>
+            {activeDelegateCodes.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 text-primary font-bold">
+                {activeDelegateCodes.length} active
+              </Badge>
+            )}
+          </Button>
+          <CreateSessionDialog onSessionCreated={fetchSessions} />
+        </div>
       </div>
+
+      {/* Delegated Scanner Right-Side Sheet */}
+      <DelegatedScannerSheet
+        open={isDelegateSheetOpen}
+        onOpenChange={(open) => {
+          setIsDelegateSheetOpen(open);
+          if (!open) {
+            fetchDelegateCodes();
+            fetchSessions();
+          }
+        }}
+        sessions={sessions}
+        selectedSessionId={selectedSession}
+        onSessionSelect={(sId) => setSelectedSession(sId)}
+      />
 
       {/* Session Selector Card */}
       <Card className="border-border">

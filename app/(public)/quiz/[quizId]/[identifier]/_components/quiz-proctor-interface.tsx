@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -761,6 +762,12 @@ export default function QuizProctorInterface({
       <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
         <Card className="max-w-2xl w-full">
           <CardHeader>
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-background p-1 border flex items-center justify-center shrink-0 shadow-xs">
+                <Image src="/assets/logo.png" alt="CodeBreakers Logo" width={24} height={24} className="object-contain" priority />
+              </div>
+              <span className="text-xs font-bold text-primary uppercase tracking-widest">CodeBreakers</span>
+            </div>
             <CardTitle className="text-2xl">Verify Your Information</CardTitle>
             <CardDescription>Please confirm your details before proceeding to the quiz</CardDescription>
           </CardHeader>
@@ -840,17 +847,25 @@ export default function QuizProctorInterface({
       <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-background to-muted">
         <Card className="max-w-3xl w-full">
           <CardHeader>
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-background p-1 border flex items-center justify-center shrink-0 shadow-xs">
+                <Image src="/assets/logo.png" alt="CodeBreakers Logo" width={24} height={24} className="object-contain" priority />
+              </div>
+              <span className="text-xs font-bold text-primary uppercase tracking-widest">CodeBreakers</span>
+            </div>
             <CardTitle className="text-2xl">{quiz.title}</CardTitle>
             <CardDescription>{quiz.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Quiz Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                <Clock className="h-5 w-5 text-primary shrink-0" />
+              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg border border-primary/20">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Clock className="h-5 w-5 text-primary" />
+                </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="font-semibold">{quiz.duration} minutes</p>
+                  <p className="text-xs text-muted-foreground font-medium">Duration</p>
+                  <p className="font-bold text-foreground">{quiz.duration} minutes</p>
                 </div>
               </div>
 
@@ -985,6 +1000,7 @@ export default function QuizProctorInterface({
           )}
 
           <div className="max-w-md w-full space-y-4 text-center p-6 border rounded-xl bg-card shadow-lg">
+
             <div className="w-16 h-16 rounded-full bg-green-600/10 flex items-center justify-center mx-auto">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
@@ -1051,7 +1067,20 @@ export default function QuizProctorInterface({
           {/* Header Card */}
           <Card>
             <CardHeader className="text-center">
-              <div className="flex justify-center mb-4">
+              <div className="flex flex-col items-center mb-2">
+                <div className="w-14 h-14 rounded-2xl bg-muted/60 p-2 border flex items-center justify-center mb-2">
+                  <Image
+                    src="/assets/logo.png"
+                    alt="CodeBreakers Logo"
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-contain"
+                    priority
+                  />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-widest text-primary">CodeBreakers</span>
+              </div>
+              <div className="flex justify-center mb-3">
                 <div className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center">
                   <CheckCircle2 className="h-10 w-10 text-white" />
                 </div>
@@ -1390,22 +1419,48 @@ export default function QuizProctorInterface({
       )}
 
       {/* Quiz Header */}
-      <div className="border-b bg-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-xl font-bold">{quiz.title}</h1>
-              <p className="text-sm text-muted-foreground">{user.name} - Set {selectedSet}</p>
+      <div className="border-b bg-card sticky top-0 z-40 shadow-xs">
+        <div className="container mx-auto px-4 py-3 sm:py-3.5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            {/* Left: CodeBreakers Logo & Quiz Info */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-background border p-1 shrink-0 flex items-center justify-center shadow-xs">
+                <Image
+                  src="/assets/logo.png"
+                  alt="CodeBreakers Logo"
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-contain"
+                  priority
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-primary tracking-wider uppercase">CodeBreakers</span>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <h1 className="text-base sm:text-lg font-bold truncate max-w-[180px] sm:max-w-md">{quiz.title}</h1>
+                </div>
+                <p className="text-xs text-muted-foreground">{user.name} - Set {selectedSet}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Timer */}
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 ${
-                isTimeLow ? 'border-destructive bg-destructive/10' : 'border-primary bg-primary/10'
+
+            {/* Right: Quiz Duration & Remaining Timer + Controls */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Quiz Duration Section with Live Countdown */}
+              <div className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg border-2 ${
+                isTimeLow ? 'border-destructive bg-destructive/10' : 'border-primary/40 bg-primary/10'
               }`}>
-                <Timer className={`h-5 w-5 ${isTimeLow ? 'text-destructive' : 'text-primary'}`} />
-                <span className={`text-lg font-bold ${isTimeLow ? 'text-destructive' : 'text-primary'}`}>
-                  {formatTime(timeRemaining)}
-                </span>
+                <div className="flex flex-col items-end text-right">
+                  <span className="text-[10px] font-semibold text-muted-foreground leading-none">
+                    Duration: {quiz.duration}m
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Timer className={`h-4 w-4 ${isTimeLow ? 'text-destructive animate-pulse' : 'text-primary'}`} />
+                    <span className={`text-base sm:text-lg font-bold font-mono leading-none ${isTimeLow ? 'text-destructive' : 'text-primary'}`}>
+                      {formatTime(timeRemaining)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {tabSwitches > 0 && (

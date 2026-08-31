@@ -3,46 +3,59 @@ import { io, Socket } from "socket.io-client";
 
 // Global singleton Socket.IO client instance
 let socketInstance: Socket | null = null;
-let initPromise: Promise<Socket | null> | null = null;
+let isInitializing = false;
 
 // Track all active room subscriptions so they can be re-joined on reconnect
 const activeRooms = new Set<string>();
+const connectionListeners = new Set<(connected: boolean) => void>();
+
+function notifyConnectionStatus(connected: boolean) {
+  connectionListeners.forEach((cb) => {
+    try {
+      cb(connected);
+    } catch {}
+  });
+}
 
 /**
  * Initialize and return the Socket.IO client singleton.
- * On first call, hits /api/socketio to ensure the server is running,
- * then establishes the WebSocket connection.
- * Subsequent calls return the existing connection instantly.
  */
 export function getSocket(): Socket | null {
   if (typeof window === "undefined") return null;
 
-  if (socketInstance?.connected) return socketInstance;
-
   if (!socketInstance) {
-    socketInstance = io({
+    const origin = window.location.origin;
+    socketInstance = io(origin, {
       path: "/api/socketio",
       addTrailingSlash: false,
-      // Performance: prefer WebSocket, fall back to polling
-      transports: ["websocket", "polling"],
-      // Reconnection settings for reliability at scale
+      transports: ["polling", "websocket"],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      // Timeout settings
       timeout: 20000,
     });
 
     socketInstance.on("connect", () => {
+      console.log("🔌 [SocketClient] Connected to server, ID:", socketInstance?.id);
+      notifyConnectionStatus(true);
+
       // Re-join all active rooms on connect or reconnection
       activeRooms.forEach((room) => {
+        console.log(`🔌 [SocketClient] Joining room on connect: ${room}`);
         socketInstance?.emit("join-room", room);
       });
     });
 
-    socketInstance.on("disconnect", () => {});
-    socketInstance.on("connect_error", () => {});
+    socketInstance.on("disconnect", (reason) => {
+      console.log("🔌 [SocketClient] Disconnected:", reason);
+      notifyConnectionStatus(false);
+    });
+
+    socketInstance.on("connect_error", (err) => {
+      console.warn("🔌 [SocketClient] Connect error:", err.message);
+      notifyConnectionStatus(false);
+    });
   }
 
   return socketInstance;
@@ -50,29 +63,42 @@ export function getSocket(): Socket | null {
 
 /**
  * Initialize the Socket.IO connection by first ensuring the server endpoint is ready.
- * Call this once on app mount or before first use.
  */
 export async function initSocket(): Promise<Socket | null> {
   if (typeof window === "undefined") return null;
-  if (socketInstance?.connected) return socketInstance;
 
-  if (initPromise) return initPromise;
+  const socket = getSocket();
+  if (socket?.connected) return socket;
 
-  initPromise = (async () => {
+  if (!isInitializing) {
+    isInitializing = true;
     try {
-      // Hit the API endpoint to ensure Socket.IO server is initialized
-      await fetch("/api/socketio");
-    } catch {
-      // Endpoint may not respond with body, that's fine
+      // Warm up the /api/socketio route on Next.js server
+      await fetch("/api/socketio").catch(() => {});
+    } finally {
+      isInitializing = false;
     }
-    return getSocket();
-  })();
+  }
 
-  return initPromise;
+  return socket;
 }
 
 /**
- * Subscribe to a room (equivalent to Pusher channel).
+ * Subscribe to connection status changes.
+ */
+export function onSocketConnectionChange(callback: (connected: boolean) => void): () => void {
+  connectionListeners.add(callback);
+  const socket = getSocket();
+  if (socket) {
+    callback(socket.connected);
+  }
+  return () => {
+    connectionListeners.delete(callback);
+  };
+}
+
+/**
+ * Subscribe to a room (channel).
  * Returns a cleanup function to leave the room.
  */
 export function joinRoom(room: string): () => void {
@@ -80,7 +106,9 @@ export function joinRoom(room: string): () => void {
 
   activeRooms.add(room);
   const socket = getSocket();
+
   if (socket?.connected) {
+    console.log(`🔌 [SocketClient] Emitting join-room: ${room}`);
     socket.emit("join-room", room);
   }
 
@@ -88,6 +116,7 @@ export function joinRoom(room: string): () => void {
     activeRooms.delete(room);
     const s = getSocket();
     if (s?.connected) {
+      console.log(`🔌 [SocketClient] Emitting leave-room: ${room}`);
       s.emit("leave-room", room);
     }
   };
@@ -117,8 +146,7 @@ export function disconnectSocket(): void {
   if (socketInstance) {
     socketInstance.disconnect();
     socketInstance = null;
-    initPromise = null;
     activeRooms.clear();
+    connectionListeners.clear();
   }
 }
-
