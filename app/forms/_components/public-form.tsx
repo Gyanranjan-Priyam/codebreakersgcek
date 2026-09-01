@@ -10,8 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -98,6 +96,34 @@ const FORM_CSS = `
   }
 
   /* ─── Form Header ─── */
+  .mf-brand-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 4px 12px 4px 6px;
+    background: #F8F9FA;
+    border: 1px solid #E9ECEF;
+    border-radius: 9999px;
+  }
+  .mf-brand-logo-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .mf-brand-name {
+    font-family: 'Sora', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1E293B;
+    letter-spacing: -0.01em;
+  }
+
   .mf-title {
     font-family: 'Sora', sans-serif;
     font-size: clamp(22px, 4vw, 32px);
@@ -259,7 +285,7 @@ const FORM_CSS = `
     width: 100%;
     background: #FFFFFF;
     border: 1.5px solid #D2D0CA;
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 12px 16px;
     margin-bottom: 8px;
     cursor: pointer;
@@ -267,17 +293,88 @@ const FORM_CSS = `
     align-items: center;
     gap: 12px;
     transition: all .15s ease;
+    user-select: none;
+    outline: none;
   }
-  .mf-option-card:hover { border-color: #0078D4; }
+  .mf-option-card:hover {
+    border-color: #0078D4;
+    background: #F8FAFD;
+  }
+  .mf-option-card:focus-visible {
+    border-color: #0078D4;
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.2);
+  }
   .mf-option-card.selected {
     border-color: #0078D4;
     background: #EFF6FC;
+    box-shadow: 0 1px 3px rgba(0, 120, 212, 0.08);
   }
   .mf-option-label {
     font-family: 'Inter', sans-serif;
     font-size: 14px;
+    font-weight: 400;
     color: #1C1B1F;
     flex: 1;
+    line-height: 1.4;
+    transition: color .15s ease;
+  }
+  .mf-option-card.selected .mf-option-label {
+    font-weight: 500;
+    color: #0F172A;
+  }
+
+  /* ─── Shadcn-Style Radio Indicator ─── */
+  .mf-radio-indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #D2D0CA;
+    background-color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all .15s ease;
+  }
+  .mf-option-card:hover .mf-radio-indicator {
+    border-color: #0078D4;
+  }
+  .mf-option-card.selected .mf-radio-indicator {
+    border-color: #0078D4;
+    background-color: #FFFFFF;
+  }
+  .mf-radio-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: #0078D4;
+    transform: scale(0);
+    transition: transform .15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .mf-option-card.selected .mf-radio-dot {
+    transform: scale(1);
+  }
+
+  /* ─── Shadcn-Style Checkbox Indicator ─── */
+  .mf-checkbox-indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #D2D0CA;
+    background-color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all .15s ease;
+    color: #FFFFFF;
+  }
+  .mf-option-card:hover .mf-checkbox-indicator {
+    border-color: #0078D4;
+  }
+  .mf-option-card.selected .mf-checkbox-indicator {
+    border-color: #0078D4;
+    background-color: #0078D4;
   }
 
   /* ─── Scale ─── */
@@ -343,6 +440,25 @@ const FORM_CSS = `
   }
   .mf-submit-btn:hover:not(:disabled) { background: #106EBE; }
   .mf-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .mf-back-btn {
+    background: #FFFFFF;
+    color: #0078D4;
+    border: 1.5px solid #0078D4;
+    border-radius: 4px;
+    padding: 11px 28px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all .15s ease;
+    margin-top: 8px;
+  }
+  .mf-back-btn:hover:not(:disabled) { background: #F0F7FD; }
+  .mf-back-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   /* ─── Footer ─── */
   .mf-footer {
@@ -614,24 +730,8 @@ const tiptapExtensions = [
   }),
 ];
 
-function hasListNodes(json: any): boolean {
-  if (!json || typeof json !== "object") return false;
-  if (json.type === "bulletList" || json.type === "orderedList") return true;
-  if (Array.isArray(json.content)) {
-    return json.content.some(hasListNodes);
-  }
-  return false;
-}
 
-function extractPlainTextFromJson(json: any): string {
-  if (!json) return "";
-  if (typeof json === "string") return json;
-  if (json.text && typeof json.text === "string") return json.text;
-  if (Array.isArray(json.content)) {
-    return json.content.map(extractPlainTextFromJson).join(" ");
-  }
-  return "";
-}
+
 
 function autoFormatDescriptionText(text: string): string {
   if (!text) return "";
@@ -776,6 +876,11 @@ export default function PublicForm({ form }: PublicFormProps) {
     message: string;
     submittedAt?: string;
   } | null>(null);
+  const [submittedDetails, setSubmittedDetails] = useState<{
+    name?: string;
+    email?: string;
+  } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [transactionId, setTransactionId] = useState("");
@@ -784,10 +889,29 @@ export default function PublicForm({ form }: PublicFormProps) {
   >({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
+  const [sectionHistory, setSectionHistory] = useState<number[]>([]);
 
-  // ─── Draft Restore ───
+  // ─── Draft Restore & Submission Check ───
   useEffect(() => {
     try {
+      const submittedKey = `public_form_submitted_${form.formId}`;
+      const isAlreadySubmitted = localStorage.getItem(submittedKey);
+
+      // If already submitted and multiple submissions not allowed, stay on success screen
+      if (isAlreadySubmitted && !form.definition.settings.allowMultipleSubmissions) {
+        const savedName =
+          localStorage.getItem(`public_form_submitted_name_${form.formId}`) || "";
+        const savedEmail =
+          localStorage.getItem(`public_form_submitted_email_${form.formId}`) || "";
+        setSubmittedDetails({ name: savedName, email: savedEmail });
+        setSuccess(true);
+        localStorage.removeItem(`public_form_draft_${form.formId}`);
+        setIsMounted(true);
+        return;
+      }
+
+      // Otherwise restore draft responses if available
       const draftKey = `public_form_draft_${form.formId}`;
       const savedDraft = localStorage.getItem(draftKey);
       if (savedDraft) {
@@ -797,18 +921,25 @@ export default function PublicForm({ form }: PublicFormProps) {
         if (parsed.transactionId) setTransactionId(parsed.transactionId);
         if (parsed.answers && typeof parsed.answers === "object")
           setAnswers(parsed.answers);
-        toast.info("Restored your saved form responses from last session.", {
-          duration: 4000,
-        });
       }
     } catch {
       // ignore storage error
+    } finally {
+      setIsMounted(true);
     }
-  }, [form.formId]);
+  }, [form.formId, form.definition.settings.allowMultipleSubmissions]);
 
   // ─── Auto-Save Draft ───
   useEffect(() => {
     if (success) return;
+    const hasAnyContent = Boolean(
+      name.trim() ||
+        email.trim() ||
+        transactionId.trim() ||
+        Object.keys(answers).length > 0,
+    );
+    if (!hasAnyContent) return;
+
     try {
       const draftKey = `public_form_draft_${form.formId}`;
       localStorage.setItem(
@@ -923,6 +1054,35 @@ export default function PublicForm({ form }: PublicFormProps) {
     return valid;
   };
 
+  const validateSection = (secIdx: number): boolean => {
+    let valid = true;
+    if (secIdx === 0) {
+      if (form.definition.settings.collectName && !name.trim()) valid = false;
+      if (
+        form.definition.settings.collectEmail &&
+        (!email.trim() || !email.includes("@"))
+      ) {
+        valid = false;
+      }
+    }
+    const currentFields = form.definition.sections[secIdx]?.fields || [];
+    for (const field of currentFields) {
+      if (!isFieldValid(field)) {
+        valid = false;
+        setTouched((prev) => ({ ...prev, [field.id]: true }));
+      }
+    }
+    if (secIdx === 0) {
+      if (form.definition.settings.collectName && !name.trim()) {
+        setTouched((prev) => ({ ...prev, __name: true }));
+      }
+      if (form.definition.settings.collectEmail && (!email.trim() || !email.includes("@"))) {
+        setTouched((prev) => ({ ...prev, __email: true }));
+      }
+    }
+    return valid;
+  };
+
   const isFieldError = (fieldId: string, required: boolean): boolean => {
     if (!required) return false;
     if (!submitAttempted && !touched[fieldId]) return false;
@@ -932,10 +1092,118 @@ export default function PublicForm({ form }: PublicFormProps) {
     return !val || (typeof val === "string" && !val.trim());
   };
 
+  /* ─── Conditional Branching & Section Navigation ─── */
+  const handleNextSection = () => {
+    setSubmitAttempted(true);
+    if (!validateSection(currentSectionIdx)) {
+      toast.error("Please fill in all required fields before proceeding.");
+      return;
+    }
+
+    const currentSec = form.definition.sections[currentSectionIdx];
+    if (!currentSec) return;
+
+    let targetAction: string | undefined = undefined;
+
+    // Check if any question in current section has branching logic active
+    for (const field of currentSec.fields) {
+      if (
+        field.goToSectionBasedOnAnswer &&
+        (field.type === "radio" || field.type === "dropdown")
+      ) {
+        const selectedVal = answers[field.id];
+        if (typeof selectedVal === "string" && selectedVal) {
+          const optIdx = (field.options || []).indexOf(selectedVal);
+          if (optIdx !== -1) {
+            const nav =
+              field.optionNavigation?.[String(optIdx)] ||
+              field.optionNavigation?.[selectedVal];
+            if (nav && nav !== "next") {
+              targetAction = nav;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // If no option-level override, check section's default afterSectionAction
+    if (!targetAction) {
+      targetAction = currentSec.afterSectionAction || "next";
+    }
+
+    // Process targetAction
+    if (targetAction === "submit") {
+      handleSubmit();
+      return;
+    }
+
+    let targetIdx = -1;
+    if (targetAction.startsWith("section_")) {
+      const targetSecId = targetAction.replace("section_", "");
+      targetIdx = form.definition.sections.findIndex((s) => s.id === targetSecId);
+      // Safeguard: If target section is the current section, avoid loop by advancing to next section
+      if (targetIdx === currentSectionIdx) {
+        targetIdx = currentSectionIdx + 1;
+      }
+    } else {
+      targetIdx = currentSectionIdx + 1;
+    }
+
+    if (targetIdx === -1 || targetIdx >= form.definition.sections.length) {
+      handleSubmit();
+    } else {
+      setSectionHistory((prev) => [...prev, currentSectionIdx]);
+      setCurrentSectionIdx(targetIdx);
+      setSubmitAttempted(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handlePrevSection = () => {
+    if (sectionHistory.length === 0) return;
+    const prevIdx = sectionHistory[sectionHistory.length - 1];
+    setSectionHistory((prev) => prev.slice(0, -1));
+    setCurrentSectionIdx(prevIdx);
+    setSubmitAttempted(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /* ─── Active/Visited Sections Validation for Submission ─── */
+  const validateForSubmission = (): boolean => {
+    let valid = true;
+    if (form.definition.settings.collectName && !name.trim()) valid = false;
+    if (
+      form.definition.settings.collectEmail &&
+      (!email.trim() || !email.includes("@"))
+    ) {
+      valid = false;
+    }
+
+    // Validate fields in visited sections + current section
+    const activeSectionIndices = new Set([...sectionHistory, currentSectionIdx]);
+    for (const sIdx of activeSectionIndices) {
+      const secFields = form.definition.sections[sIdx]?.fields || [];
+      for (const field of secFields) {
+        if (!isFieldValid(field)) {
+          valid = false;
+          setTouched((prev) => ({ ...prev, [field.id]: true }));
+        }
+      }
+    }
+    if (form.definition.settings.collectName && !name.trim()) {
+      setTouched((prev) => ({ ...prev, __name: true }));
+    }
+    if (form.definition.settings.collectEmail && (!email.trim() || !email.includes("@"))) {
+      setTouched((prev) => ({ ...prev, __email: true }));
+    }
+    return valid;
+  };
+
   /* ─── Submit ─── */
   const handleSubmit = async () => {
     setSubmitAttempted(true);
-    if (!validateAll()) {
+    if (!validateForSubmission()) {
       toast.error("Please fill in all required fields.");
       return;
     }
@@ -963,12 +1231,33 @@ export default function PublicForm({ form }: PublicFormProps) {
       });
       toast.warning(result.message);
     } else if (result.status === "success") {
+      const submittedName = name.trim();
+      const submittedEmail = email.trim();
+      setSubmittedDetails({ name: submittedName, email: submittedEmail });
       setSuccess(true);
       try {
         localStorage.removeItem(`public_form_draft_${form.formId}`);
+        localStorage.setItem(`public_form_submitted_${form.formId}`, "true");
+        if (submittedName)
+          localStorage.setItem(
+            `public_form_submitted_name_${form.formId}`,
+            submittedName,
+          );
+        if (submittedEmail)
+          localStorage.setItem(
+            `public_form_submitted_email_${form.formId}`,
+            submittedEmail,
+          );
       } catch {
         // ignore storage error
       }
+      setName("");
+      setEmail("");
+      setTransactionId("");
+      setAnswers({});
+      setTouched({});
+      setCurrentSectionIdx(0);
+      setSectionHistory([]);
     } else {
       toast.error(result.message);
     }
@@ -984,8 +1273,79 @@ export default function PublicForm({ form }: PublicFormProps) {
     form.definition.settings.collectName ||
     form.definition.settings.collectEmail;
 
+  /* ─── Dynamically determine if current button should be Submit or Next ─── */
+  const isCurrentStepSubmit = useMemo(() => {
+    // If it's the last section in the form, it's always submit
+    if (currentSectionIdx >= form.definition.sections.length - 1) return true;
+
+    const currentSec = form.definition.sections[currentSectionIdx];
+    if (!currentSec) return true;
+
+    // Check if any question in the current section with branching active is pointing to 'submit'
+    for (const field of currentSec.fields) {
+      if (
+        field.goToSectionBasedOnAnswer &&
+        (field.type === "radio" || field.type === "dropdown")
+      ) {
+        const selectedVal = answers[field.id];
+        if (typeof selectedVal === "string" && selectedVal) {
+          const optIdx = (field.options || []).indexOf(selectedVal);
+          if (optIdx !== -1) {
+            const nav =
+              field.optionNavigation?.[String(optIdx)] ||
+              field.optionNavigation?.[selectedVal];
+            if (nav === "submit") return true;
+            if (nav && nav !== "next" && nav.startsWith("section_")) return false;
+          }
+        }
+      }
+    }
+
+    // Otherwise check section's default afterSectionAction
+    if (currentSec.afterSectionAction === "submit") {
+      return true;
+    }
+
+    return false;
+  }, [currentSectionIdx, form.definition.sections, answers]);
+
   /* ─── Build numbered questions ─── */
   let questionNum = 0;
+
+  /* ═══ RENDER: LOADING / MOUNTING (Eliminates Flash on Refresh) ═══ */
+  if (!isMounted) {
+    return (
+      <>
+        <style dangerouslySetInnerHTML={{ __html: FORM_CSS }} />
+        <div className="mf-page" style={{ background: "#F3F2F1" }}>
+          <div
+            className="mf-banner"
+            style={{
+              background: bannerImage ? undefined : bannerGradient,
+            }}
+          >
+            {bannerImage && (
+              <Image
+                src={bannerImage}
+                alt=""
+                fill
+                style={{ objectFit: "cover" }}
+                priority
+              />
+            )}
+          </div>
+          <div className="mf-container">
+            <div className="mf-card" style={{ textAlign: "center", padding: "60px 24px" }}>
+              <Loader2 className="animate-spin h-7 w-7 text-[#0078D4] mx-auto mb-3" />
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "#605E5C", fontWeight: 500 }}>
+                Loading form…
+              </p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   /* ═══ RENDER: DUPLICATE / ALREADY SUBMITTED ═══ */
   if (duplicateInfo) {
@@ -1069,29 +1429,28 @@ export default function PublicForm({ form }: PublicFormProps) {
               {/* Previous Response Details Box */}
               <div
                 style={{
-                  background: "#F9F9F8",
-                  border: "1px solid #E5E5E5",
-                  borderRadius: 12,
-                  padding: "16px 20px",
+                  padding: "16px 0",
                   maxWidth: 440,
                   margin: "0 auto 28px",
                   textAlign: "left",
+                  borderTop: "1px solid #E5E5E5",
+                  borderBottom: "1px solid #E5E5E5",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Form</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1C1B1F" }}>{form.title}</span>
+                  <span style={{ fontSize: 13, color: "#666", fontWeight: 500 }}>Form</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#1C1B1F" }}>{form.title}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Previous Response ID</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: "#1C1B1F" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: duplicateInfo.submittedAt ? 8 : 0 }}>
+                  <span style={{ fontSize: 13, color: "#666", fontWeight: 500 }}>Previous Response ID</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "monospace", color: "#1C1B1F" }}>
                     {duplicateInfo.referenceNumber || `#${duplicateInfo.previousResponseId.slice(0, 8).toUpperCase()}`}
                   </span>
                 </div>
                 {duplicateInfo.submittedAt && (
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Submitted On</span>
-                    <span style={{ fontSize: 12, color: "#444" }}>
+                    <span style={{ fontSize: 13, color: "#666", fontWeight: 500 }}>Submitted On</span>
+                    <span style={{ fontSize: 13, color: "#444" }}>
                       {new Date(duplicateInfo.submittedAt).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",
@@ -1100,35 +1459,6 @@ export default function PublicForm({ form }: PublicFormProps) {
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* Action Buttons */}
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 12,
-                }}
-              >
-                
-                <button
-                  type="button"
-                  onClick={() => setDuplicateInfo(null)}
-                  style={{
-                    background: "#FFFFFF",
-                    border: "1px solid #D1D5DB",
-                    color: "#374151",
-                    padding: "10px 18px",
-                    borderRadius: 10,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Dismiss / Review Answers
-                </button>
               </div>
 
               <div
@@ -1144,9 +1474,6 @@ export default function PublicForm({ form }: PublicFormProps) {
                   style={{
                     width: 36,
                     height: 36,
-                    borderRadius: "50%",
-                    background: "#FFF",
-                    border: "1px solid #e8e8e8",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1163,12 +1490,12 @@ export default function PublicForm({ form }: PublicFormProps) {
                 <span
                   style={{
                     fontFamily: "'Sora', sans-serif",
-                    fontSize: 13,
+                    fontSize: 20,
                     fontWeight: 600,
                     color: "#1C1B1F",
                   }}
                 >
-                  Codebreakers
+                  CodeBreakers
                 </span>
               </div>
             </div>
@@ -1240,7 +1567,7 @@ export default function PublicForm({ form }: PublicFormProps) {
                   marginBottom: 12,
                 }}
               >
-                You&apos;re in, {firstName}!
+                You&apos;re in, {submittedDetails?.name ? submittedDetails.name.split(" ")[0] : firstName}!
               </h1>
 
               <p
@@ -1254,8 +1581,29 @@ export default function PublicForm({ form }: PublicFormProps) {
                 }}
               >
                 {form.definition.settings.successMessage ||
-                  `Confirmation sent to ${email || "your email"}. See you at Codebreakers.`}
+                  `Confirmation sent to ${submittedDetails?.email || email || "your email"}. See you at CodeBreakers.`}
               </p>
+
+              {form.definition.settings.allowMultipleSubmissions && (
+                <div style={{ marginTop: 20 }}>
+                  <button
+                    type="button"
+                    className="mf-back-btn"
+                    onClick={() => {
+                      try {
+                        localStorage.removeItem(`public_form_submitted_${form.formId}`);
+                        localStorage.removeItem(`public_form_draft_${form.formId}`);
+                      } catch {
+                        // ignore storage error
+                      }
+                      setSuccess(false);
+                      setSubmittedDetails(null);
+                    }}
+                  >
+                    Submit another response
+                  </button>
+                </div>
+              )}
 
               <div
                 style={{
@@ -1280,7 +1628,6 @@ export default function PublicForm({ form }: PublicFormProps) {
                     alt="Codebreakers"
                     width={36}
                     height={36}
-                    style={{ objectFit: "contain" }}
                   />
                 </div>
                 <span
@@ -1655,27 +2002,31 @@ export default function PublicForm({ form }: PublicFormProps) {
 
         {/* Radio */}
         {field.type === "radio" && (
-          <div>
-            <RadioGroup
-              value={(answers[field.id] as string) || ""}
-              onValueChange={(opt) => updateAnswer(field.id, opt)}
-            >
-              {(field.options || ["Option 1"]).map((opt) => {
-                const selected = answers[field.id] === opt;
-                return (
-                  <label
-                    key={opt}
-                    className={`mf-option-card ${selected ? "selected" : ""}`}
-                  >
-                    <RadioGroupItem
-                      value={opt}
-                      className="h-4 w-4 border-2 border-[#D2D0CA] text-[#0078D4]"
-                    />
-                    <span className="mf-option-label">{opt}</span>
-                  </label>
-                );
-              })}
-            </RadioGroup>
+          <div role="radiogroup" aria-label={field.label}>
+            {(field.options || ["Option 1"]).map((opt) => {
+              const selected = answers[field.id] === opt;
+              return (
+                <div
+                  key={opt}
+                  className={`mf-option-card ${selected ? "selected" : ""}`}
+                  onClick={() => updateAnswer(field.id, opt)}
+                  role="radio"
+                  aria-checked={selected}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      updateAnswer(field.id, opt);
+                    }
+                  }}
+                >
+                  <div className="mf-radio-indicator">
+                    <div className="mf-radio-dot" />
+                  </div>
+                  <span className="mf-option-label">{opt}</span>
+                </div>
+              );
+            })}
             {fieldError && (
               <p className="mf-error-msg">This field is required</p>
             )}
@@ -1684,7 +2035,7 @@ export default function PublicForm({ form }: PublicFormProps) {
 
         {/* Checkbox */}
         {field.type === "checkbox" && (
-          <div>
+          <div role="group" aria-label={field.label}>
             {(field.options || ["Option 1"]).map((opt) => {
               const cur = (answers[field.id] as string[]) || [];
               const selected = cur.includes(opt);
@@ -1693,18 +2044,21 @@ export default function PublicForm({ form }: PublicFormProps) {
                   key={opt}
                   className={`mf-option-card ${selected ? "selected" : ""}`}
                   onClick={() => toggleCheckbox(field.id, opt)}
-                  role="button"
+                  role="checkbox"
+                  aria-checked={selected}
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ")
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
                       toggleCheckbox(field.id, opt);
+                    }
                   }}
                 >
-                  <Checkbox
-                    checked={selected}
-                    onCheckedChange={() => toggleCheckbox(field.id, opt)}
-                    className="h-4 w-4 rounded border-2 border-[#D2D0CA] data-[state=checked]:bg-[#0078D4] data-[state=checked]:border-[#0078D4]"
-                  />
+                  <div className="mf-checkbox-indicator">
+                    {selected && (
+                      <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+                    )}
+                  </div>
                   <span className="mf-option-label">{opt}</span>
                 </div>
               );
@@ -1869,6 +2223,20 @@ export default function PublicForm({ form }: PublicFormProps) {
         {/* ─── Form Card ─── */}
         <div className="mf-container">
           <div className="mf-card mf-fade-in">
+            {/* Form Brand Header */}
+            <div className="mf-brand-header">
+              <div className="mf-brand-logo-wrap">
+                <Image
+                  src="/assets/logo.png"
+                  alt="Codebreakers"
+                  width={20}
+                  height={20}
+                  style={{ objectFit: "contain" }}
+                />
+              </div>
+              <span className="mf-brand-name">CodeBreakers</span>
+            </div>
+
             {/* Form Title */}
             {form.title && <h1 className="mf-title">{form.title}</h1>}
 
@@ -1937,113 +2305,192 @@ export default function PublicForm({ form }: PublicFormProps) {
                   </p>
                 )}
 
-                {/* ─── Name Field ─── */}
-                {form.definition.settings.collectName &&
-                  (() => {
-                    questionNum++;
-                    const nameErr =
-                      (submitAttempted || touched["__name"]) && !name.trim();
-                    return (
-                      <div className="mf-question mf-fade-in">
-                        <p className="mf-question-label">
-                          {questionNum}. NAME{" "}
-                          <span className="mf-asterisk">*</span>
-                        </p>
-                        <input
-                          className={`mf-input${nameErr ? " mf-input-error" : ""}`}
-                          type="text"
-                          value={name}
-                          onChange={(e) => {
-                            setName(e.target.value);
-                            setTouched((c) => ({ ...c, __name: true }));
-                          }}
-                          placeholder="Enter your answer"
-                        />
-                        {nameErr && (
-                          <p className="mf-error-msg">This field is required</p>
-                        )}
-                      </div>
-                    );
-                  })()}
+                {/* ─── Name & Email (Section 1) ─── */}
+                {currentSectionIdx === 0 && (
+                  <>
+                    {/* Name Field */}
+                    {form.definition.settings.collectName &&
+                      (() => {
+                        questionNum++;
+                        const nameErr =
+                          (submitAttempted || touched["__name"]) && !name.trim();
+                        return (
+                          <div className="mf-question mf-fade-in">
+                            <p className="mf-question-label">
+                              {questionNum}. NAME{" "}
+                              <span className="mf-asterisk">*</span>
+                            </p>
+                            <input
+                              className={`mf-input${nameErr ? " mf-input-error" : ""}`}
+                              type="text"
+                              value={name}
+                              onChange={(e) => {
+                                setName(e.target.value);
+                                setTouched((c) => ({ ...c, __name: true }));
+                              }}
+                              placeholder="Enter your answer"
+                            />
+                            {nameErr && (
+                              <p className="mf-error-msg">This field is required</p>
+                            )}
+                          </div>
+                        );
+                      })()}
 
-                {/* ─── Email Field ─── */}
-                {form.definition.settings.collectEmail &&
-                  (() => {
-                    questionNum++;
-                    const emailErr =
-                      (submitAttempted || touched["__email"]) &&
-                      (!email.trim() || !email.includes("@"));
-                    return (
-                      <div className="mf-question mf-fade-in">
-                        <p className="mf-question-label">
-                          {questionNum}. Email{" "}
-                          <span className="mf-asterisk">*</span>
-                        </p>
-                        <input
-                          className={`mf-input${emailErr ? " mf-input-error" : ""}`}
-                          type="email"
-                          value={email}
-                          onChange={(e) => {
-                            setEmail(e.target.value);
-                            setTouched((c) => ({ ...c, __email: true }));
-                          }}
-                          placeholder="Enter your answer"
-                        />
-                        {emailErr && (
-                          <p className="mf-error-msg">
-                            Please enter a valid email address
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
+                    {/* Email Field */}
+                    {form.definition.settings.collectEmail &&
+                      (() => {
+                        questionNum++;
+                        const emailErr =
+                          (submitAttempted || touched["__email"]) &&
+                          (!email.trim() || !email.includes("@"));
+                        return (
+                          <div className="mf-question mf-fade-in">
+                            <p className="mf-question-label">
+                              {questionNum}. Email{" "}
+                              <span className="mf-asterisk">*</span>
+                            </p>
+                            <input
+                              className={`mf-input${emailErr ? " mf-input-error" : ""}`}
+                              type="email"
+                              value={email}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                setTouched((c) => ({ ...c, __email: true }));
+                              }}
+                              placeholder="Enter your answer"
+                            />
+                            {emailErr && (
+                              <p className="mf-error-msg">
+                                Please enter a valid email address
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                  </>
+                )}
 
-                {/* ─── Section Fields ─── */}
-                {form.definition.sections.map((section, sIdx) => {
-                  const showSectionHeader =
-                    form.definition.sections.length > 1 ||
-                    (section.title && section.title !== "Section 1") ||
-                    !!section.description;
+                {/* ─── Current Section Questions ─── */}
+                {(() => {
+                  const currentSection =
+                    form.definition.sections[currentSectionIdx] ||
+                    form.definition.sections[0];
+                  if (!currentSection) return null;
 
                   return (
-                    <div key={section.id}>
-                      {showSectionHeader && (
-                        <div style={{ marginTop: 24, marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #eee" }}>
-                          {section.title && (
-                            <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px", color: "#1C1B1F" }}>
-                              {section.title}
-                            </h2>
-                          )}
-                          {section.description &&
-                            renderRichText(section.description, "mf-description")}
+                    <div key={currentSection.id} className="mf-fade-in">
+                      {form.definition.sections.length > 1 && (
+                        <div
+                          style={{
+                            marginTop: 20,
+                            marginBottom: 16,
+                            paddingBottom: 10,
+                            borderBottom: "1.5px solid #EDEBE9",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#0078D4",
+                                background: "#EFF6FC",
+                                padding: "3px 8px",
+                                borderRadius: 4,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              Section {currentSectionIdx + 1} of{" "}
+                              {form.definition.sections.length}
+                            </span>
+                          </div>
+                          {currentSection.title &&
+                            currentSection.title !== "Section 1" && (
+                              <h2
+                                style={{
+                                  fontSize: 18,
+                                  fontWeight: 700,
+                                  margin: "6px 0 4px",
+                                  color: "#1C1B1F",
+                                }}
+                              >
+                                {currentSection.title}
+                              </h2>
+                            )}
+                          {currentSection.description &&
+                            renderRichText(
+                              currentSection.description,
+                              "mf-description",
+                            )}
                         </div>
                       )}
-                      {section.fields.map((field) => {
+                      {currentSection.fields.map((field) => {
                         questionNum++;
                         return renderField(field, questionNum);
                       })}
                     </div>
                   );
-                })}
+                })()}
 
-                {/* ─── Submit Button ─── */}
-                <div style={{ paddingTop: 16 }}>
-                  <button
-                    type="button"
-                    className="mf-submit-btn"
-                    disabled={isSubmitting}
-                    onClick={handleSubmit}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="animate-spin h-4 w-4" /> Submitting…
-                      </>
-                    ) : (
-                      <>
-                        {form.definition.settings.submitButtonLabel || "Submit"}
-                      </>
-                    )}
-                  </button>
+                {/* ─── Navigation Buttons (Back / Next / Submit) ─── */}
+                <div
+                  style={{
+                    paddingTop: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  {sectionHistory.length > 0 ? (
+                    <button
+                      type="button"
+                      className="mf-back-btn"
+                      disabled={isSubmitting}
+                      onClick={handlePrevSection}
+                    >
+                      Back
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+
+                  {isCurrentStepSubmit ? (
+                    <button
+                      type="button"
+                      className="mf-submit-btn"
+                      disabled={isSubmitting}
+                      onClick={handleSubmit}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="animate-spin h-4 w-4" /> Submitting…
+                        </>
+                      ) : (
+                        <>
+                          {form.definition.settings.submitButtonLabel || "Submit"}
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="mf-submit-btn"
+                      disabled={isSubmitting}
+                      onClick={handleNextSection}
+                    >
+                      Next
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -2053,7 +2500,7 @@ export default function PublicForm({ form }: PublicFormProps) {
           <div className="mf-footer">
             <a href="/privacy">Privacy Policy</a>
             <span style={{ margin: "0 8px", color: "#ccc" }}>·</span>
-            Powered by <strong>Codebreakers</strong>
+            Powered by <strong>CodeBreakers</strong>
           </div>
         </div>
       </div>

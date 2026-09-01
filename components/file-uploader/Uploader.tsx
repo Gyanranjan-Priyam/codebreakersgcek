@@ -351,8 +351,17 @@ export function Uploader({ value, onChange, fileTypeAccepted, disabled = false, 
                     </div>
 
                     {uploading && (
-                        <div className="mt-4 w-full max-w-xs">
-                            <Progress value={uploadProgress} className="h-1.5" />
+                        <div className="mt-4 w-full max-w-xs space-y-1.5">
+                            <div className="flex justify-between items-center text-xs font-medium">
+                                <span className="text-muted-foreground">Uploading file...</span>
+                                <span className="font-mono font-bold text-primary">{uploadProgress}%</span>
+                            </div>
+                            <div className="relative w-full h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-primary rounded-full transition-all duration-200 ease-out"
+                                    style={{ width: `${Math.max(4, Math.min(100, uploadProgress))}%` }}
+                                />
+                            </div>
                         </div>
                     )}
                 </div>

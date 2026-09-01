@@ -1,7 +1,7 @@
 /**
- * Maximum allowed original upload size: 1 MB (1,048,576 bytes)
+ * Maximum allowed original upload size: 5 MB (5,242,880 bytes)
  */
-export const MAX_ORIGINAL_FILE_SIZE_BYTES = 1 * 1024 * 1024; // 1 MB
+export const MAX_ORIGINAL_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
  * Maximum allowed file size for Google Drive Form Uploads: 300 KB (307,200 bytes)
@@ -33,13 +33,13 @@ export function isImageMimeType(mimeType: string, fileName?: string): boolean {
 }
 
 /**
- * Compresses an image file in the browser using HTML5 Canvas / OffscreenCanvas
+ * Compresses an image file in the browser using HTML5 Canvas
  * preserving its ORIGINAL format (JPG stays JPG, PNG stays PNG, WEBP stays WEBP)
- * to ensure the final output is strictly <= 300 KB (307,200 bytes).
+ * and maximizing visual quality while ensuring the final output is strictly <= 300 KB (307,200 bytes).
  */
 export async function compressImageToMax300KB(
   file: File,
-  onProgress?: (stage: string) => void
+  onProgress?: (stage: string, percent?: number) => void
 ): Promise<CompressionResult> {
   const originalSizeBytes = file.size;
 
@@ -59,8 +59,9 @@ export async function compressImageToMax300KB(
     extension = ".webp";
   }
 
-  // If already under 300 KB, return the original file in its native format
+  // If already under 300 KB, return the original file in its native format directly
   if (originalSizeBytes <= MAX_COMPRESSED_SIZE_BYTES) {
+    onProgress?.("File ready", 100);
     return {
       file,
       blob: file,
@@ -72,19 +73,19 @@ export async function compressImageToMax300KB(
     };
   }
 
-  onProgress?.("Reading image...");
+  onProgress?.("Reading image...", 15);
 
   // Load image into HTMLImageElement
   const imageBitmap = await loadImage(file);
   const originalWidth = imageBitmap.naturalWidth || imageBitmap.width;
   const originalHeight = imageBitmap.naturalHeight || imageBitmap.height;
 
-  onProgress?.("Optimizing resolution & file size...");
+  onProgress?.("Optimizing resolution & quality...", 35);
 
-  // Start with max dimension 1920px (preserving aspect ratio)
+  // Start with high-definition cap 2560px to preserve sharpness for large photos
   let width = originalWidth;
   let height = originalHeight;
-  const maxInitialDimension = 1920;
+  const maxInitialDimension = 2560;
 
   if (width > maxInitialDimension || height > maxInitialDimension) {
     if (width > height) {
@@ -96,7 +97,7 @@ export async function compressImageToMax300KB(
     }
   }
 
-  // Create canvas
+  // Create canvas with high-quality smoothing
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) {
@@ -106,19 +107,23 @@ export async function compressImageToMax300KB(
   let bestBlob: Blob | null = null;
 
   if (isPng) {
-    // For PNG: iterative dimension downscaling to keep lossless PNG format under 300 KB
-    const dimensionSteps = [1.0, 0.85, 0.70, 0.58, 0.48, 0.38, 0.30];
+    // For PNG: gradual dimension steps with high-quality bicubic smoothing to keep lossless PNG format under 300 KB
+    const dimensionSteps = [1.0, 0.90, 0.80, 0.70, 0.60, 0.50, 0.40, 0.30];
 
-    for (const scale of dimensionSteps) {
-      const curW = Math.max(100, Math.round(width * scale));
-      const curH = Math.max(100, Math.round(height * scale));
+    for (let i = 0; i < dimensionSteps.length; i++) {
+      const scale = dimensionSteps[i];
+      const curW = Math.max(120, Math.round(width * scale));
+      const curH = Math.max(120, Math.round(height * scale));
 
       canvas.width = curW;
       canvas.height = curH;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, curW, curH);
       ctx.drawImage(imageBitmap, 0, 0, curW, curH);
 
-      onProgress?.(`Optimizing PNG dimensions (${curW}×${curH})...`);
+      const pct = Math.round(40 + (i / dimensionSteps.length) * 50);
+      onProgress?.(`Optimizing PNG dimensions (${curW}×${curH})...`, pct);
       const blob = await canvasToBlob(canvas, "image/png");
 
       if (blob && blob.size <= MAX_COMPRESSED_SIZE_BYTES) {
@@ -127,16 +132,18 @@ export async function compressImageToMax300KB(
       }
     }
   } else {
-    // For JPEG / WebP: iterative quality and dimension stepping
-    const qualitySteps = [0.90, 0.82, 0.74, 0.65, 0.55, 0.45, 0.35];
+    // For JPEG / WebP: fine-tuned quality steps to preserve maximum detail and avoid over-compression
+    const qualitySteps = [0.92, 0.88, 0.84, 0.80, 0.76, 0.72, 0.68, 0.64, 0.58, 0.50];
 
-    for (let attempt = 0; attempt < 8; attempt++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
       canvas.width = width;
       canvas.height = height;
 
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, width, height);
 
-      // If JPEG, fill white background for transparent pixels
+      // If JPEG, fill crisp white background for transparent pixels
       if (targetMime === "image/jpeg") {
         ctx.fillStyle = "#FFFFFF";
         ctx.fillRect(0, 0, width, height);
@@ -144,8 +151,10 @@ export async function compressImageToMax300KB(
 
       ctx.drawImage(imageBitmap, 0, 0, width, height);
 
-      for (const quality of qualitySteps) {
-        onProgress?.(`Compressing (${Math.round(quality * 100)}% quality)...`);
+      for (let qIdx = 0; qIdx < qualitySteps.length; qIdx++) {
+        const quality = qualitySteps[qIdx];
+        const pct = Math.round(40 + (attempt * 4) + (qIdx / qualitySteps.length) * 50);
+        onProgress?.(`Optimizing quality (${Math.round(quality * 100)}%)...`, Math.min(pct, 92));
         const blob = await canvasToBlob(canvas, targetMime, quality);
 
         if (blob && blob.size <= MAX_COMPRESSED_SIZE_BYTES) {
@@ -158,11 +167,11 @@ export async function compressImageToMax300KB(
         break;
       }
 
-      // Scale down dimensions by 20% and try again
-      width = Math.round(width * 0.8);
-      height = Math.round(height * 0.8);
+      // Scale down dimensions gently by 15% to maintain sharpness
+      width = Math.round(width * 0.85);
+      height = Math.round(height * 0.85);
 
-      if (width < 200 || height < 200) {
+      if (width < 250 || height < 250) {
         break;
       }
     }
@@ -179,7 +188,7 @@ export async function compressImageToMax300KB(
   const newFileName = `${originalBaseName}${extension}`;
   const compressedFile = new File([bestBlob], newFileName, { type: targetMime });
 
-  onProgress?.("Compression complete");
+  onProgress?.("Compression complete", 96);
 
   return {
     file: compressedFile,
@@ -199,14 +208,16 @@ export async function compressImageToMax300KB(
  */
 export async function processAndCompressFormFile(
   file: File,
-  onProgress?: (stage: string) => void
+  onProgress?: (stage: string, percent?: number) => void
 ): Promise<CompressionResult> {
-  // Check 1 MB upload limit
+  // Check 5 MB upload limit
   if (file.size > MAX_ORIGINAL_FILE_SIZE_BYTES) {
     throw new Error(
-      `"${file.name}" exceeds the maximum allowed file size of 1 MB (${(file.size / (1024 * 1024)).toFixed(1)} MB). Please upload a file up to 1 MB.`
+      `"${file.name}" exceeds the maximum allowed file size of 5 MB (${(file.size / (1024 * 1024)).toFixed(1)} MB). Please upload a file up to 5 MB.`
     );
   }
+
+  onProgress?.("Validating file...", 10);
 
   if (isImageMimeType(file.type, file.name)) {
     return compressImageToMax300KB(file, onProgress);
@@ -218,6 +229,8 @@ export async function processAndCompressFormFile(
       `This file (${(file.size / 1024).toFixed(0)} KB) exceeds the maximum allowed size of 300 KB. Please upload a PDF under 300 KB.`
     );
   }
+
+  onProgress?.("File ready", 100);
 
   return {
     file,

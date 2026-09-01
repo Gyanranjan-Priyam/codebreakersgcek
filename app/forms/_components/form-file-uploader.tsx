@@ -59,6 +59,7 @@ export function FormFileUploader({
   const [processingState, setProcessingState] = useState<{
     isProcessing: boolean;
     fileName?: string;
+    fileSize?: number;
     stage?: string;
     progress: number;
   }>({ isProcessing: false, progress: 0 });
@@ -97,29 +98,31 @@ export function FormFileUploader({
       const maxAllowedBytes = MAX_ORIGINAL_FILE_SIZE_BYTES;
 
       if (file.size > maxAllowedBytes) {
-        toast.error(`"${file.name}" exceeds the maximum allowed file size of 1 MB.`);
+        toast.error(`"${file.name}" exceeds the maximum allowed file size of 5 MB.`);
         continue;
       }
 
       setProcessingState({
         isProcessing: true,
         fileName: file.name,
+        fileSize: file.size,
         stage: "Reading file...",
-        progress: 25,
+        progress: 15,
       });
 
       try {
-        const result = await processAndCompressFormFile(file, (stage) => {
+        const result = await processAndCompressFormFile(file, (stage, percent) => {
           setProcessingState((prev) => ({
             ...prev,
             stage,
-            progress: Math.min(prev.progress + 20, 90),
+            progress: percent !== undefined ? percent : Math.min(prev.progress + 15, 90),
           }));
         });
 
         // Convert blob to Base64 (stored locally in client state, uploaded on form submit)
-        setProcessingState((prev) => ({ ...prev, stage: "Ready for submission", progress: 98 }));
+        setProcessingState((prev) => ({ ...prev, stage: "Encoding file...", progress: 95 }));
         const base64Data = await blobToBase64(result.blob);
+        setProcessingState((prev) => ({ ...prev, stage: "Ready", progress: 100 }));
 
         let previewUrl: string | undefined;
         if (result.mimeType.startsWith("image/")) {
@@ -226,24 +229,46 @@ export function FormFileUploader({
               <p className="text-xs text-[#605E5C]">
                 {imageOnly ? "Images (JPG, PNG, WEBP)" : `Allowed: ${allowedFileTypes.join(", ").toUpperCase()}`}
                 {" • "}
-                Max size: <span className="font-semibold text-[#1C1B1F]">1 MB</span> (Optimized to ≤ 300 KB)
+                Max size: <span className="font-semibold text-[#1C1B1F]">5 MB</span> (Optimized to ≤ 300 KB)
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Processing Loader */}
+      {/* Real-Time Processing / Upload Progress Card */}
       {processingState.isProcessing && (
-        <div className="p-4 rounded-xl border border-[#0078D4]/20 bg-[#F0F7FD] space-y-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-[#0078D4] font-medium">
-              <Loader2 className="w-4 h-4 animate-spin text-[#0078D4]" />
-              <span className="text-[#1C1B1F] font-semibold">Processing {processingState.fileName}...</span>
+        <div className="p-4 rounded-xl border border-[#0078D4]/30 bg-[#F0F7FD] shadow-xs space-y-3 animate-in fade-in-50 duration-200">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-[#EBF3FC] text-[#0078D4] flex items-center justify-center shrink-0 border border-[#0078D4]/20">
+                <Loader2 className="w-4 h-4 animate-spin text-[#0078D4]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#1C1B1F] truncate max-w-[200px] sm:max-w-[300px]">
+                  {processingState.fileName}
+                </p>
+                <p className="text-[11px] text-[#605E5C]">
+                  {processingState.fileSize ? `${(processingState.fileSize / 1024).toFixed(0)} KB • ` : ""}
+                  <span className="text-[#0078D4] font-medium">{processingState.stage}</span>
+                </p>
+              </div>
             </div>
-            <span className="text-[#605E5C] text-[11px]">{processingState.stage}</span>
+
+            <div className="text-right shrink-0">
+              <span className="text-sm font-bold font-mono text-[#0078D4]">
+                {Math.round(processingState.progress)}%
+              </span>
+            </div>
           </div>
-          <Progress value={processingState.progress} className="h-1.5 bg-[#D2D0CA]/40" />
+
+          {/* High-visibility Progress bar */}
+          <div className="relative w-full h-2 bg-[#D2D0CA]/30 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#0078D4] rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${Math.max(5, Math.min(100, processingState.progress))}%` }}
+            />
+          </div>
         </div>
       )}
 

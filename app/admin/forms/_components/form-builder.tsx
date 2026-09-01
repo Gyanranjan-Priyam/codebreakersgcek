@@ -23,6 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -78,6 +83,9 @@ import {
   Check,
   SlidersHorizontal,
   HardDrive,
+  MoreHorizontal,
+  Split,
+  ArrowRight,
 } from "lucide-react";
 import {
   createForm,
@@ -412,6 +420,237 @@ function BannerSidebarSheet({
   );
 }
 
+/* ─── Google Forms-Style Adaptive Side Toolbar ─── */
+
+function AdaptiveSideToolbar({
+  onAddField,
+  onAddSection,
+  onOpenBanner,
+  isMobileHorizontal = false,
+}: {
+  onAddField: (type: FormFieldType) => void;
+  onAddSection: () => void;
+  onOpenBanner: () => void;
+  isMobileHorizontal?: boolean;
+}) {
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+
+  const moreTypes: Array<{
+    type: FormFieldType;
+    icon: React.ElementType;
+    label: string;
+    description: string;
+  }> = [
+    { type: "long_text", icon: AlignLeft, label: "Long answer", description: "Multi-line paragraph text" },
+    { type: "linear_scale", icon: SlidersHorizontal, label: "Linear scale", description: "Numeric rating scale" },
+    { type: "payment", icon: CreditCard, label: "Payment", description: "UPI payment & dynamic QR" },
+    { type: "date", icon: CalendarIcon, label: "Date picker", description: "Interactive calendar picker" },
+    { type: "multi_input", icon: Layers, label: "Multi-inputs", description: "Sub-question inputs" },
+    { type: "button", icon: ExternalLink, label: "Link button", description: "Action button to external URL" },
+  ];
+
+  if (isMobileHorizontal) {
+    return (
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onAddField("radio")}
+          title="Add multiple choice"
+          className="h-8 w-8 rounded-xl flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/30 transition-all active:scale-95 cursor-pointer"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onAddField("short_text")}
+          title="Add short answer"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all active:scale-95 cursor-pointer"
+        >
+          <Type className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onAddField("checkbox")}
+          title="Add checkboxes"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all active:scale-95 cursor-pointer"
+        >
+          <CheckSquare className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onAddField("file_upload")}
+          title="Add file upload"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all active:scale-95 cursor-pointer"
+        >
+          <HardDrive className="h-4 w-4" />
+        </button>
+
+        <Popover open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              title="More question types"
+              className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                isMoreOpen ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+              }`}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="center" className="w-60 p-1.5 rounded-2xl shadow-xl z-50 border border-border bg-card">
+            <p className="px-2.5 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+              More Types
+            </p>
+            <div className="space-y-0.5">
+              {moreTypes.map(({ type, icon: Icon, label }) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => {
+                    onAddField(type);
+                    setIsMoreOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-left hover:bg-muted/80 transition-colors text-xs font-medium cursor-pointer"
+                >
+                  <Icon className="h-3.5 w-3.5 text-primary" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <div className="h-4 w-px bg-border/60 mx-0.5" />
+        <button
+          type="button"
+          onClick={onAddSection}
+          title="Add section"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-primary hover:bg-primary/10 transition-all active:scale-95 cursor-pointer"
+        >
+          <Layers className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onOpenBanner}
+          title="Banner settings"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all active:scale-95 cursor-pointer"
+        >
+          <Palette className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="bg-card border border-border/80 rounded-2xl shadow-xl shadow-black/8 p-1.5 flex flex-col gap-1 w-fit select-none animate-in fade-in-50 zoom-in-95 duration-200"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={() => onAddField("radio")}
+        title="Add question (Multiple choice)"
+        className="h-9 w-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onAddField("short_text")}
+        title="Add short answer"
+        className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+      >
+        <Type className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onAddField("checkbox")}
+        title="Add checkboxes"
+        className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+      >
+        <CheckSquare className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onAddField("file_upload")}
+        title="Add file upload (Google Drive)"
+        className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+      >
+        <HardDrive className="h-4 w-4" />
+      </button>
+
+      {/* Adaptive More Options Popover */}
+      <Popover open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title="More question types"
+            className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
+              isMoreOpen ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+            }`}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="start"
+          sideOffset={10}
+          className="w-64 p-1.5 rounded-2xl shadow-2xl z-50 border border-border bg-card"
+        >
+          <p className="px-2.5 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+            More Question Types
+          </p>
+          <div className="space-y-0.5">
+            {moreTypes.map(({ type, icon: Icon, label, description }) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => {
+                  onAddField(type);
+                  setIsMoreOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-muted/80 transition-colors cursor-pointer"
+              >
+                <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Icon className="h-3.5 w-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground">{label}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <div className="my-0.5 h-px bg-border/50 mx-1" />
+
+      <button
+        type="button"
+        onClick={onAddSection}
+        title="Add new section"
+        className="h-9 w-9 rounded-xl flex items-center justify-center text-primary hover:bg-primary/10 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+      >
+        <Layers className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={onOpenBanner}
+        title="Header Banner Settings"
+        className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+      >
+        <Palette className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 /* ─── Question Card ─── */
 
 function QuestionCard({
@@ -419,19 +658,27 @@ function QuestionCard({
   field,
   isActive,
   isGoogleDriveConnected,
+  sections,
   onSelect,
   onUpdate,
   onDelete,
   onDuplicate,
+  onAddField,
+  onAddSection,
+  onOpenBanner,
 }: {
   sectionId: string;
   field: FormFieldDefinition;
   isActive: boolean;
   isGoogleDriveConnected?: boolean | null;
+  sections: FormSectionDefinition[];
   onSelect: () => void;
   onUpdate: (patch: Partial<FormFieldDefinition>) => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onAddField: (type: FormFieldType) => void;
+  onAddSection: () => void;
+  onOpenBanner: () => void;
 }) {
   const [showImageUpload, setShowImageUpload] = useState(false);
   const sortableId = `field:${sectionId}:${field.id}`;
@@ -444,12 +691,24 @@ function QuestionCard({
 
   return (
     <div
+      id={`field-card-${field.id}`}
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={onSelect}
       className={`group relative rounded-2xl transition-all duration-300 cursor-pointer
         ${isActive ? "bg-card border-2 border-primary/50 shadow-lg shadow-primary/10 ring-2 ring-primary/10 cursor-default" : "bg-card border border-border hover:border-primary/30 hover:shadow-md hover:shadow-primary/5 shadow-xs"}`}
     >
+      {/* Side Toolbar (anchored to active question card) */}
+      {isActive && (
+        <div className="hidden md:flex absolute -right-12 sm:-right-14 top-2 z-30">
+          <AdaptiveSideToolbar
+            onAddField={onAddField}
+            onAddSection={onAddSection}
+            onOpenBanner={onOpenBanner}
+          />
+        </div>
+      )}
+
       {isActive && <div className="absolute left-0 top-4 bottom-4 w-1 bg-primary rounded-r-full" />}
       <div className="flex justify-center pt-3 pb-1">
         <button type="button" className="text-muted-foreground/30 hover:text-muted-foreground/60 cursor-grab active:cursor-grabbing transition-colors p-1" {...attributes} {...listeners}>
@@ -533,17 +792,81 @@ function QuestionCard({
                 </div>
               ) : field.type === "radio" || field.type === "checkbox" || field.type === "dropdown" ? (
                 <div className="space-y-2.5">
+                  {(field.type === "radio" || field.type === "dropdown") && field.goToSectionBasedOnAnswer && sections.length > 1 && (
+                    <div className="p-2.5 rounded-xl bg-primary/5 border border-primary/20 text-xs text-primary flex items-center gap-2">
+                      <Split className="h-4 w-4 shrink-0" />
+                      <span className="font-medium">Branching active: Choose what section each option navigates to.</span>
+                    </div>
+                  )}
+
                   {(field.options || ["Option 1"]).map((option, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      {field.type === "radio" ? <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/50 shrink-0" /> : field.type === "checkbox" ? <div className="h-4 w-4 rounded border-2 border-muted-foreground/50 shrink-0" /> : <span className="text-xs font-bold text-muted-foreground w-5 text-center shrink-0">{idx + 1}.</span>}
-                      <Input value={option} onChange={(e) => updateOptionText(idx, e.target.value)} className="flex-1 bg-background border-border/50 hover:border-primary/50 focus-visible:ring-primary/30 text-sm h-9 rounded-lg" placeholder={`Option ${idx + 1}`} />
-                      {(field.options?.length || 0) > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(idx)} className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><X className="h-3.5 w-3.5" /></Button>}
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <div className="flex items-center gap-3 flex-1">
+                        {field.type === "radio" ? (
+                          <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/50 shrink-0" />
+                        ) : field.type === "checkbox" ? (
+                          <div className="h-4 w-4 rounded border-2 border-muted-foreground/50 shrink-0" />
+                        ) : (
+                          <span className="text-xs font-bold text-muted-foreground w-5 text-center shrink-0">{idx + 1}.</span>
+                        )}
+                        <Input
+                          value={option}
+                          onChange={(e) => updateOptionText(idx, e.target.value)}
+                          className="flex-1 bg-background border-border/50 hover:border-primary/50 focus-visible:ring-primary/30 text-sm h-9 rounded-lg"
+                          placeholder={`Option ${idx + 1}`}
+                        />
+                        {(field.options?.length || 0) > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeOption(idx)}
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Go to section dropdown per option */}
+                      {field.goToSectionBasedOnAnswer && (field.type === "radio" || field.type === "dropdown") && sections.length > 1 && (
+                        <div className="pl-7 sm:pl-0 shrink-0">
+                          <Select
+                            value={field.optionNavigation?.[String(idx)] || "next"}
+                            onValueChange={(val) => {
+                              const nav = { ...(field.optionNavigation || {}) };
+                              nav[String(idx)] = val;
+                              onUpdate({ optionNavigation: nav });
+                            }}
+                          >
+                            <SelectTrigger className="w-full sm:w-56 h-8 bg-muted/40 border-border/60 text-xs rounded-lg font-medium">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="next" className="text-xs">Continue to next section</SelectItem>
+                              {sections
+                                .filter((sec) => sec.id !== sectionId)
+                                .map((sec) => {
+                                  const sIdx = sections.findIndex((s) => s.id === sec.id);
+                                  return (
+                                    <SelectItem key={sec.id} value={`section_${sec.id}`} className="text-xs">
+                                      Go to section {sIdx + 1} ({sec.title || `Section ${sIdx + 1}`})
+                                    </SelectItem>
+                                  );
+                                })}
+                              <SelectItem value="submit" className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                Submit form
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                   ))}
                   <div className="flex items-center gap-3 pt-1">
-                    <Button type="button" variant="ghost" size="sm" onClick={addOption} className="text-xs text-primary hover:text-primary hover:bg-primary/10 rounded-lg h-8"><Plus className="mr-1 h-3 w-3" /> Add option</Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={addOption} className="text-xs text-primary hover:text-primary hover:bg-primary/10 rounded-lg h-8 cursor-pointer"><Plus className="mr-1 h-3 w-3" /> Add option</Button>
                     <span className="text-muted-foreground/50 text-xs">or</span>
-                    <Button type="button" variant="ghost" size="sm" onClick={addOtherOption} className="text-xs text-muted-foreground hover:text-foreground rounded-lg h-8">Add &quot;Other&quot;</Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={addOtherOption} className="text-xs text-muted-foreground hover:text-foreground rounded-lg h-8 cursor-pointer">Add &quot;Other&quot;</Button>
                   </div>
                 </div>
               ) : field.type === "button" ? (
@@ -888,7 +1211,7 @@ function QuestionCard({
                       <div className="p-2.5 rounded-lg bg-background border border-border/60 text-xs space-y-1">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Max Upload Size:</span>
-                          <span className="font-semibold text-foreground">1 MB</span>
+                          <span className="font-semibold text-foreground">5 MB</span>
                         </div>
                         <div className="flex justify-between text-[11px] text-muted-foreground">
                           <span>Target in Drive:</span>
@@ -955,10 +1278,30 @@ function QuestionCard({
             </div>
 
             {/* Bottom toolbar */}
-            <div className="flex items-center justify-between pt-3 border-t border-border/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/50">
               <div className="flex items-center gap-1">
-                <Button type="button" variant="ghost" size="icon" onClick={onDuplicate} className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60" title="Duplicate"><Copy className="h-4 w-4" /></Button>
-                <Button type="button" variant="ghost" size="icon" onClick={onDelete} className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10" title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" onClick={onDuplicate} className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 cursor-pointer" title="Duplicate"><Copy className="h-4 w-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" onClick={onDelete} className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer" title="Delete"><Trash2 className="h-4 w-4" /></Button>
+
+                {/* Branching Toggle for Radio/Dropdown */}
+                {(field.type === "radio" || field.type === "dropdown") && sections.length > 1 && (
+                  <Button
+                    type="button"
+                    variant={field.goToSectionBasedOnAnswer ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => onUpdate({ goToSectionBasedOnAnswer: !field.goToSectionBasedOnAnswer })}
+                    className={`h-8 text-xs rounded-lg gap-1.5 ml-1 transition-all cursor-pointer ${
+                      field.goToSectionBasedOnAnswer
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground border-border/60"
+                    }`}
+                    title="Go to section based on answer"
+                  >
+                    <Split className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Go to section based on answer</span>
+                    <span className="sm:hidden">Branching</span>
+                  </Button>
+                )}
               </div>
               <div className="flex items-center gap-2.5">
                 <span className="text-xs font-medium text-muted-foreground">Required</span>
@@ -1131,8 +1474,41 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
   /* ─── Field operations ─── */
   const addField = (type: FormFieldType = "radio") => {
     const f = emptyField(type, currentSection.fields.length);
-    setDefinition((c) => ({ ...c, sections: c.sections.map((s, i) => i === safeIdx ? { ...s, fields: [...s.fields, f] } : s) }));
+    if (activeFieldId && activeFieldId !== "title" && activeFieldId !== "section") {
+      const activeIdx = currentSection.fields.findIndex((field) => field.id === activeFieldId);
+      if (activeIdx !== -1) {
+        const newFields = [...currentSection.fields];
+        newFields.splice(activeIdx + 1, 0, f);
+        const reordered = newFields.map((field, idx) => ({ ...field, order: idx }));
+        setDefinition((c) => ({
+          ...c,
+          sections: c.sections.map((s, i) => (i === safeIdx ? { ...s, fields: reordered } : s)),
+        }));
+        setActiveFieldId(f.id);
+
+        // Auto-scroll to the newly created question
+        setTimeout(() => {
+          const el = document.getElementById(`field-card-${f.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 80);
+        return;
+      }
+    }
+    setDefinition((c) => ({
+      ...c,
+      sections: c.sections.map((s, i) => (i === safeIdx ? { ...s, fields: [...s.fields, f] } : s)),
+    }));
     setActiveFieldId(f.id);
+
+    // Auto-scroll to the newly created question
+    setTimeout(() => {
+      const el = document.getElementById(`field-card-${f.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 80);
   };
 
   const updateField = (id: string, patch: Partial<FormFieldDefinition>) => {
@@ -1506,13 +1882,29 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
 
         {/* ─── QUESTIONS TAB ─── */}
         {activeTab === "questions" && (
-          <div className="max-w-3xl mx-auto px-4 flex gap-4">
-            <div className="flex-1 space-y-3 min-w-0">
+          <div className="max-w-3xl mx-auto px-4 md:pr-16 relative">
+            <div className="space-y-3 min-w-0">
 
               {/* Title & Banner Card */}
-              <div className="bg-card rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+              <div
+                className={`bg-card rounded-2xl border border-border/60 shadow-sm relative transition-all ${
+                  activeFieldId === "title" ? "ring-2 ring-primary/20" : ""
+                }`}
+                onClick={() => setActiveFieldId("title")}
+              >
+                {/* Side toolbar anchored to Title Card when active */}
+                {activeFieldId === "title" && (
+                  <div className="hidden md:flex absolute -right-12 sm:-right-14 top-4 z-30">
+                    <AdaptiveSideToolbar
+                      onAddField={addField}
+                      onAddSection={addSection}
+                      onOpenBanner={() => setIsBannerSidebarOpen(true)}
+                    />
+                  </div>
+                )}
+
                 <div
-                  className={`relative w-full cursor-pointer group transition-all ${
+                  className={`relative w-full cursor-pointer group transition-all overflow-hidden rounded-t-2xl ${
                     hasBanner ? "h-40" : "h-14 border-b border-dashed border-border/50 hover:border-primary/40"
                   }`}
                   onClick={() => setIsBannerSidebarOpen(true)}
@@ -1581,7 +1973,25 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
               )}
 
               {/* Active section header editor */}
-              <div className="bg-card rounded-2xl border border-l-4 border-l-primary border-border/60 shadow-sm p-5 space-y-3">
+              <div
+                className={`bg-card rounded-2xl border border-l-4 border-l-primary border-border/60 shadow-sm p-5 space-y-3 relative transition-all ${
+                  activeFieldId === "section" || (activeFieldId === null && currentSection.fields.length === 0)
+                    ? "ring-2 ring-primary/20"
+                    : ""
+                }`}
+                onClick={() => setActiveFieldId("section")}
+              >
+                {/* Side toolbar anchored to Section Card when active or when form has no questions */}
+                {(activeFieldId === "section" || (activeFieldId === null && currentSection.fields.length === 0)) && (
+                  <div className="hidden md:flex absolute -right-12 sm:-right-14 top-4 z-30">
+                    <AdaptiveSideToolbar
+                      onAddField={addField}
+                      onAddSection={addSection}
+                      onOpenBanner={() => setIsBannerSidebarOpen(true)}
+                    />
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 flex-1">
                     <Layers className="h-4 w-4 text-primary shrink-0" />
@@ -1604,6 +2014,40 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
                   onChange={(val) => updateSection(safeIdx, { description: val })}
                   placeholder="Section description (optional)"
                 />
+
+                {/* After section action selector (Google Forms style) */}
+                {definition.sections.length > 1 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/40 text-xs">
+                    <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                      <ArrowRight className="h-3.5 w-3.5 text-primary" /> After section {safeIdx + 1}:
+                    </span>
+                    <Select
+                      value={currentSection.afterSectionAction || "next"}
+                      onValueChange={(val) => updateSection(safeIdx, { afterSectionAction: val })}
+                    >
+                      <SelectTrigger className="w-56 sm:w-64 h-8 bg-background border-border/60 text-xs rounded-lg font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="next" className="text-xs">Continue to next section</SelectItem>
+                        {definition.sections
+                          .filter((sec) => sec.id !== currentSection.id)
+                          .map((sec) => {
+                            const sIdx = definition.sections.findIndex((s) => s.id === sec.id);
+                            return (
+                              <SelectItem key={sec.id} value={`section_${sec.id}`} className="text-xs">
+                                Go to section {sIdx + 1} ({sec.title || `Section ${sIdx + 1}`})
+                              </SelectItem>
+                            );
+                          })}
+                        <SelectItem value="submit" className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          Submit form
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 pt-1 border-t border-border/30">
                   <span className="text-[11px] text-muted-foreground/70">
                     {safeIdx + 1} of {definition.sections.length} sections
@@ -1623,17 +2067,26 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
                         field={field}
                         isActive={activeFieldId === field.id}
                         isGoogleDriveConnected={isGoogleDriveConnected}
+                        sections={definition.sections}
                         onSelect={() => setActiveFieldId(field.id)}
                         onUpdate={(patch) => updateField(field.id, patch)}
                         onDelete={() => deleteField(field.id)}
                         onDuplicate={() => duplicateField(field.id)}
+                        onAddField={addField}
+                        onAddSection={addSection}
+                        onOpenBanner={() => setIsBannerSidebarOpen(true)}
                       />
                     ))}
                     {currentSection.fields.length === 0 && (
-                      <div className="bg-card rounded-2xl border border-dashed border-border/60 p-12 text-center space-y-3">
-                        <div className="h-12 w-12 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto"><Plus className="h-6 w-6 text-muted-foreground" /></div>
-                        <p className="text-sm font-medium text-muted-foreground">No questions in this section</p>
-                        <p className="text-xs text-muted-foreground/70">Click + in the sidebar to add questions</p>
+                      <div
+                        onClick={() => addField("radio")}
+                        className="bg-card rounded-2xl border-2 border-dashed border-border/70 hover:border-primary/50 hover:bg-primary/5 p-10 text-center space-y-3 cursor-pointer transition-all group"
+                      >
+                        <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex items-center justify-center mx-auto transition-all shadow-sm">
+                          <Plus className="h-6 w-6" />
+                        </div>
+                        <p className="text-sm font-semibold text-foreground">Add your first question</p>
+                        <p className="text-xs text-muted-foreground">Click here or use the toolbar on the right</p>
                       </div>
                     )}
                   </div>
@@ -1641,32 +2094,14 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
               </DndContext>
             </div>
 
-            {/* Floating toolbar */}
-            <div className="sticky top-[104px] h-fit">
-              <div className="bg-card border border-border/60 rounded-2xl shadow-lg shadow-black/5 p-2 flex flex-col gap-1">
-                <button type="button" onClick={() => addField("radio")} title="Add multiple choice" className="h-9 w-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/30 transition-all hover:scale-105">
-                  <Plus className="h-4 w-4" />
-                </button>
-                {([
-                  { type: "short_text" as FormFieldType, icon: Type, label: "Short answer" },
-                  { type: "checkbox" as FormFieldType, icon: CheckSquare, label: "Checkboxes" },
-                  { type: "linear_scale" as FormFieldType, icon: SlidersHorizontal, label: "Linear scale rating" },
-                  { type: "file_upload" as FormFieldType, icon: HardDrive, label: "File upload (Google Drive)" },
-                  { type: "payment" as FormFieldType, icon: CreditCard, label: "Payment" },
-                  { type: "button" as FormFieldType, icon: ExternalLink, label: "Link button" },
-                ] as Array<{ type: FormFieldType; icon: React.ElementType; label: string }>).map(({ type, icon: Icon, label }) => (
-                  <button key={type} type="button" onClick={() => addField(type)} title={label} className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all hover:scale-105">
-                    <Icon className="h-4 w-4" />
-                  </button>
-                ))}
-                <div className="my-1 h-px bg-border/50 mx-1" />
-                <button type="button" onClick={addSection} title="Add new section" className="h-9 w-9 rounded-xl flex items-center justify-center text-primary hover:bg-primary/10 transition-all hover:scale-105">
-                  <Layers className="h-4 w-4" />
-                </button>
-                <button type="button" onClick={() => setIsBannerSidebarOpen(true)} title="Header Banner Settings" className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all hover:scale-105">
-                  <Palette className="h-4 w-4" />
-                </button>
-              </div>
+            {/* Mobile floating action bar */}
+            <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card/95 backdrop-blur-xl border border-border/80 shadow-2xl rounded-2xl p-1.5 flex items-center gap-1.5">
+              <AdaptiveSideToolbar
+                onAddField={addField}
+                onAddSection={addSection}
+                onOpenBanner={() => setIsBannerSidebarOpen(true)}
+                isMobileHorizontal
+              />
             </div>
           </div>
         )}

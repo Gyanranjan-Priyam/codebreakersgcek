@@ -51,6 +51,10 @@ export interface FormFieldDefinition {
   maxFiles?: number;
   imageOnly?: boolean;
   multipleFiles?: boolean;
+  /** Conditional branching (Google Forms style) */
+  goToSectionBasedOnAnswer?: boolean;
+  /** Mapping of option index/text to target: 'next' | 'submit' | `section_${sectionId}` */
+  optionNavigation?: Record<string, string>;
 }
 
 export interface FormSectionDefinition {
@@ -59,6 +63,8 @@ export interface FormSectionDefinition {
   description?: string;
   order: number;
   fields: FormFieldDefinition[];
+  /** Default action after completing this section: 'next' | 'submit' | `section_${sectionId}` */
+  afterSectionAction?: string;
 }
 
 /** Pre-defined banner gradient templates */
