@@ -38,7 +38,6 @@ import { createTask } from "../actions";
 import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
-  taskNumber: z.number().min(1, "Task number must be at least 1"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().optional(),
   startDate: z.date({
@@ -67,7 +66,6 @@ export default function CreateTaskDialog({ userId }: CreateTaskDialogProps) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      taskNumber: 1,
       title: "",
       description: "",
       points: 10,
@@ -78,7 +76,6 @@ export default function CreateTaskDialog({ userId }: CreateTaskDialogProps) {
     setIsSubmitting(true);
     try {
       const result = await createTask({
-        taskNumber: data.taskNumber,
         title: data.title,
         description: data.description,
         startDate: data.startDate,
@@ -114,32 +111,11 @@ export default function CreateTaskDialog({ userId }: CreateTaskDialogProps) {
         <DialogHeader>
           <DialogTitle>Create Task</DialogTitle>
           <DialogDescription>
-            Create a new task for members to complete and earn points
+            Create a new task for members to complete and earn points. (Task number is auto-generated)
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="taskNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Task Number</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter task number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
-                      value={field.value}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="title"

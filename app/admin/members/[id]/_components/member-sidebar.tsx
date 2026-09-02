@@ -338,14 +338,14 @@ export default function MemberSidebar({ member, stats }: MemberSidebarProps) {
             <span>Edit Member Details</span>
           </Button>
 
-          {/* Assign Roles & Domain */}
+          {/* Assign Batch, Roles & Domain */}
           <Button
             variant="outline"
             className="w-full justify-start text-xs font-medium"
             onClick={() => setShowAssignSheet(true)}
           >
             <UserCheck className="mr-2 h-4 w-4 text-primary" />
-            <span>Assign Roles & Domain</span>
+            <span>Assign Batch, Roles & Domain</span>
           </Button>
 
           {/* Ban/Unban Member */}

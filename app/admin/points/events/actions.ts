@@ -39,7 +39,7 @@ export async function getAllEventPoints() {
 }
 
 export async function createEventPoint(data: {
-  eventNumber: number;
+  eventNumber?: number;
   title: string;
   description?: string;
   eventDate: Date;
@@ -49,21 +49,31 @@ export async function createEventPoint(data: {
   await requireAdmin();
   
   try {
-    // Check if event number already exists
-    const existingEvent = await prisma.eventPoint.findUnique({
-      where: { eventNumber: data.eventNumber },
-    });
+    let finalEventNumber = data.eventNumber;
 
-    if (existingEvent) {
-      return {
-        status: "error" as const,
-        message: "Event number already exists",
-      };
+    if (!finalEventNumber || finalEventNumber <= 0) {
+      const latest = await prisma.eventPoint.findFirst({
+        orderBy: { eventNumber: "desc" },
+        select: { eventNumber: true },
+      });
+      finalEventNumber = (latest?.eventNumber || 0) + 1;
+    } else {
+      // Check if event number already exists
+      const existingEvent = await prisma.eventPoint.findUnique({
+        where: { eventNumber: finalEventNumber },
+      });
+
+      if (existingEvent) {
+        return {
+          status: "error" as const,
+          message: `Event #${finalEventNumber} already exists`,
+        };
+      }
     }
 
     const event = await prisma.eventPoint.create({
       data: {
-        eventNumber: data.eventNumber,
+        eventNumber: finalEventNumber,
         title: data.title,
         description: data.description || null,
         eventDate: data.eventDate,

@@ -269,7 +269,7 @@ export function NotificationPermissionDialog({
     onClose?.();
   };
 
-  if (!isOpen || permission === "granted" || permission === "unsupported") {
+  if (!userId || !isOpen || permission === "granted" || permission === "unsupported") {
     return null;
   }
 

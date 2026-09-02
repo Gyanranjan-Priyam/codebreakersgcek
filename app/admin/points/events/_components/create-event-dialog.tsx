@@ -38,7 +38,6 @@ import { createEventPoint } from "../actions";
 import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
-  eventNumber: z.number().min(1, "Event number must be at least 1"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().optional(),
   eventDate: z.date({
@@ -61,7 +60,6 @@ export default function CreateEventDialog({ userId }: CreateEventDialogProps) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      eventNumber: 1,
       title: "",
       description: "",
       points: 10,
@@ -72,7 +70,6 @@ export default function CreateEventDialog({ userId }: CreateEventDialogProps) {
     setIsSubmitting(true);
     try {
       const result = await createEventPoint({
-        eventNumber: data.eventNumber,
         title: data.title,
         description: data.description,
         eventDate: data.eventDate,
@@ -107,32 +104,11 @@ export default function CreateEventDialog({ userId }: CreateEventDialogProps) {
         <DialogHeader>
           <DialogTitle>Create Event</DialogTitle>
           <DialogDescription>
-            Create a new event for members to participate and earn points
+            Create a new event for members to participate and earn points. (Event number is auto-generated)
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="eventNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Event Number</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter event number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
-                      value={field.value}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="title"

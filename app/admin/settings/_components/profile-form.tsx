@@ -370,7 +370,7 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
               onValueChange={(v) => set("admissionYear", v)}
               disabled={pending}
             >
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
@@ -408,7 +408,7 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             onValueChange={(v) => set("branch", v)}
             disabled={pending}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Select branch" />
             </SelectTrigger>
             <SelectContent>
@@ -423,7 +423,7 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
 
         <FormField id="collegeName" label="College">
           <Select value={selectedCollege} onValueChange={handleCollegeChange} disabled={pending}>
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Select college" />
             </SelectTrigger>
             <SelectContent>
@@ -520,10 +520,10 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
           </FormField>
           <FormField id="state" label="State">
             <Select value={formData.state} onValueChange={handleStateChange} disabled={pending}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="State" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-60 overflow-y-auto">
                 {statesDistrictsData.states.map((s) => (
                   <SelectItem key={s.state} value={s.state}>{s.state}</SelectItem>
                 ))}
@@ -538,10 +538,10 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             onValueChange={(v) => set("district", v)}
             disabled={!selectedState || pending}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Select district" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-60 overflow-y-auto">
               {availableDistricts.map((d) => (
                 <SelectItem key={d} value={d}>{d}</SelectItem>
               ))}

@@ -805,8 +805,8 @@ export default function StudentQRScanner({
                   : "No students match your filter."}
               </div>
             ) : (
-              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                {filteredHistory.map((item) => (
+              <div className="space-y-2">
+                {filteredHistory.slice(0, 4).map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center justify-between p-2.5 rounded-lg border bg-card hover:bg-muted/40 transition-colors"
@@ -843,6 +843,12 @@ export default function StudentQRScanner({
                     </div>
                   </div>
                 ))}
+
+                {scanHistory.length > 4 && (
+                  <p className="text-[11px] text-center text-muted-foreground pt-1">
+                    Showing latest 4 of {scanHistory.length} scanned students
+                  </p>
+                )}
               </div>
             )}
           </CardContent>

@@ -431,7 +431,7 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
               onValueChange={(v) => set("admissionYear", v)}
               disabled={pending}
             >
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
@@ -471,7 +471,7 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
             onValueChange={(v) => set("branch", v)}
             disabled={pending}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Select branch" />
             </SelectTrigger>
             <SelectContent>
@@ -490,7 +490,7 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
             onValueChange={handleCollegeChange}
             disabled={pending}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Select college" />
             </SelectTrigger>
             <SelectContent>
@@ -673,10 +673,10 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
               onValueChange={handleStateChange}
               disabled={pending}
             >
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="State" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-60 overflow-y-auto">
                 {statesDistrictsData.states.map((s) => (
                   <SelectItem key={s.state} value={s.state}>
                     {s.state}
@@ -693,10 +693,10 @@ export function UserProfileForm({ initialData }: UserProfileFormProps) {
             onValueChange={(v) => set("district", v)}
             disabled={!selectedState || pending}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Select district" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-60 overflow-y-auto">
               {availableDistricts.map((d) => (
                 <SelectItem key={d} value={d}>
                   {d}

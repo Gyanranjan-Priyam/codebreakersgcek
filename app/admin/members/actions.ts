@@ -1236,10 +1236,108 @@ export async function updateMemberBatch(
   }
 }
 
+async function ensureCustomRoleTable() {
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "custom_role" (
+        "id" TEXT PRIMARY KEY,
+        "name" TEXT UNIQUE NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (err) {
+    console.error("Error ensuring custom_role table:", err);
+  }
+}
+
+export async function getCustomRoles(): Promise<{ id: string; name: string; createdAt: Date }[]> {
+  try {
+    await ensureCustomRoleTable();
+    const roles = await prisma.$queryRaw<Array<{ id: string; name: string; createdAt: Date }>>`
+      SELECT id, name, "createdAt" FROM "custom_role" ORDER BY name ASC
+    `;
+    return (roles || []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      createdAt: new Date(r.createdAt),
+    }));
+  } catch (error) {
+    console.error("Error fetching custom roles:", error);
+    return [];
+  }
+}
+
+export async function createCustomRole(name: string): Promise<{
+  status: "success" | "error";
+  message: string;
+  data?: { id: string; name: string };
+}> {
+  await requireAdmin();
+  try {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return { status: "error", message: "Role name cannot be empty." };
+    }
+    if (trimmed.length > 50) {
+      return { status: "error", message: "Role name must be under 50 characters." };
+    }
+
+    await ensureCustomRoleTable();
+
+    const existing = await prisma.$queryRaw<Array<{ id: string; name: string }>>`
+      SELECT id, name FROM "custom_role" WHERE LOWER(name) = LOWER(${trimmed}) LIMIT 1
+    `;
+
+    if (existing && existing.length > 0) {
+      return { status: "error", message: `Role "${trimmed}" already exists.` };
+    }
+
+    const newId = randomUUID();
+    const now = new Date();
+
+    await prisma.$executeRaw`
+      INSERT INTO "custom_role" ("id", "name", "createdAt") VALUES (${newId}, ${trimmed}, ${now})
+    `;
+
+    revalidatePath("/admin/members");
+    return {
+      status: "success",
+      message: `Role "${trimmed}" created successfully.`,
+      data: { id: newId, name: trimmed },
+    };
+  } catch (error) {
+    console.error("Error creating custom role:", error);
+    return { status: "error", message: "Failed to create custom role." };
+  }
+}
+
+export async function deleteCustomRole(id: string): Promise<{
+  status: "success" | "error";
+  message: string;
+}> {
+  await requireAdmin();
+  try {
+    await ensureCustomRoleTable();
+    await prisma.$executeRaw`
+      DELETE FROM "custom_role" WHERE id = ${id}
+    `;
+
+    revalidatePath("/admin/members");
+    return {
+      status: "success",
+      message: "Custom role deleted successfully.",
+    };
+  } catch (error) {
+    console.error("Error deleting custom role:", error);
+    return { status: "error", message: "Failed to delete custom role." };
+  }
+}
+
 export async function updateMemberRolesAndDomain(
   userId: string,
   roles: string[],
-  specializedDomain: string | null
+  specializedDomain: string | null,
+  batchId?: string | null
 ) {
   await requireAdmin();
 
@@ -1259,17 +1357,24 @@ export async function updateMemberRolesAndDomain(
     const isSystemAdmin = isSystemAdminRole(existing.role);
     const serializedRoles = serializeMemberRoles(roles, isSystemAdmin);
 
+    const updateData: Record<string, any> = {
+      role: serializedRoles,
+      specializedDomain: specializedDomain || null,
+      updatedAt: new Date(),
+    };
+
+    if (batchId !== undefined) {
+      updateData.batchId = batchId && batchId !== "none" ? batchId : null;
+    }
+
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        role: serializedRoles,
-        specializedDomain: specializedDomain || null,
-        updatedAt: new Date(),
-      },
+      data: updateData,
     });
 
     revalidatePath("/admin/members");
     revalidatePath(`/admin/members/${userId}`);
+    revalidatePath("/admin/batches");
     revalidatePath("/member");
     if (existing.cbUserId) {
       revalidatePath(`/member/${existing.cbUserId}`);
@@ -1277,13 +1382,13 @@ export async function updateMemberRolesAndDomain(
 
     return {
       status: "success" as const,
-      message: "Member roles and specialized domains updated successfully.",
+      message: "Member batch, roles, and specialized domains updated successfully.",
     };
   } catch (error) {
-    console.error("Error updating member roles and domain:", error);
+    console.error("Error updating member batch, roles and domain:", error);
     return {
       status: "error" as const,
-      message: "Failed to update member roles and domains.",
+      message: "Failed to update member batch, roles, and domains.",
     };
   }
 }

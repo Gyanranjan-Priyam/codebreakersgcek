@@ -1,12 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Card, CardContent } from '../ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
 import { Button } from '../ui/button';
-import { CloudUploadIcon, EyeIcon, FileIcon, ImageIcon, Loader2, TrashIcon } from 'lucide-react';
+import { EyeIcon, FileIcon, ImageIcon, Loader2, TrashIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Progress } from '../ui/progress';
 import Image from 'next/image';

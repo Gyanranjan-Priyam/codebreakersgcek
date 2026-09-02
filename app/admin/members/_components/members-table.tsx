@@ -660,19 +660,7 @@ export default function MembersTable({ members }: MembersTableProps) {
                             }}
                           >
                             <UserCheck className="mr-2 h-3.5 w-3.5 text-primary" />
-                            Assign Roles & Domain
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="cursor-pointer"
-                            onClick={() => {
-                              setSelectedMember(member);
-                              setSelectedMemberIds(new Set([member.id]));
-                              setTargetBatchId(member.batchId || "none");
-                              setShowAssignBatchDialog(true);
-                            }}
-                          >
-                            <Layers className="mr-2 h-3.5 w-3.5 text-primary" />
-                            Assign Batch
+                            Assign Batch, Roles & Domain
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="cursor-pointer"

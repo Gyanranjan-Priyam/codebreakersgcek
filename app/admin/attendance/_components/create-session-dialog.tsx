@@ -43,7 +43,6 @@ import { toast } from "sonner";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
 
 const formSchema = z.object({
-  sessionNumber: z.number().min(1, "Session number must be at least 1"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   date: z.date({
     message: "Please select a date",
@@ -69,7 +68,6 @@ export default function CreateSessionDialog({ onSessionCreated }: CreateSessionD
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sessionNumber: 1,
       title: "",
       targetBatchIds: [],
     },
@@ -93,7 +91,6 @@ export default function CreateSessionDialog({ onSessionCreated }: CreateSessionD
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          sessionNumber: data.sessionNumber,
           title: data.title,
           date: data.date.toISOString(),
           day,
@@ -131,32 +128,11 @@ export default function CreateSessionDialog({ onSessionCreated }: CreateSessionD
         <DialogHeader>
           <DialogTitle>Create Attendance Session</DialogTitle>
           <DialogDescription>
-            Create a new attendance session for members to mark their presence
+            Create a new attendance session for members to mark their presence. (Session number is auto-generated)
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="sessionNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Session Number</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter session number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
-                      value={field.value}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="title"

@@ -58,6 +58,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
   Search,
   MoreVertical,
   Eye,
@@ -72,9 +78,27 @@ import {
   HardDrive,
   ImageIcon,
   ExternalLink,
+  Calendar as CalendarIcon,
+  CalendarRange,
+  ChevronDown,
+  X,
+  Filter,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { SilentRefreshButton } from "@/components/ui/silent-refresh-button";
+import {
+  format,
+  isSameDay,
+  isWithinInterval,
+  startOfDay,
+  endOfDay,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  isValid,
+} from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
 import {
   updateFormResponseStatus,
   updateFormResponsesStatus,
@@ -148,12 +172,22 @@ function extractAnswerValue(
   return String(raw).trim() || "—";
 }
 
-function exportResponsesToExcel(form: FormDetail, responses: FormResponseSummary[]) {
-  if (!responses || responses.length === 0) {
+function exportResponses(
+  form: FormDetail,
+  responsesToExport: FormResponseSummary[],
+  options?: {
+    formatType?: "xlsx" | "csv";
+    filterLabel?: string;
+    isAll?: boolean;
+    isSelectedOnly?: boolean;
+  }
+) {
+  if (!responsesToExport || responsesToExport.length === 0) {
     toast.error("No responses available to export.");
     return;
   }
 
+  const formatType = options?.formatType || "xlsx";
   const columns: Array<{
     header: string;
     getValue: (res: FormResponseSummary, index: number) => string;
@@ -170,7 +204,7 @@ function exportResponsesToExcel(form: FormDetail, responses: FormResponseSummary
     s.fields?.some((f) => f.type === "payment")
   );
 
-  if (formHasPayment || responses.some((r) => r.transactionId)) {
+  if (formHasPayment || responsesToExport.some((r) => r.transactionId)) {
     columns.push(
       { header: "Payment Status", getValue: (r) => r.paymentStatus || "pending" },
       { header: "Transaction ID", getValue: (r) => r.transactionId || "—" }
@@ -249,7 +283,7 @@ function exportResponsesToExcel(form: FormDetail, responses: FormResponseSummary
   });
 
   const headers = columns.map((c) => c.header);
-  const rows = responses.map((r, idx) => columns.map((c) => c.getValue(r, idx)));
+  const rows = responsesToExport.map((r, idx) => columns.map((c) => c.getValue(r, idx)));
 
   const sheetData = [headers, ...rows];
   const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
@@ -270,11 +304,25 @@ function exportResponsesToExcel(form: FormDetail, responses: FormResponseSummary
   XLSX.utils.book_append_sheet(workbook, worksheet, "Responses");
 
   const cleanTitle = (form.title || "Form").replace(/[^a-zA-Z0-9]/g, "_");
-  const fileName = `${cleanTitle}_Responses_${new Date().toISOString().split("T")[0]}.xlsx`;
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  let filterPart = "";
+  if (options?.isSelectedOnly) {
+    filterPart = "_Selected";
+  } else if (options?.isAll) {
+    filterPart = "_All";
+  } else if (options?.filterLabel) {
+    const cleanFilter = options.filterLabel.replace(/[^a-zA-Z0-9]/g, "_");
+    filterPart = `_${cleanFilter}`;
+  }
+  const fileName = `${cleanTitle}_Responses${filterPart}_${todayStr}.${formatType}`;
 
-  XLSX.writeFile(workbook, fileName);
-  toast.success(`Exported ${responses.length} responses to Excel (.xlsx)`);
+  XLSX.writeFile(workbook, fileName, { bookType: formatType });
+  toast.success(
+    `Exported ${responsesToExport.length} responses to ${formatType.toUpperCase()}`
+  );
 }
+
+type DateFilterMode = "all" | "today" | "yesterday" | "last7" | "last30" | "thisMonth" | "single" | "range";
 
 interface ResponsesClientProps {
   form: FormDetail;
@@ -289,6 +337,11 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "verified" | "rejected" | "pending">("all");
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("all");
+  const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewingResponse, setViewingResponse] = useState<FormResponseSummary | null>(null);
   const [viewingFile, setViewingFile] = useState<any | null>(null);
@@ -371,6 +424,26 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
     return list;
   }, [form.definition]);
 
+  // Active Date Filter Label
+  const activeDateLabel = useMemo(() => {
+    if (dateFilterMode === "all") return "";
+    if (dateFilterMode === "today") return "Today";
+    if (dateFilterMode === "yesterday") return "Yesterday";
+    if (dateFilterMode === "last7") return "Last 7 Days";
+    if (dateFilterMode === "last30") return "Last 30 Days";
+    if (dateFilterMode === "thisMonth") return "This Month";
+    if (dateFilterMode === "single" && singleDate) {
+      return format(singleDate, "dd MMM yyyy");
+    }
+    if (dateFilterMode === "range" && dateRange?.from) {
+      if (dateRange.to && !isSameDay(dateRange.from, dateRange.to)) {
+        return `${format(dateRange.from, "dd MMM yyyy")} – ${format(dateRange.to, "dd MMM yyyy")}`;
+      }
+      return format(dateRange.from, "dd MMM yyyy");
+    }
+    return "";
+  }, [dateFilterMode, singleDate, dateRange]);
+
   // Filtered responses
   const filteredResponses = useMemo(() => {
     return responses.filter((res) => {
@@ -378,6 +451,31 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
         if (statusFilter === "pending" && res.paymentStatus !== "pending" && res.paymentStatus !== "submitted") return false;
         if (statusFilter === "verified" && res.paymentStatus !== "verified") return false;
         if (statusFilter === "rejected" && res.paymentStatus !== "rejected") return false;
+      }
+      if (dateFilterMode !== "all") {
+        const resDate = new Date(res.createdAt);
+        if (isValid(resDate)) {
+          const now = new Date();
+          if (dateFilterMode === "today") {
+            if (!isSameDay(resDate, now)) return false;
+          } else if (dateFilterMode === "yesterday") {
+            if (!isSameDay(resDate, subDays(now, 1))) return false;
+          } else if (dateFilterMode === "last7") {
+            if (!isWithinInterval(resDate, { start: startOfDay(subDays(now, 6)), end: endOfDay(now) })) return false;
+          } else if (dateFilterMode === "last30") {
+            if (!isWithinInterval(resDate, { start: startOfDay(subDays(now, 29)), end: endOfDay(now) })) return false;
+          } else if (dateFilterMode === "thisMonth") {
+            if (!isWithinInterval(resDate, { start: startOfMonth(now), end: endOfMonth(now) })) return false;
+          } else if (dateFilterMode === "single") {
+            if (singleDate && !isSameDay(resDate, singleDate)) return false;
+          } else if (dateFilterMode === "range") {
+            if (dateRange?.from) {
+              const start = startOfDay(dateRange.from);
+              const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+              if (!isWithinInterval(resDate, { start, end })) return false;
+            }
+          }
+        }
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -388,7 +486,7 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
       }
       return true;
     });
-  }, [responses, statusFilter, searchQuery]);
+  }, [responses, statusFilter, dateFilterMode, singleDate, dateRange, searchQuery]);
 
   const isAllSelected = filteredResponses.length > 0 && filteredResponses.every((r) => selectedIds.has(r.id));
 
@@ -446,16 +544,32 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
     setIsLoading(false);
   };
 
+  const clearAllFilters = () => {
+    setDateFilterMode("all");
+    setSingleDate(undefined);
+    setDateRange(undefined);
+    setStatusFilter("all");
+    setSearchQuery("");
+  };
+
+  const hasActiveFilters = dateFilterMode !== "all" || statusFilter !== "all" || Boolean(searchQuery.trim());
+
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="space-y-3">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle>
-              Responses ({filteredResponses.length})
-            </CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2">
+                <span>Responses</span>
+                <Badge variant="outline" className="font-mono text-xs px-2 py-0.5 font-bold">
+                  {filteredResponses.length}
+                  {filteredResponses.length !== responses.length && ` of ${responses.length}`}
+                </Badge>
+              </CardTitle>
+            </div>
 
-            <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2.5 sm:items-center flex-wrap">
               {/* Bulk actions */}
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-md">
@@ -475,44 +589,410 @@ export default function ResponsesClient({ form }: ResponsesClientProps) {
                 </div>
               )}
 
+              {/* Date Filter Popover */}
+              <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-9 text-xs justify-start gap-2 font-normal border-border/80 cursor-pointer",
+                      dateFilterMode !== "all"
+                        ? "border-primary/50 bg-primary/10 text-primary font-medium hover:bg-primary/15"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="truncate max-w-[170px]">
+                      {dateFilterMode === "all" ? "Filter by Date" : activeDateLabel}
+                    </span>
+                    {dateFilterMode !== "all" ? (
+                      <span
+                        role="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDateFilterMode("all");
+                          setSingleDate(undefined);
+                          setDateRange(undefined);
+                        }}
+                        className="ml-1 p-0.5 rounded-full hover:bg-primary/20 cursor-pointer"
+                        title="Clear date filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </span>
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-auto" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-50 shadow-2xl border-border" align="end">
+                  <div className="p-3 border-b border-border/60 bg-muted/20 flex flex-col gap-2.5 max-w-[340px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <CalendarIcon className="h-3.5 w-3.5 text-primary" />
+                        Date Filter
+                      </span>
+                      {dateFilterMode !== "all" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDateFilterMode("all");
+                            setSingleDate(undefined);
+                            setDateRange(undefined);
+                          }}
+                          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-destructive cursor-pointer"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="grid grid-cols-3 gap-1 text-xs">
+                      <Button
+                        variant={dateFilterMode === "today" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setDateFilterMode("today")}
+                        className="h-7 text-[11px] px-2 cursor-pointer"
+                      >
+                        Today
+                      </Button>
+                      <Button
+                        variant={dateFilterMode === "yesterday" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setDateFilterMode("yesterday")}
+                        className="h-7 text-[11px] px-2 cursor-pointer"
+                      >
+                        Yesterday
+                      </Button>
+                      <Button
+                        variant={dateFilterMode === "last7" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setDateFilterMode("last7")}
+                        className="h-7 text-[11px] px-2 cursor-pointer"
+                      >
+                        Last 7 Days
+                      </Button>
+                      <Button
+                        variant={dateFilterMode === "last30" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setDateFilterMode("last30")}
+                        className="h-7 text-[11px] px-2 cursor-pointer"
+                      >
+                        Last 30 Days
+                      </Button>
+                      <Button
+                        variant={dateFilterMode === "thisMonth" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setDateFilterMode("thisMonth")}
+                        className="h-7 text-[11px] px-2 cursor-pointer"
+                      >
+                        This Month
+                      </Button>
+                      <Button
+                        variant={dateFilterMode === "all" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setDateFilterMode("all");
+                          setSingleDate(undefined);
+                          setDateRange(undefined);
+                        }}
+                        className="h-7 text-[11px] px-2 cursor-pointer"
+                      >
+                        All Time
+                      </Button>
+                    </div>
+
+                    {/* Mode Toggle: Single Day vs Date Range */}
+                    <div className="flex items-center gap-1 p-1 bg-muted rounded-lg text-xs mt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDateFilterMode("single");
+                          if (!singleDate) setSingleDate(new Date());
+                        }}
+                        className={cn(
+                          "flex-1 py-1 px-2 text-center font-medium rounded-md transition-all cursor-pointer text-xs",
+                          dateFilterMode === "single"
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Single Day
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDateFilterMode("range");
+                          if (!dateRange?.from) {
+                            setDateRange({ from: subDays(new Date(), 7), to: new Date() });
+                          }
+                        }}
+                        className={cn(
+                          "flex-1 py-1 px-2 text-center font-medium rounded-md transition-all cursor-pointer text-xs",
+                          dateFilterMode === "range"
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Date Range
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Calendar view for custom selection */}
+                  <div className="p-2 flex justify-center">
+                    {dateFilterMode === "range" ? (
+                      <Calendar
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={(range) => {
+                          setDateFilterMode("range");
+                          setDateRange(range);
+                        }}
+                        numberOfMonths={1}
+                        className="rounded-md"
+                      />
+                    ) : (
+                      <Calendar
+                        mode="single"
+                        selected={singleDate}
+                        onSelect={(day) => {
+                          if (day) {
+                            setDateFilterMode("single");
+                            setSingleDate(day);
+                          }
+                        }}
+                        className="rounded-md"
+                      />
+                    )}
+                  </div>
+
+                  {/* Popover Footer */}
+                  <div className="p-3 border-t border-border/60 bg-muted/20 flex items-center justify-between text-xs">
+                    <span className="text-[11px] text-muted-foreground truncate max-w-[200px] font-mono">
+                      {activeDateLabel ? `Filtered: ${activeDateLabel}` : "No date filter"}
+                    </span>
+                    <Button
+                      size="sm"
+                      className="h-7 px-3 text-xs cursor-pointer"
+                      onClick={() => setIsDatePopoverOpen(false)}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               {/* Status filter */}
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-                <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectTrigger className="w-full sm:w-[140px] h-9">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-60 overflow-y-auto">
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="verified">Approved / Verified</SelectItem>
+                  <SelectItem value="verified">Approved</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
 
-              {/* Export to Excel button */}
-              <Button
-                type="button"
-                onClick={() => exportResponsesToExcel(form, filteredResponses)}
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-9 rounded-md shadow-xs flex items-center gap-1.5 shrink-0"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Export to Excel
-              </Button>
+              {/* Enhanced Export Dropdown with Date Filter Support */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-9 rounded-md shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span>Export ({filteredResponses.length})</span>
+                    <ChevronDown className="h-3.5 w-3.5 opacity-80 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel className="text-xs">
+                    Export Filtered ({filteredResponses.length} rows)
+                    {activeDateLabel && (
+                      <span className="block text-[10px] font-normal text-muted-foreground font-mono mt-0.5">
+                        📅 {activeDateLabel}
+                      </span>
+                    )}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() =>
+                      exportResponses(form, filteredResponses, {
+                        formatType: "xlsx",
+                        filterLabel: activeDateLabel,
+                      })
+                    }
+                  >
+                    <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                    <span>Export to Excel (.xlsx)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() =>
+                      exportResponses(form, filteredResponses, {
+                        formatType: "csv",
+                        filterLabel: activeDateLabel,
+                      })
+                    }
+                  >
+                    <FileText className="mr-2 h-4 w-4 text-blue-600" />
+                    <span>Export to CSV (.csv)</span>
+                  </DropdownMenuItem>
+
+                  {selectedIds.size > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs">
+                        Export Selected ({selectedIds.size} rows)
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={() => {
+                          const selectedList = responses.filter((r) => selectedIds.has(r.id));
+                          exportResponses(form, selectedList, {
+                            formatType: "xlsx",
+                            filterLabel: "Selected",
+                            isSelectedOnly: true,
+                          });
+                        }}
+                      >
+                        <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                        <span>Export Selected to Excel</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={() => {
+                          const selectedList = responses.filter((r) => selectedIds.has(r.id));
+                          exportResponses(form, selectedList, {
+                            formatType: "csv",
+                            filterLabel: "Selected",
+                            isSelectedOnly: true,
+                          });
+                        }}
+                      >
+                        <FileText className="mr-2 h-4 w-4 text-blue-600" />
+                        <span>Export Selected to CSV</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+
+                  {hasActiveFilters && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs">
+                        Export All Records ({responses.length} total)
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={() =>
+                          exportResponses(form, responses, {
+                            formatType: "xlsx",
+                            isAll: true,
+                          })
+                        }
+                      >
+                        <Download className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <span>Export All to Excel (.xlsx)</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={() =>
+                          exportResponses(form, responses, {
+                            formatType: "csv",
+                            isAll: true,
+                          })
+                        }
+                      >
+                        <Download className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <span>Export All to CSV (.csv)</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               {/* Search */}
-              <div className="relative w-full sm:w-auto sm:min-w-64">
+              <div className="relative w-full sm:w-auto sm:min-w-56">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Search name, email, ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-9"
                 />
               </div>
 
               <SilentRefreshButton toastMessage="Form responses refreshed silently" />
             </div>
           </div>
+
+          {/* Active Filter Chips & Clear All */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/40">
+              <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                <Filter className="h-3 w-3" />
+                Active Filters:
+              </span>
+              {dateFilterMode !== "all" && (
+                <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 text-xs font-normal bg-primary/10 text-primary border border-primary/25">
+                  <CalendarIcon className="h-3 w-3 text-primary" />
+                  <span>Date: {activeDateLabel}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateFilterMode("all");
+                      setSingleDate(undefined);
+                      setDateRange(undefined);
+                    }}
+                    className="hover:text-destructive cursor-pointer ml-1"
+                    title="Remove date filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {statusFilter !== "all" && (
+                <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 text-xs font-normal">
+                  <span>Status: {statusFilter === "verified" ? "Approved" : statusFilter}</span>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("all")}
+                    className="hover:text-destructive cursor-pointer ml-1"
+                    title="Remove status filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {searchQuery.trim() && (
+                <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 text-xs font-normal">
+                  <span>Search: &quot;{searchQuery}&quot;</span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="hover:text-destructive cursor-pointer ml-1"
+                    title="Clear search"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFilters}
+                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                Reset all
+              </Button>
+            </div>
+          )}
         </CardHeader>
 
         <CardContent>

@@ -105,7 +105,7 @@ export async function getAllAttendanceSessions() {
 }
 
 export async function createAttendanceSession(data: {
-  sessionNumber: number;
+  sessionNumber?: number;
   title: string;
   date: Date;
   day: string;
@@ -115,21 +115,31 @@ export async function createAttendanceSession(data: {
   await requireAdmin();
   
   try {
-    // Check if session number already exists
-    const existingSession = await prisma.attendanceSession.findUnique({
-      where: { sessionNumber: data.sessionNumber },
-    });
+    let finalSessionNumber = data.sessionNumber;
 
-    if (existingSession) {
-      return {
-        status: "error" as const,
-        message: "Session number already exists",
-      };
+    if (!finalSessionNumber || finalSessionNumber <= 0) {
+      const latest = await prisma.attendanceSession.findFirst({
+        orderBy: { sessionNumber: "desc" },
+        select: { sessionNumber: true },
+      });
+      finalSessionNumber = (latest?.sessionNumber || 0) + 1;
+    } else {
+      // Check if session number already exists
+      const existingSession = await prisma.attendanceSession.findUnique({
+        where: { sessionNumber: finalSessionNumber },
+      });
+
+      if (existingSession) {
+        return {
+          status: "error" as const,
+          message: `Session #${finalSessionNumber} already exists`,
+        };
+      }
     }
 
     const session = await prisma.attendanceSession.create({
       data: {
-        sessionNumber: data.sessionNumber,
+        sessionNumber: finalSessionNumber,
         title: data.title,
         date: data.date,
         day: data.day,

@@ -40,7 +40,7 @@ export async function getAllTasks() {
 }
 
 export async function createTask(data: {
-  taskNumber: number;
+  taskNumber?: number;
   title: string;
   description?: string;
   startDate: Date;
@@ -51,21 +51,31 @@ export async function createTask(data: {
   await requireAdmin();
   
   try {
-    // Check if task number already exists
-    const existingTask = await prisma.task.findUnique({
-      where: { taskNumber: data.taskNumber },
-    });
+    let finalTaskNumber = data.taskNumber;
 
-    if (existingTask) {
-      return {
-        status: "error" as const,
-        message: "Task number already exists",
-      };
+    if (!finalTaskNumber || finalTaskNumber <= 0) {
+      const latest = await prisma.task.findFirst({
+        orderBy: { taskNumber: "desc" },
+        select: { taskNumber: true },
+      });
+      finalTaskNumber = (latest?.taskNumber || 0) + 1;
+    } else {
+      // Check if task number already exists
+      const existingTask = await prisma.task.findUnique({
+        where: { taskNumber: finalTaskNumber },
+      });
+
+      if (existingTask) {
+        return {
+          status: "error" as const,
+          message: `Task #${finalTaskNumber} already exists`,
+        };
+      }
     }
 
     const task = await prisma.task.create({
       data: {
-        taskNumber: data.taskNumber,
+        taskNumber: finalTaskNumber,
         title: data.title,
         description: data.description || null,
         startDate: data.startDate,

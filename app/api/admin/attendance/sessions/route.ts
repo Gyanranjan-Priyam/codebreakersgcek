@@ -58,28 +58,38 @@ export async function POST(req: NextRequest) {
 
     const { sessionNumber, title, date, day, targetBatchIds } = await req.json();
 
-    if (!sessionNumber || !title || !date || !day) {
+    if (!title || !date || !day) {
       return NextResponse.json(
-        { error: "Session number, title, date, and day are required" },
+        { error: "Title, date, and day are required" },
         { status: 400 }
       );
     }
 
-    // Check if session number already exists
-    const existingSession = await prisma.attendanceSession.findUnique({
-      where: { sessionNumber: parseInt(sessionNumber) },
-    });
+    let finalSessionNumber: number;
+    if (!sessionNumber || parseInt(sessionNumber) <= 0) {
+      const latest = await prisma.attendanceSession.findFirst({
+        orderBy: { sessionNumber: "desc" },
+        select: { sessionNumber: true },
+      });
+      finalSessionNumber = (latest?.sessionNumber || 0) + 1;
+    } else {
+      finalSessionNumber = parseInt(sessionNumber);
+      // Check if session number already exists
+      const existingSession = await prisma.attendanceSession.findUnique({
+        where: { sessionNumber: finalSessionNumber },
+      });
 
-    if (existingSession) {
-      return NextResponse.json(
-        { error: "Session number already exists" },
-        { status: 400 }
-      );
+      if (existingSession) {
+        return NextResponse.json(
+          { error: `Session #${finalSessionNumber} already exists` },
+          { status: 400 }
+        );
+      }
     }
 
     const attendanceSession = await prisma.attendanceSession.create({
       data: {
-        sessionNumber: parseInt(sessionNumber),
+        sessionNumber: finalSessionNumber,
         title,
         date: new Date(date),
         day,

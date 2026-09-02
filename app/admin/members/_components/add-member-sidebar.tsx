@@ -25,6 +25,9 @@ import {
   createMember,
   getFormCandidateByResponseId,
   FormCandidateItem,
+  getCustomRoles,
+  createCustomRole,
+  deleteCustomRole,
 } from "../actions";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -45,6 +48,9 @@ import {
   UserCheck,
   Target,
   FileSpreadsheet,
+  Plus,
+  Trash2,
+  X,
 } from "lucide-react";
 import { getActiveBatchesList } from "@/app/admin/batches/actions";
 import {
@@ -79,6 +85,9 @@ export default function AddMemberSidebar({ isOpen, onClose, onOpenExcelImport }:
   const [batchId, setBatchId] = useState<string>("none");
   const [specializedDomain, setSpecializedDomain] = useState<string>("");
   const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
+  const [newRoleInput, setNewRoleInput] = useState<string>("");
+  const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["Member"]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -90,10 +99,15 @@ export default function AddMemberSidebar({ isOpen, onClose, onOpenExcelImport }:
   useEffect(() => {
     if (isOpen) {
       getActiveBatchesList().then((list) => setBatchesList(list));
+      getCustomRoles().then((roles) => setCustomRoles(roles));
     }
   }, [isOpen]);
 
-  const handleToggleRole = (role: AssignableRole) => {
+  const allRoles: string[] = Array.from(
+    new Set([...ASSIGNABLE_ROLES, ...customRoles.map((r) => r.name)])
+  );
+
+  const handleToggleRole = (role: string) => {
     if (role === "Member") {
       setSelectedRoles(["Member"]);
       return;
@@ -108,6 +122,56 @@ export default function AddMemberSidebar({ isOpen, onClose, onOpenExcelImport }:
         return;
       }
       setSelectedRoles([...withoutMember, role]);
+    }
+  };
+
+  const handleCreateNewRole = async () => {
+    const trimmed = newRoleInput.trim();
+    if (!trimmed) return;
+
+    if (allRoles.some((r) => r.toLowerCase() === trimmed.toLowerCase())) {
+      toast.info(`Role "${trimmed}" already exists.`);
+      if (!selectedRoles.includes(trimmed)) {
+        handleToggleRole(trimmed);
+      }
+      setNewRoleInput("");
+      return;
+    }
+
+    setIsCreatingRole(true);
+    try {
+      const res = await createCustomRole(trimmed);
+      if (res.status === "success" && res.data) {
+        toast.success(res.message);
+        setCustomRoles((prev) => [...prev, res.data!]);
+        const withoutMember = selectedRoles.filter((r) => r !== "Member");
+        if (withoutMember.length < MAX_MEMBER_ROLES) {
+          setSelectedRoles([...withoutMember, res.data.name]);
+        }
+        setNewRoleInput("");
+      } else {
+        toast.error(res.message);
+      }
+    } catch {
+      toast.error("Failed to create role.");
+    } finally {
+      setIsCreatingRole(false);
+    }
+  };
+
+  const handleDeleteCustomRole = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    try {
+      const res = await deleteCustomRole(id);
+      if (res.status === "success") {
+        toast.success(res.message);
+        setCustomRoles((prev) => prev.filter((r) => r.id !== id));
+        setSelectedRoles((prev) => prev.filter((r) => r !== name));
+      } else {
+        toast.error(res.message);
+      }
+    } catch {
+      toast.error("Failed to delete role.");
     }
   };
 
@@ -563,8 +627,41 @@ export default function AddMemberSidebar({ isOpen, onClose, onOpenExcelImport }:
                       : `${selectedRoles.filter((r) => r !== "Member").length} / ${MAX_MEMBER_ROLES} selected`}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {ASSIGNABLE_ROLES.map((role) => {
+
+                {/* Create New Custom Role Input */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Create new role (e.g. Design Lead)..."
+                    value={newRoleInput}
+                    onChange={(e) => setNewRoleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleCreateNewRole();
+                      }
+                    }}
+                    disabled={isSubmitting || isCreatingRole}
+                    className="text-xs h-8 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleCreateNewRole}
+                    disabled={!newRoleInput.trim() || isSubmitting || isCreatingRole}
+                    className="h-8 text-xs gap-1 shrink-0 cursor-pointer"
+                  >
+                    {isCreatingRole ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Plus className="h-3 w-3" />
+                    )}
+                    <span>Add Role</span>
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border rounded-md bg-muted/10 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  {allRoles.map((role) => {
                     const isSelected = selectedRoles.includes(role);
                     const isMemberRole = role === "Member";
                     const isMemberActive =
@@ -575,11 +672,14 @@ export default function AddMemberSidebar({ isOpen, onClose, onOpenExcelImport }:
                       selectedRoles.filter((r) => r !== "Member").length >= MAX_MEMBER_ROLES;
                     const disabled = !isSelected && !isMemberRole && isMaxReached;
                     const { badgeClass } = getRoleBadgeClasses(role);
+                    const customRoleItem = customRoles.find(
+                      (cr) => cr.name.toLowerCase() === role.toLowerCase()
+                    );
 
                     return (
                       <label
                         key={role}
-                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs transition-all cursor-pointer select-none ${
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs transition-all cursor-pointer select-none group ${
                           isSelected || isMemberActive
                             ? "border-primary/50 bg-primary/5 shadow-xs"
                             : disabled
@@ -591,16 +691,27 @@ export default function AddMemberSidebar({ isOpen, onClose, onOpenExcelImport }:
                           checked={isSelected || isMemberActive}
                           disabled={disabled || isSubmitting}
                           onCheckedChange={() => !disabled && handleToggleRole(role)}
-                          className="h-3.5 w-3.5"
+                          className="h-3.5 w-3.5 shrink-0"
                         />
                         <span className="flex-1 truncate">
                           <Badge
                             variant="outline"
-                            className={`text-[10px] py-0 px-1.5 font-normal ${badgeClass}`}
+                            className={`text-[10px] py-0 px-1.5 font-normal truncate block max-w-full ${badgeClass}`}
                           >
                             {role}
                           </Badge>
                         </span>
+
+                        {customRoleItem && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteCustomRole(e, customRoleItem.id, customRoleItem.name)}
+                            className="opacity-0 group-hover:opacity-100 hover:text-destructive p-0.5 rounded transition-opacity cursor-pointer"
+                            title="Delete custom role"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </label>
                     );
                   })}

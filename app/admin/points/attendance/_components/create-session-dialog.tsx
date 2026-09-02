@@ -46,7 +46,6 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const formSchema = z.object({
-  sessionNumber: z.number().min(1, "Session number must be at least 1"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   date: z.date({
     message: "Please select a date",
@@ -77,7 +76,6 @@ export default function CreateSessionDialog({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sessionNumber: 1,
       title: "",
       targetBatchIds: [],
     },
@@ -104,7 +102,6 @@ export default function CreateSessionDialog({
       const day = getDayName(data.date);
 
       const result = await createAttendanceSession({
-        sessionNumber: data.sessionNumber,
         title: data.title,
         date: data.date,
         day,
@@ -139,34 +136,11 @@ export default function CreateSessionDialog({
         <DialogHeader>
           <DialogTitle>Create Attendance Session</DialogTitle>
           <DialogDescription>
-            Create a new attendance session for members to mark their presence
+            Create a new attendance session for members to mark their presence. (Session number is auto-generated)
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="sessionNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Session Number</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter session number"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseInt(e.target.value, 10) || 1)
-                      }
-                      value={field.value}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="title"

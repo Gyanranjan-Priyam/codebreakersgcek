@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useTransition, useRef } from "react";
@@ -43,7 +44,22 @@ export function RealtimeAttendanceListener({
   const [, startTransition] = useTransition();
   const { data: session } = useSession();
 
-  const isPublicMemberPage = pathname?.startsWith("/member/");
+  const isPublicFormPage =
+    !pathname ||
+    pathname.startsWith("/forms") ||
+    pathname.startsWith("/quiz-external") ||
+    pathname.startsWith("/system-register") ||
+    pathname.startsWith("/thank-you") ||
+    pathname.startsWith("/receipt") ||
+    pathname.startsWith("/member") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/verify-request") ||
+    pathname.startsWith("/device-limit") ||
+    pathname.startsWith("/not-admin") ||
+    pathname.startsWith("/unauthorized") ||
+    pathname.startsWith("/file-viewer") ||
+    pathname.startsWith("/attachment-list");
 
   const userId = propUserId || session?.user?.id || null;
   const userName = propUserName || session?.user?.name || null;
@@ -109,8 +125,8 @@ export function RealtimeAttendanceListener({
           data: { url: "/dashboard" },
         });
 
-        // 3. Show rich Sonner toast (only if not on public member page) with deterministic ID
-        if (!isPublicMemberPage) {
+        // 3. Show rich Sonner toast (only if not on public form/page) with deterministic ID
+        if (!isPublicFormPage) {
           toast.success(
             <div className="flex items-start gap-3 w-full">
               <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-500 shrink-0 mt-0.5">
@@ -164,7 +180,7 @@ export function RealtimeAttendanceListener({
           data: { url: "/dashboard" },
         });
 
-        if (!isPublicMemberPage) {
+        if (!isPublicFormPage) {
           toast.info(
             <div className="flex items-start gap-2.5">
               <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
@@ -189,9 +205,10 @@ export function RealtimeAttendanceListener({
     return () => {
       cleanupFns.forEach((fn) => fn());
     };
-  }, [userId, cbUserId, userName, router, isPublicMemberPage]);
+  }, [userId, cbUserId, userName, router, isPublicFormPage]);
 
-  if (isPublicMemberPage) {
+  // Only render the notification permission dialog if the user is authenticated and not on a public form/page
+  if (isPublicFormPage || !userId) {
     return null;
   }
 

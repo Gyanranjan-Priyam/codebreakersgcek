@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Sheet,
   SheetContent,
@@ -14,6 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   UserCheck,
@@ -24,10 +31,12 @@ import {
   RotateCcw,
   Plus,
   X,
+  Layers,
+  Sparkles,
+  Trash2,
 } from "lucide-react";
 import {
   ASSIGNABLE_ROLES,
-  AssignableRole,
   MAX_MEMBER_ROLES,
   parseMemberRoles,
   isSystemAdminRole,
@@ -39,7 +48,13 @@ import {
   serializeSpecializedDomains,
   getDomainBadgeClasses,
 } from "@/lib/specialized-domains";
-import { updateMemberRolesAndDomain } from "../actions";
+import {
+  updateMemberRolesAndDomain,
+  getCustomRoles,
+  createCustomRole,
+  deleteCustomRole,
+} from "../actions";
+import { getActiveBatchesList } from "@/app/admin/batches/actions";
 
 interface AssignRolesDomainSheetProps {
   isOpen: boolean;
@@ -51,6 +66,12 @@ interface AssignRolesDomainSheetProps {
     cbUserId?: string | null;
     role?: string | null;
     specializedDomain?: string | null;
+    batchId?: string | null;
+    batch?: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
   } | null;
   onSuccess?: () => void;
 }
@@ -61,6 +82,12 @@ export function AssignRolesDomainSheet({
   member,
   onSuccess,
 }: AssignRolesDomainSheetProps) {
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("none");
+  const [batchesList, setBatchesList] = useState<{ id: string; name: string; code: string; memberCount?: number }[]>([]);
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
+  const [newRoleInput, setNewRoleInput] = useState<string>("");
+  const [isCreatingRole, setIsCreatingRole] = useState(false);
+
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["Member"]);
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
   const [customDomainInput, setCustomDomainInput] = useState<string>("");
@@ -68,8 +95,28 @@ export function AssignRolesDomainSheet({
 
   const isSystemAdmin = member ? isSystemAdminRole(member.role) : false;
 
+  const loadData = useCallback(async () => {
+    try {
+      const [batches, roles] = await Promise.all([
+        getActiveBatchesList(),
+        getCustomRoles(),
+      ]);
+      setBatchesList(batches);
+      setCustomRoles(roles);
+    } catch (err) {
+      console.error("Error loading sheet dependencies:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadData();
+    }
+  }, [isOpen, loadData]);
+
   useEffect(() => {
     if (member) {
+      setSelectedBatchId(member.batchId || "none");
       const parsedRoles = parseMemberRoles(member.role);
       const clubRoles = parsedRoles.filter((r) => r !== "Admin");
       setSelectedRoles(
@@ -81,12 +128,18 @@ export function AssignRolesDomainSheet({
       );
       setSelectedDomains(parseSpecializedDomains(member.specializedDomain));
       setCustomDomainInput("");
+      setNewRoleInput("");
     }
   }, [member]);
 
   if (!member) return null;
 
-  const handleToggleRole = (role: AssignableRole) => {
+  // All roles: Predefined + Custom (unique)
+  const allRoles: string[] = Array.from(
+    new Set([...ASSIGNABLE_ROLES, ...customRoles.map((r) => r.name)])
+  );
+
+  const handleToggleRole = (role: string) => {
     if (role === "Member") {
       setSelectedRoles(isSystemAdmin ? [] : ["Member"]);
       return;
@@ -112,6 +165,57 @@ export function AssignRolesDomainSheet({
     if (role === "Member" || role === "Admin") return;
     const next = selectedRoles.filter((r) => r !== role && r !== "Admin");
     setSelectedRoles(next.length === 0 ? (isSystemAdmin ? [] : ["Member"]) : next);
+  };
+
+  const handleCreateNewRole = async () => {
+    const trimmed = newRoleInput.trim();
+    if (!trimmed) return;
+
+    if (allRoles.some((r) => r.toLowerCase() === trimmed.toLowerCase())) {
+      toast.info(`Role "${trimmed}" already exists.`);
+      if (!selectedRoles.includes(trimmed)) {
+        handleToggleRole(trimmed);
+      }
+      setNewRoleInput("");
+      return;
+    }
+
+    setIsCreatingRole(true);
+    try {
+      const res = await createCustomRole(trimmed);
+      if (res.status === "success" && res.data) {
+        toast.success(res.message);
+        setCustomRoles((prev) => [...prev, res.data!]);
+        // Auto-select if slot available
+        const withoutMember = selectedRoles.filter((r) => r !== "Member" && r !== "Admin");
+        if (withoutMember.length < MAX_MEMBER_ROLES) {
+          setSelectedRoles([...withoutMember, res.data.name]);
+        }
+        setNewRoleInput("");
+      } else {
+        toast.error(res.message);
+      }
+    } catch {
+      toast.error("Failed to create role.");
+    } finally {
+      setIsCreatingRole(false);
+    }
+  };
+
+  const handleDeleteCustomRole = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    try {
+      const res = await deleteCustomRole(id);
+      if (res.status === "success") {
+        toast.success(res.message);
+        setCustomRoles((prev) => prev.filter((r) => r.id !== id));
+        setSelectedRoles((prev) => prev.filter((r) => r !== name));
+      } else {
+        toast.error(res.message);
+      }
+    } catch {
+      toast.error("Failed to delete role.");
+    }
   };
 
   const handleToggleDomain = (domain: string) => {
@@ -154,7 +258,8 @@ export function AssignRolesDomainSheet({
       const res = await updateMemberRolesAndDomain(
         member.id,
         selectedRoles,
-        serializedDomain
+        serializedDomain,
+        selectedBatchId === "none" ? null : selectedBatchId
       );
       if (res.status === "success") {
         toast.success(res.message);
@@ -164,7 +269,7 @@ export function AssignRolesDomainSheet({
         toast.error(res.message);
       }
     } catch {
-      toast.error("An error occurred while updating roles and domain.");
+      toast.error("An error occurred while updating member.");
     } finally {
       setIsSubmitting(false);
     }
@@ -184,29 +289,73 @@ export function AssignRolesDomainSheet({
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2 text-lg">
               <UserCheck className="h-5 w-5 text-primary" />
-              <span>Assign Roles & Specialized Domains</span>
+              <span>Assign Batch, Roles & Domain</span>
             </SheetTitle>
             <SheetDescription className="text-xs">
-              Configure assigned club roles (up to {MAX_MEMBER_ROLES}) and multiple technical domains for{" "}
+              Configure batch, assigned club roles (up to {MAX_MEMBER_ROLES}), and technical domains for{" "}
               <strong className="text-foreground">{member.name}</strong>
               {member.cbUserId && ` (${member.cbUserId})`}.
             </SheetDescription>
           </SheetHeader>
         </div>
 
-        {/* Scrollable Content (Hidden Scrollbar + Lenis Prevent) */}
+        {/* Scrollable Content (Order: 1. Batch -> 2. Role -> 3. Domain) */}
         <div
           data-lenis-prevent
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-6 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           onWheel={(event) => event.stopPropagation()}
           onTouchMoveCapture={(event) => event.stopPropagation()}
         >
-          {/* SECTION 1: MEMBER ROLES */}
+          {/* SECTION 1: BATCH ASSIGNMENT */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                <Layers className="h-4 w-4 text-primary" />
+                1. Batch Assignment
+              </Label>
+              {selectedBatchId !== "none" && (
+                <Badge variant="secondary" className="text-[11px] font-normal">
+                  Assigned
+                </Badge>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Select the academic or club batch this member belongs to.
+            </p>
+
+            <Select
+              value={selectedBatchId}
+              onValueChange={setSelectedBatchId}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger className="w-full h-9 text-xs">
+                <SelectValue placeholder="Select a batch..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-60 overflow-y-auto">
+                <SelectItem value="none" className="text-xs text-muted-foreground">
+                  -- No Batch Assigned --
+                </SelectItem>
+                {batchesList.map((b) => (
+                  <SelectItem key={b.id} value={b.id} className="text-xs">
+                    <span className="font-medium">{b.name}</span>
+                    <span className="ml-2 font-mono text-[10px] text-muted-foreground">
+                      ({b.code})
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* SECTION 2: MEMBER ROLES */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
                 <UserCheck className="h-4 w-4 text-primary" />
-                1. Member Roles
+                2. Member Roles
               </Label>
               <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md">
                 {isSystemAdmin
@@ -265,9 +414,41 @@ export function AssignRolesDomainSheet({
                 })}
               </div>
 
-              {/* Role Cards Grid */}
+              {/* Create New Custom Role Input */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Create new role (e.g. Design Lead, Content Writer)..."
+                  value={newRoleInput}
+                  onChange={(e) => setNewRoleInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCreateNewRole();
+                    }
+                  }}
+                  disabled={isSubmitting || isCreatingRole}
+                  className="text-xs h-9 flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleCreateNewRole}
+                  disabled={!newRoleInput.trim() || isSubmitting || isCreatingRole}
+                  className="h-9 text-xs gap-1 shrink-0 cursor-pointer"
+                >
+                  {isCreatingRole ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  <span>Add Role</span>
+                </Button>
+              </div>
+
+              {/* Role Cards Grid (Predefined + Custom Roles) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {ASSIGNABLE_ROLES.map((role) => {
+                {allRoles.map((role) => {
                   const isSelected = selectedRoles.includes(role);
                   const isMemberRole = role === "Member";
                   const isMemberActive =
@@ -279,11 +460,14 @@ export function AssignRolesDomainSheet({
                     !isSelected && !isMemberRole && isMaxRolesReached;
 
                   const { badgeClass } = getRoleBadgeClasses(role);
+                  const customRoleItem = customRoles.find(
+                    (cr) => cr.name.toLowerCase() === role.toLowerCase()
+                  );
 
                   return (
                     <label
                       key={role}
-                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-medium ${
+                      className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-medium group ${
                         isSelected || isMemberActive
                           ? "border-primary/50 bg-primary/5 shadow-2xs"
                           : disabled
@@ -297,7 +481,7 @@ export function AssignRolesDomainSheet({
                         onCheckedChange={() =>
                           !disabled && handleToggleRole(role)
                         }
-                        className="h-4 w-4"
+                        className="h-4 w-4 shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <Badge
@@ -307,6 +491,17 @@ export function AssignRolesDomainSheet({
                           {role}
                         </Badge>
                       </div>
+
+                      {customRoleItem && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteCustomRole(e, customRoleItem.id, customRoleItem.name)}
+                          className="opacity-0 group-hover:opacity-100 hover:text-destructive p-1 rounded transition-opacity cursor-pointer"
+                          title="Delete custom role"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                     </label>
                   );
                 })}
@@ -316,12 +511,12 @@ export function AssignRolesDomainSheet({
 
           <Separator />
 
-          {/* SECTION 2: SPECIALIZED DOMAINS */}
+          {/* SECTION 3: SPECIALIZED DOMAINS */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
                 <Target className="h-4 w-4 text-indigo-500" />
-                2. Specialized Domains
+                3. Specialized Domains
               </Label>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md">
@@ -397,7 +592,7 @@ export function AssignRolesDomainSheet({
                   variant="secondary"
                   onClick={handleAddCustomDomain}
                   disabled={!customDomainInput.trim() || isSubmitting}
-                  className="h-9 text-xs gap-1 shrink-0"
+                  className="h-9 text-xs gap-1 shrink-0 cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Add</span>
@@ -465,7 +660,7 @@ export function AssignRolesDomainSheet({
             ) : (
               <>
                 <Check className="h-4 w-4" />
-                <span>Save Roles & Domains</span>
+                <span>Save Batch, Roles & Domains</span>
               </>
             )}
           </Button>

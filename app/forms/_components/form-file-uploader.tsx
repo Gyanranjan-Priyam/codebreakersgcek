@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
-import { Progress } from "@/components/ui/progress";
 import {
   UploadCloud,
   FileText,
@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import {
   processAndCompressFormFile,
   MAX_ORIGINAL_FILE_SIZE_BYTES,
-  CompressionResult,
 } from "@/lib/file-compression";
 
 export interface ProcessedFormFile {
@@ -44,9 +43,6 @@ interface FormFileUploaderProps {
 
 export function FormFileUploader({
   fieldId,
-  label = "Upload File",
-  description,
-  required = false,
   allowedFileTypes = ["jpg", "jpeg", "png", "webp", "pdf"],
   maxFiles = 1,
   imageOnly = false,

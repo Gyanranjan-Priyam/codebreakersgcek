@@ -164,6 +164,14 @@ model Batch {
   @@map("batch")
 }
 
+model CustomRole {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("custom_role")
+}
+
 model AttendanceSession {
   id             String       @id @default(cuid())
   sessionNumber  Int
