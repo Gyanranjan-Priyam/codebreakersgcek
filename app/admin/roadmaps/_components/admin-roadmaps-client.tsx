@@ -65,8 +65,10 @@ interface AdminRoadmapItem {
 
 export function AdminRoadmapsClient({
   initialRoadmaps,
+  baseUrl = "/admin/roadmaps",
 }: {
   initialRoadmaps: AdminRoadmapItem[];
+  baseUrl?: string;
 }) {
   const [roadmaps, setRoadmaps] = useState<AdminRoadmapItem[]>(initialRoadmaps);
   const [search, setSearch] = useState("");
@@ -251,7 +253,7 @@ export function AdminRoadmapsClient({
                         asChild
                         className="h-8 text-xs gap-1"
                       >
-                        <Link href={`/admin/roadmaps/${r.id}`}>
+                        <Link href={`${baseUrl}/${r.id}`}>
                           <Edit className="w-3.5 h-3.5" />
                           <span>Visual Studio</span>
                         </Link>

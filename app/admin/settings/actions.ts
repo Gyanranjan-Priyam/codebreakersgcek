@@ -5,7 +5,8 @@ import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { isSystemAdminRole } from "@/lib/member-roles";
+import { isSystemAdminRole, isCoAdminRole, hasAdminOrCoAdminAccess } from "@/lib/member-roles";
+import { parseUserAgent, type ParsedDeviceInfo } from "@/lib/user-agent";
 
 // Validation schema for profile updates
 const profileUpdateSchema = z.object({
@@ -607,3 +608,369 @@ export async function getGoogleDriveStatusAction() {
     };
   }
 }
+
+export interface AdminSessionItem {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userImage: string | null;
+  userRole: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  deviceInfo: ParsedDeviceInfo;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  isCurrentSession: boolean;
+  isInactive: boolean;
+  daysInactive: number;
+}
+
+export interface AdminSessionsData {
+  sessions: AdminSessionItem[];
+  stats: {
+    totalSessions: number;
+    totalAdminSessions: number;
+    totalCoAdminSessions: number;
+    totalUniqueUsers: number;
+    inactiveSessionsCount: number;
+  };
+  policy: {
+    inactiveDays: number;
+  };
+}
+
+export async function getAdminAndCoAdminSessionsAction() {
+  try {
+    const callerSession = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!callerSession?.user || !isSystemAdminRole(callerSession.user.role)) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized: Full Admin access required",
+      };
+    }
+
+    // Read inactive days policy from SystemSettings (default 7 days)
+    const policySetting = await prisma.systemSettings.findUnique({
+      where: { key: "admin_session_inactive_days" },
+    });
+    const inactiveDays = policySetting ? parseInt(policySetting.value, 10) || 7 : 7;
+
+    // Fetch all users with admin or co-admin roles
+    const elevatedUsers = await prisma.user.findMany({
+      where: {
+        role: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+      },
+    });
+
+    const adminOrCoAdminUsers = elevatedUsers.filter((u) => hasAdminOrCoAdminAccess(u.role));
+    const adminUserIds = adminOrCoAdminUsers.map((u) => u.id);
+
+    if (adminUserIds.length === 0) {
+      return {
+        status: "success" as const,
+        data: {
+          sessions: [],
+          stats: {
+            totalSessions: 0,
+            totalAdminSessions: 0,
+            totalCoAdminSessions: 0,
+            totalUniqueUsers: 0,
+            inactiveSessionsCount: 0,
+          },
+          policy: { inactiveDays },
+        },
+      };
+    }
+
+    // Fetch active sessions for these users
+    const now = new Date();
+    const rawSessions = await prisma.session.findMany({
+      where: {
+        userId: { in: adminUserIds },
+        expiresAt: { gt: now },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    const currentSessionToken = callerSession.session.token;
+    const currentSessionId = callerSession.session.id;
+
+    let totalAdminSessions = 0;
+    let totalCoAdminSessions = 0;
+    let inactiveSessionsCount = 0;
+    const uniqueUsersSet = new Set<string>();
+
+    const sessions: AdminSessionItem[] = rawSessions.map((s) => {
+      uniqueUsersSet.add(s.userId);
+      const isCaller = s.id === currentSessionId || s.token === currentSessionToken;
+      const isAdmin = isSystemAdminRole(s.user.role);
+      const isCoAdmin = isCoAdminRole(s.user.role);
+
+      if (isAdmin) totalAdminSessions++;
+      else if (isCoAdmin) totalCoAdminSessions++;
+
+      const lastActiveTime = s.updatedAt ? s.updatedAt.getTime() : s.createdAt.getTime();
+      const diffMs = Math.max(0, Date.now() - lastActiveTime);
+      const daysInactive = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const isInactive = daysInactive >= inactiveDays;
+
+      if (isInactive) {
+        inactiveSessionsCount++;
+      }
+
+      return {
+        id: s.id,
+        userId: s.userId,
+        userName: s.user.name || "Administrator",
+        userEmail: s.user.email,
+        userImage: s.user.image,
+        userRole: isAdmin ? "Admin" : isCoAdmin ? "Co-Admin" : "Staff",
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        deviceInfo: parseUserAgent(s.userAgent),
+        createdAt: s.createdAt.toISOString(),
+        updatedAt: s.updatedAt.toISOString(),
+        expiresAt: s.expiresAt.toISOString(),
+        isCurrentSession: isCaller,
+        isInactive,
+        daysInactive,
+      };
+    });
+
+    return {
+      status: "success" as const,
+      data: {
+        sessions,
+        stats: {
+          totalSessions: sessions.length,
+          totalAdminSessions,
+          totalCoAdminSessions,
+          totalUniqueUsers: uniqueUsersSet.size,
+          inactiveSessionsCount,
+        },
+        policy: {
+          inactiveDays,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching admin sessions:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to load active admin sessions",
+    };
+  }
+}
+
+export async function revokeSessionAction(sessionId: string) {
+  try {
+    const callerSession = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!callerSession?.user || !isSystemAdminRole(callerSession.user.role)) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized: Full Admin access required",
+      };
+    }
+
+    if (!sessionId || !sessionId.trim()) {
+      return {
+        status: "error" as const,
+        message: "Session ID is required",
+      };
+    }
+
+    // Verify session exists
+    const target = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { user: { select: { name: true, email: true } } },
+    });
+
+    if (!target) {
+      return {
+        status: "error" as const,
+        message: "Session not found or already logged out",
+      };
+    }
+
+    // Delete session from DB
+    await prisma.session.delete({
+      where: { id: sessionId },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/system-settings");
+
+    return {
+      status: "success" as const,
+      message: `Device session for ${target.user.name || target.user.email} successfully logged out.`,
+    };
+  } catch (error) {
+    console.error("Error revoking session:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to log out session",
+    };
+  }
+}
+
+export async function revokeAllOtherSessionsAction(targetUserId: string) {
+  try {
+    const callerSession = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!callerSession?.user || !isSystemAdminRole(callerSession.user.role)) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized: Full Admin access required",
+      };
+    }
+
+    const currentSessionId = callerSession.session.id;
+
+    const result = await prisma.session.deleteMany({
+      where: {
+        userId: targetUserId,
+        id: { not: currentSessionId },
+      },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/system-settings");
+
+    return {
+      status: "success" as const,
+      message: `Terminated ${result.count} other active device sessions.`,
+    };
+  } catch (error) {
+    console.error("Error revoking other sessions:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to revoke other sessions",
+    };
+  }
+}
+
+export async function saveAdminSessionPolicyAction(inactiveDays: number) {
+  try {
+    const callerSession = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!callerSession?.user || !isSystemAdminRole(callerSession.user.role)) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized: Full Admin access required",
+      };
+    }
+
+    const days = Math.max(1, Math.min(90, inactiveDays));
+
+    await prisma.systemSettings.upsert({
+      where: { key: "admin_session_inactive_days" },
+      update: {
+        value: days.toString(),
+        updatedAt: new Date(),
+      },
+      create: {
+        key: "admin_session_inactive_days",
+        value: days.toString(),
+        description: "Days of inactivity after which Admin and Co-Admin sessions are eligible for auto-cleanup",
+      },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/system-settings");
+
+    return {
+      status: "success" as const,
+      message: `Inactive session auto-cleanup policy updated to ${days} days.`,
+      data: { inactiveDays: days },
+    };
+  } catch (error) {
+    console.error("Error saving admin session policy:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to save session policy",
+    };
+  }
+}
+
+export async function cleanupInactiveAdminSessionsAction(customDays?: number) {
+  try {
+    const callerSession = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!callerSession?.user || !isSystemAdminRole(callerSession.user.role)) {
+      return {
+        status: "error" as const,
+        message: "Unauthorized: Full Admin access required",
+      };
+    }
+
+    let inactiveDays = customDays;
+    if (!inactiveDays) {
+      const policySetting = await prisma.systemSettings.findUnique({
+        where: { key: "admin_session_inactive_days" },
+      });
+      inactiveDays = policySetting ? parseInt(policySetting.value, 10) || 7 : 7;
+    }
+
+    const cutoffDate = new Date(Date.now() - inactiveDays * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const currentSessionId = callerSession.session.id;
+
+    // Delete expired sessions OR sessions where updatedAt is older than cutoff (protecting caller's current session)
+    const result = await prisma.session.deleteMany({
+      where: {
+        id: { not: currentSessionId },
+        OR: [
+          { expiresAt: { lte: now } },
+          { updatedAt: { lte: cutoffDate } },
+        ],
+      },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/system-settings");
+
+    return {
+      status: "success" as const,
+      message: `Cleaned up ${result.count} stale or inactive sessions (older than ${inactiveDays} days).`,
+      count: result.count,
+    };
+  } catch (error) {
+    console.error("Error cleaning up inactive sessions:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to cleanup inactive sessions",
+    };
+  }
+}

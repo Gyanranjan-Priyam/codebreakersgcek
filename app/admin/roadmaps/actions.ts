@@ -7,15 +7,15 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_ROADMAPS } from "@/lib/roadmaps/data/default-tracks";
 import { parseMermaidToRoadmap } from "@/lib/roadmaps/mermaid-parser";
-import { isSystemAdminRole } from "@/lib/member-roles";
+import { isSystemAdminRole, hasAdminOrCoAdminAccess } from "@/lib/member-roles";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
-  if (!session?.user || !isSystemAdminRole((session.user as any).role)) {
-    throw new Error("Unauthorized: Admin privileges required");
+  if (!session?.user || !hasAdminOrCoAdminAccess((session.user as any).role)) {
+    throw new Error("Unauthorized: Admin or Co-Admin privileges required");
   }
 
   return session.user;

@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { isSystemAdminRole } from "@/lib/member-roles";
+import { isSystemAdminRole, isCoAdminRole } from "@/lib/member-roles";
 
 export async function GET() {
     const session = await auth.api.getSession({
@@ -104,6 +104,11 @@ export async function GET() {
     // If user is admin, they have unlimited device access -> redirect to admin dashboard
     if (isSystemAdminRole(session.user.role) || isSystemAdminRole(dbUser.role)) {
         return redirect("/admin");
+    }
+
+    // If user is co-admin, redirect to co-admin portal
+    if (isCoAdminRole(session.user.role) || isCoAdminRole(dbUser.role)) {
+        return redirect("/co-admin");
     }
 
     // ── Device Limit Enforcement (Max 2 Devices for Regular Users) ──

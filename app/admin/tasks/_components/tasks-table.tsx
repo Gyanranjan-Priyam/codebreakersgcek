@@ -40,9 +40,15 @@ import EditTaskDialog from "./edit-task-dialog";
 
 interface TasksTableProps {
   tasks: TaskData[];
+  canDelete?: boolean;
+  baseUrl?: string;
 }
 
-export default function TasksTable({ tasks }: TasksTableProps) {
+export default function TasksTable({
+  tasks,
+  canDelete = true,
+  baseUrl = "/admin/tasks",
+}: TasksTableProps) {
   const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -182,7 +188,7 @@ export default function TasksTable({ tasks }: TasksTableProps) {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
-                            router.push(`/admin/tasks/${task.taskNumber}`);
+                            router.push(`${baseUrl}/${task.taskNumber}`);
                           }}
                         >
                           <Eye className="h-4 w-4 mr-2 text-blue-500" />
@@ -197,17 +203,21 @@ export default function TasksTable({ tasks }: TasksTableProps) {
                           <Edit className="h-4 w-4 mr-2 text-green-500" />
                           Edit Task
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedTask(task);
-                            setDeleteDialogOpen(true);
-                          }}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Task
-                        </DropdownMenuItem>
+                        {canDelete && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedTask(task);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Task
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

@@ -53,9 +53,15 @@ interface Quiz {
 
 interface QuizzesTableProps {
   quizzes: Quiz[];
+  systemsOnly?: boolean;
+  baseUrl?: string;
 }
 
-export default function QuizzesTable({ quizzes }: QuizzesTableProps) {
+export default function QuizzesTable({
+  quizzes,
+  systemsOnly = false,
+  baseUrl = "/admin/quizzes",
+}: QuizzesTableProps) {
   const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
@@ -149,74 +155,98 @@ export default function QuizzesTable({ quizzes }: QuizzesTableProps) {
                   {new Date(quiz.createdAt).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
+                  {systemsOnly ? (
+                    <div className="flex items-center justify-end gap-2">
+                      <Button asChild size="sm" variant="default" className="gap-1.5">
+                        <Link href={`${baseUrl}/${quiz.quizId}/systems`}>
+                          <Monitor className="h-4 w-4" />
+                          <span>Manage Systems</span>
+                        </Link>
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/quizzes/${quiz.quizId}`}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/quizzes/edit/${quiz.quizId}`}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Quiz
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/quizzes/results/${quiz.quizId}`}>
-                          <BarChart3 className="h-4 w-4 mr-2" />
-                          View Results
-                        </Link>
-                      </DropdownMenuItem>
-                      {quiz.targetAudience === "EXTERNAL" && (
-                        <>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/quizzes/${quiz.quizId}/systems`}>
-                              <Monitor className="h-4 w-4 mr-2" />
-                              System Registration
-                            </Link>
-                          </DropdownMenuItem>
-                          {quiz.accessCode && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                navigator.clipboard.writeText(quiz.accessCode!);
-                                toast.success(`Code ${quiz.accessCode} copied`);
-                              }}
-                            >
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copy Access Code
-                            </DropdownMenuItem>
-                          )}
-                        </>
+                      {quiz.accessCode && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(quiz.accessCode!);
+                            toast.success(`Access code ${quiz.accessCode} copied!`);
+                          }}
+                          title="Copy Access Code"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
                       )}
-                      <DropdownMenuItem onClick={() => handleToggleStatus(quiz)}>
-                        {quiz.isActive ? (
-                          <><ToggleLeft className="h-4 w-4 mr-2" />Deactivate</>
-                        ) : (
-                          <><ToggleRight className="h-4 w-4 mr-2" />Activate</>
+                    </div>
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href={`/admin/quizzes/${quiz.quizId}`}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/admin/quizzes/edit/${quiz.quizId}`}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Quiz
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/admin/quizzes/results/${quiz.quizId}`}>
+                            <BarChart3 className="h-4 w-4 mr-2" />
+                            View Results
+                          </Link>
+                        </DropdownMenuItem>
+                        {quiz.targetAudience === "EXTERNAL" && (
+                          <>
+                            <DropdownMenuItem asChild>
+                              <Link href={`${baseUrl}/${quiz.quizId}/systems`}>
+                                <Monitor className="h-4 w-4 mr-2" />
+                                System Registration
+                              </Link>
+                            </DropdownMenuItem>
+                            {quiz.accessCode && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  navigator.clipboard.writeText(quiz.accessCode!);
+                                  toast.success(`Code ${quiz.accessCode} copied`);
+                                }}
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Access Code
+                              </DropdownMenuItem>
+                            )}
+                          </>
                         )}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => {
-                          setSelectedQuiz(quiz);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <DropdownMenuItem onClick={() => handleToggleStatus(quiz)}>
+                          {quiz.isActive ? (
+                            <><ToggleLeft className="h-4 w-4 mr-2" />Deactivate</>
+                          ) : (
+                            <><ToggleRight className="h-4 w-4 mr-2" />Activate</>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => {
+                            setSelectedQuiz(quiz);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

@@ -295,7 +295,7 @@ export function UserTransactionsClient({
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8 max-w-8xl mx-auto w-full">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full">
       {/* ── Top Header & Title ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

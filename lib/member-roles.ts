@@ -2,16 +2,19 @@
  * CodeBreakers Member Roles Definition & Helper Utilities
  *
  * Rules:
- * 1. Roles: Admin, Secretary, Assistant Secretary, Treasurer, Management Lead,
+ * 1. System Roles: Admin, Co-Admin
+ * 2. Club Roles: Secretary, Assistant Secretary, Treasurer, Management Lead,
  *    Management Co-Lead, Management Team Member, Technical Lead, Tech Co-Lead,
  *    Tech Member, Event Coordinator, Event Co-Coordinator, Social Media Lead, Member
- * 2. Each member can have max 4 club roles assigned.
- * 3. System Admins permanently retain their 'Admin' status and can also be assigned up to 4 club roles.
+ * 3. Each member can have max 4 club roles assigned.
+ * 4. System Admins and Co-Admins permanently retain their system status.
  */
 
 export const SYSTEM_ROLE_ADMIN = "admin";
+export const SYSTEM_ROLE_CO_ADMIN = "co-admin";
 
 export const ASSIGNABLE_ROLES = [
+  "Co-Admin",
   "Secretary",
   "Assistant Secretary",
   "Treasurer",
@@ -32,7 +35,7 @@ export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 export const MAX_MEMBER_ROLES = 4;
 
 /**
- * Checks if a raw role string indicates a system administrator.
+ * Checks if a raw role string indicates a full system administrator.
  */
 export function isSystemAdminRole(rawRole: string | null | undefined): boolean {
   if (!rawRole) return false;
@@ -42,8 +45,30 @@ export function isSystemAdminRole(rawRole: string | null | undefined): boolean {
 }
 
 /**
+ * Checks if a raw role string indicates a co-admin.
+ */
+export function isCoAdminRole(rawRole: string | null | undefined): boolean {
+  if (!rawRole) return false;
+  const lower = rawRole.toLowerCase();
+  if (lower === "co-admin" || lower === "co_admin" || lower === "coadmin") return true;
+  return lower
+    .split(",")
+    .some((part) => {
+      const p = part.trim();
+      return p === "co-admin" || p === "co_admin" || p === "coadmin";
+    });
+}
+
+/**
+ * Checks if a user has full admin OR co-admin access.
+ */
+export function hasAdminOrCoAdminAccess(rawRole: string | null | undefined): boolean {
+  return isSystemAdminRole(rawRole) || isCoAdminRole(rawRole);
+}
+
+/**
  * Parses raw role string from DB into an array of individual role strings.
- * If user is an admin, "Admin" is always placed first.
+ * If user is an admin or co-admin, that title is placed first.
  */
 export function parseMemberRoles(rawRole: string | null | undefined): string[] {
   if (!rawRole) return ["Member"];
@@ -54,8 +79,9 @@ export function parseMemberRoles(rawRole: string | null | undefined): string[] {
     return ["Member"];
   }
 
-  // Check if system admin
+  // Check if system admin or co-admin
   const hasAdmin = isSystemAdminRole(trimmed);
+  const hasCoAdmin = !hasAdmin && isCoAdminRole(trimmed);
 
   // Support JSON array string
   try {
@@ -63,10 +89,20 @@ export function parseMemberRoles(rawRole: string | null | undefined): string[] {
     if (Array.isArray(parsed) && parsed.length > 0) {
       const valid = parsed
         .map((r) => String(r).trim())
-        .filter((r) => r.length > 0 && r.toLowerCase() !== "admin");
+        .filter(
+          (r) =>
+            r.length > 0 &&
+            r.toLowerCase() !== "admin" &&
+            r.toLowerCase() !== "co-admin" &&
+            r.toLowerCase() !== "co_admin" &&
+            r.toLowerCase() !== "coadmin"
+        );
 
       if (hasAdmin) {
         return ["Admin", ...valid];
+      }
+      if (hasCoAdmin) {
+        return ["Co-Admin", ...valid];
       }
       return valid.length > 0 ? valid : ["Member"];
     }
@@ -78,10 +114,20 @@ export function parseMemberRoles(rawRole: string | null | undefined): string[] {
   const split = trimmed
     .split(",")
     .map((r) => r.trim())
-    .filter((r) => r.length > 0 && r.toLowerCase() !== "admin");
+    .filter(
+      (r) =>
+        r.length > 0 &&
+        r.toLowerCase() !== "admin" &&
+        r.toLowerCase() !== "co-admin" &&
+        r.toLowerCase() !== "co_admin" &&
+        r.toLowerCase() !== "coadmin"
+    );
 
   if (hasAdmin) {
     return ["Admin", ...split];
+  }
+  if (hasCoAdmin) {
+    return ["Co-Admin", ...split];
   }
 
   if (split.length === 0) {
@@ -93,14 +139,20 @@ export function parseMemberRoles(rawRole: string | null | undefined): string[] {
 
 /**
  * Serializes an array of roles into a comma-separated string for DB storage.
- * If isSystemAdmin is true, 'admin' is preserved at the front.
  */
-export function serializeMemberRoles(roles: string[], isSystemAdmin = false): string {
+export function serializeMemberRoles(
+  roles: string[],
+  isSystemAdmin = false,
+  isCoAdmin = false
+): string {
   const cleanClubRoles = roles
     .map((r) => r.trim())
     .filter(
       (r) =>
         r.toLowerCase() !== "admin" &&
+        r.toLowerCase() !== "co-admin" &&
+        r.toLowerCase() !== "co_admin" &&
+        r.toLowerCase() !== "coadmin" &&
         r.toLowerCase() !== "member" &&
         r.toLowerCase() !== "normal member" &&
         r.length > 0
@@ -112,6 +164,13 @@ export function serializeMemberRoles(roles: string[], isSystemAdmin = false): st
       return `admin, ${cleanClubRoles.join(", ")}`;
     }
     return "admin";
+  }
+
+  if (isCoAdmin) {
+    if (cleanClubRoles.length > 0) {
+      return `co-admin, ${cleanClubRoles.join(", ")}`;
+    }
+    return "co-admin";
   }
 
   if (cleanClubRoles.length === 0) {
@@ -132,6 +191,12 @@ export function getRoleBadgeClasses(role: string): {
   if (r === "admin") {
     return {
       badgeClass: "bg-purple-600 hover:bg-purple-700 text-white border-none shadow-xs font-semibold",
+    };
+  }
+  if (r === "co-admin" || r === "co_admin" || r === "coadmin") {
+    return {
+      badgeClass:
+        "bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-xs font-semibold",
     };
   }
   if (r.includes("secretary") || r.includes("sacratary")) {
@@ -175,3 +240,4 @@ export function getRoleBadgeClasses(role: string): {
       "bg-muted text-muted-foreground border-border hover:bg-muted/80",
   };
 }
+

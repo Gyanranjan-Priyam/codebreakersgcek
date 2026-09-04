@@ -29,7 +29,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
   };
 
   return (
-    <header className="print:hidden flex h-(--header-height) shrink-0 items-center justify-between gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+    <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-md supports-backdrop-filter:bg-background/80 print:hidden flex h-(--header-height) shrink-0 items-center justify-between gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator

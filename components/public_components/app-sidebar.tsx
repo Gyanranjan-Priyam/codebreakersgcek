@@ -14,7 +14,11 @@ import {
   Compass,
 } from "lucide-react";
 import { IconUserShield } from "@tabler/icons-react";
-import { isSystemAdminRole } from "@/lib/member-roles";
+import {
+  isSystemAdminRole,
+  isCoAdminRole,
+  hasAdminOrCoAdminAccess,
+} from "@/lib/member-roles";
 
 import { NavMain } from "@/components/public_components/nav-main";
 import { NavSecondary } from "@/components/public_components/nav-secondary";
@@ -119,6 +123,8 @@ const data = {
 
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const isAdmin = isSystemAdminRole(user?.role);
+  const isCoAdmin = isCoAdminRole(user?.role);
+  const hasElevatedAccess = hasAdminOrCoAdminAccess(user?.role);
 
   const secondaryNav = React.useMemo(() => {
     const items = [...data.navSecondary];
@@ -128,9 +134,15 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         url: "/admin",
         icon: IconUserShield,
       });
+    } else if (isCoAdmin) {
+      items.unshift({
+        title: "Co-Admin Console",
+        url: "/co-admin",
+        icon: IconUserShield,
+      });
     }
     return items;
-  }, [isAdmin]);
+  }, [isAdmin, isCoAdmin]);
 
   // Create user data with proper formatting
   const userData = user
@@ -184,7 +196,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
 
         {/* Workspace Switcher Below Logo (Only shown for admins) */}
         {isAdmin && (
-          <WorkspaceSwitcher currentWorkspace="member" />
+          <WorkspaceSwitcher currentWorkspace="member" userRole={user?.role} />
         )}
       </SidebarHeader>
       <SidebarContent>

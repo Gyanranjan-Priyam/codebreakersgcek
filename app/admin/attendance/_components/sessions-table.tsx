@@ -52,6 +52,7 @@ interface SessionsTableProps {
   selectedSession: string;
   onSelectSession: (sessionId: string) => void;
   onSessionDeleted?: () => void;
+  canDelete?: boolean;
 }
 
 export default function SessionsTable({
@@ -59,6 +60,7 @@ export default function SessionsTable({
   selectedSession,
   onSelectSession,
   onSessionDeleted,
+  canDelete = true,
 }: SessionsTableProps) {
   const [sessionToDelete, setSessionToDelete] =
     useState<AttendanceSession | null>(null);
@@ -232,14 +234,18 @@ export default function SessionsTable({
                           <CheckCircle2 className="mr-2 h-4 w-4" />
                           Select for Scanning
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="cursor-pointer text-destructive focus:text-destructive"
-                          onClick={() => setSessionToDelete(session)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Session
-                        </DropdownMenuItem>
+                        {canDelete && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="cursor-pointer text-destructive focus:text-destructive"
+                              onClick={() => setSessionToDelete(session)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Session
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

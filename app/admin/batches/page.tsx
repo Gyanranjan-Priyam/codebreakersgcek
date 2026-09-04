@@ -16,16 +16,14 @@ export default async function AdminBatchesPage() {
   const stats = result.stats;
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 lg:px-2 py-3 sm:py-6 max-w-8xl">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full">
       <PageHeader
         title="Batches"
         description="Organize students into batches. Assign tasks, attendance sessions, quizzes, and leaderboards to specific batches."
         showBackButton={false}
       />
 
-      <div className="mt-6 sm:mt-8">
-        <BatchesClient initialBatches={batches} stats={stats} />
-      </div>
+      <BatchesClient initialBatches={batches} stats={stats} />
     </div>
   );
 }

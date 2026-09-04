@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { isSystemAdminRole } from "@/lib/member-roles";
+import { isSystemAdminRole, hasAdminOrCoAdminAccess } from "@/lib/member-roles";
 import { emitSocketEvent, emitSocketEventToRooms } from "@/lib/socket-server";
 
 export function extractStudentIdentifier(qrContent: string): string {
@@ -47,9 +47,9 @@ export async function POST(req: NextRequest) {
       headers: await headers(),
     });
 
-    if (!authSession?.user || !isSystemAdminRole(authSession.user.role)) {
+    if (!authSession?.user || !hasAdminOrCoAdminAccess(authSession.user.role)) {
       return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
+        { error: "Unauthorized. Admin or Co-Admin access required." },
         { status: 401 }
       );
     }

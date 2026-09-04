@@ -14,20 +14,18 @@ export default async function AdminTransactionsPage() {
   const formsSummary = result.formsSummary || [];
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 lg:px-2 py-3 sm:py-6 max-w-8xl">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full">
       <PageHeader
         title="Transactions"
         description="Manage form registration payment transactions. View receipts, verify payments, and export data."
         showBackButton={false}
       />
 
-      <div className="mt-6 sm:mt-8">
-        <TransactionsClient
-          initialTransactions={transactions}
-          initialPaymentForms={paymentForms}
-          initialFormsSummary={formsSummary}
-        />
-      </div>
+      <TransactionsClient
+        initialTransactions={transactions}
+        initialPaymentForms={paymentForms}
+        initialFormsSummary={formsSummary}
+      />
     </div>
   );
 }

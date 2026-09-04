@@ -47,9 +47,15 @@ interface FormRow {
 
 interface FormsListProps {
   forms: FormRow[];
+  canManage?: boolean;
+  baseUrl?: string;
 }
 
-export default function FormsList({ forms }: FormsListProps) {
+export default function FormsList({
+  forms,
+  canManage = true,
+  baseUrl = "/admin/forms",
+}: FormsListProps) {
   const router = useRouter();
   const [selectedForm, setSelectedForm] = useState<FormRow | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -188,14 +194,16 @@ export default function FormsList({ forms }: FormsListProps) {
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
                       <DropdownMenuSeparator />
+                      {canManage && (
+                        <DropdownMenuItem asChild>
+                          <Link href={`/admin/forms/${form.formId}`}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Form
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem asChild>
-                        <Link href={`/admin/forms/${form.formId}`}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Form
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/forms/${form.formId}/responses`}>
+                        <Link href={`${baseUrl}/${form.formId}/responses`}>
                           <Inbox className="mr-2 h-4 w-4" />
                           View Responses
                           {form._count.responses > 0 && (
@@ -215,45 +223,49 @@ export default function FormsList({ forms }: FormsListProps) {
                           Open Public Form
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handlePublishToggle(form)} disabled={isLoading}>
-                        {form.isPublished ? (
-                          <>
-                            <ToggleLeft className="mr-2 h-4 w-4" />
-                            Unpublish
-                          </>
-                        ) : (
-                          <>
-                            <ToggleRight className="mr-2 h-4 w-4" />
-                            Publish
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      {form.isPublished && (
-                        <DropdownMenuItem onClick={() => handleAcceptingToggle(form)} disabled={isLoading}>
-                          {form.acceptingResponses ? (
-                            <>
-                              <Ban className="mr-2 h-4 w-4" />
-                              Stop Collecting
-                            </>
-                          ) : (
-                            <>
-                              <PlayCircle className="mr-2 h-4 w-4" />
-                              Start Collecting
-                            </>
+                      {canManage && (
+                        <>
+                          <DropdownMenuItem onClick={() => handlePublishToggle(form)} disabled={isLoading}>
+                            {form.isPublished ? (
+                              <>
+                                <ToggleLeft className="mr-2 h-4 w-4" />
+                                Unpublish
+                              </>
+                            ) : (
+                              <>
+                                <ToggleRight className="mr-2 h-4 w-4" />
+                                Publish
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          {form.isPublished && (
+                            <DropdownMenuItem onClick={() => handleAcceptingToggle(form)} disabled={isLoading}>
+                              {form.acceptingResponses ? (
+                                <>
+                                  <Ban className="mr-2 h-4 w-4" />
+                                  Stop Collecting
+                                </>
+                              ) : (
+                                <>
+                                  <PlayCircle className="mr-2 h-4 w-4" />
+                                  Start Collecting
+                                </>
+                              )}
+                            </DropdownMenuItem>
                           )}
-                        </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => {
+                              setSelectedForm(form);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
                       )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => {
-                          setSelectedForm(form);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

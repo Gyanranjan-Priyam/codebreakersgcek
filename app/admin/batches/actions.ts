@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
+import { requireCoAdmin } from "@/app/data/admin/require-co-admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -50,7 +51,7 @@ export async function getBatches(): Promise<{
   error?: string;
 }> {
   try {
-    await requireAdmin();
+    await requireCoAdmin();
 
     const [batches, totalUsersWithBatch, totalUsersWithoutBatch] = await Promise.all([
       prisma.batch.findMany({
@@ -285,7 +286,7 @@ export async function getBatchMembers(batchId: string): Promise<{
   error?: string;
 }> {
   try {
-    await requireAdmin();
+    await requireCoAdmin();
 
     const members = await prisma.user.findMany({
       where: { batchId },
@@ -320,7 +321,7 @@ export async function getUnassignedMembers(): Promise<{
   error?: string;
 }> {
   try {
-    await requireAdmin();
+    await requireCoAdmin();
 
     const members = await prisma.user.findMany({
       where: { batchId: null },
@@ -358,7 +359,7 @@ export async function assignMembersToBatch(
   error?: string;
 }> {
   try {
-    await requireAdmin();
+    await requireCoAdmin();
 
     if (!userIds || userIds.length === 0) {
       return { success: false, error: "No members selected." };

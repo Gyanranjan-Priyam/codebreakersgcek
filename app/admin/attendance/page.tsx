@@ -90,7 +90,7 @@ export default function AttendanceQRPage() {
   const selectedSessionData = sessions.find((s) => s.id === selectedSession);
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 space-y-6">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

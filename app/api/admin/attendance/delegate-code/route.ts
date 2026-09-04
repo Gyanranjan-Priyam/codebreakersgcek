@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { isSystemAdminRole } from "@/lib/member-roles";
+import { isSystemAdminRole, hasAdminOrCoAdminAccess } from "@/lib/member-roles";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I/O/0/1 to avoid confusion
@@ -24,9 +24,9 @@ export async function POST(req: NextRequest) {
       headers: await headers(),
     });
 
-    if (!session?.user || !isSystemAdminRole(session.user.role)) {
+    if (!session?.user || !hasAdminOrCoAdminAccess(session.user.role)) {
       return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
+        { error: "Unauthorized. Admin or Co-Admin access required." },
         { status: 401 }
       );
     }
@@ -110,9 +110,9 @@ export async function GET() {
       headers: await headers(),
     });
 
-    if (!session?.user || !isSystemAdminRole(session.user.role)) {
+    if (!session?.user || !hasAdminOrCoAdminAccess(session.user.role)) {
       return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
+        { error: "Unauthorized. Admin or Co-Admin access required." },
         { status: 401 }
       );
     }
@@ -184,9 +184,9 @@ export async function DELETE(req: NextRequest) {
       headers: await headers(),
     });
 
-    if (!session?.user || !isSystemAdminRole(session.user.role)) {
+    if (!session?.user || !hasAdminOrCoAdminAccess(session.user.role)) {
       return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
+        { error: "Unauthorized. Admin or Co-Admin access required." },
         { status: 401 }
       );
     }

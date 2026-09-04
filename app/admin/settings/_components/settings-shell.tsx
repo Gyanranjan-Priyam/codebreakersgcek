@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -10,6 +11,8 @@ import { GitHubOrgSettings } from "./github-org-settings";
 import { DataCleanup } from "./data-cleanup";
 import { GoogleDriveSettingsCard } from "./google-drive-settings-card";
 import { UserSocialLinksForm } from "@/app/(public)/dashboard/settings/_components/user-social-links-form";
+import { AdminSessionsManager } from "./admin-sessions-manager";
+import type { AdminSessionsData } from "../actions";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
@@ -70,6 +73,7 @@ interface SettingsShellProps {
     isConnected: boolean;
     email?: string;
   };
+  sessionsData?: AdminSessionsData;
 }
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -85,6 +89,7 @@ export function SettingsShell({
   isRegistrationEnabled,
   githubOrgName,
   googleDriveStatus,
+  sessionsData,
 }: SettingsShellProps) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams?.get("tab") as Tab) || (searchParams?.get("gdrive") ? "security" : "profile");
@@ -270,6 +275,19 @@ export function SettingsShell({
         {/* Tab: System Settings */}
         {activeTab === "system" && (
           <div className="space-y-8 max-w-3xl">
+            {/* Active Admin & Co-Admin Sessions */}
+            {sessionsData && (
+              <div className="space-y-3">
+                <SectionHeading>Active Admin &amp; Co-Admin Sessions &amp; Devices</SectionHeading>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Inspect logged-in devices across Admin and Co-Admin accounts, remotely log out devices, and configure inactive auto-logout policies.
+                </p>
+                <AdminSessionsManager initialData={sessionsData} />
+              </div>
+            )}
+
+            {sessionsData && <Separator />}
+
             {/* Registration toggle */}
             <div className="space-y-2">
               <SectionHeading>User Registration</SectionHeading>

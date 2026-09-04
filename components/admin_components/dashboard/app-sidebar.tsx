@@ -14,6 +14,7 @@ import {
   QrCode,
   Receipt,
   Compass,
+  MonitorCog 
 } from "lucide-react";
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main";
@@ -102,6 +103,11 @@ const data = {
   ],
   navSecondary: [
     {
+      title: "System Settings",
+      url: "/admin/system-settings",
+      icon: MonitorCog,
+    },
+    {
       title: "Settings",
       url: "/admin/settings",
       icon: Settings,
@@ -157,7 +163,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         </SidebarMenu>
 
         {/* Workspace Switcher Below Logo */}
-        <WorkspaceSwitcher currentWorkspace="admin" />
+        <WorkspaceSwitcher currentWorkspace="admin" userRole={user?.role} />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />

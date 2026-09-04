@@ -1,10 +1,10 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "./require-admin";
+import { requireCoAdmin } from "./require-co-admin";
 
 export async function getDashboardStats() {
-    await requireAdmin();
+    await requireCoAdmin();
     
     try {
         const currentDate = new Date();

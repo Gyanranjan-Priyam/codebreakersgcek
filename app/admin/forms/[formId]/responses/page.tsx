@@ -27,16 +27,14 @@ export default async function FormResponsesPage({ params }: ResponsesPageProps) 
   const form = result.data;
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 lg:px-2 py-3 sm:py-6 max-w-8xl">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full">
       <PageHeader
         title={`Responses — ${form.title}`}
         description={`${form._count.responses} total response${form._count.responses !== 1 ? "s" : ""} for this form.`}
         showBackButton={false}
       />
 
-      <div className="mt-6 sm:mt-8">
-        <ResponsesClient form={form} />
-      </div>
+      <ResponsesClient form={form} />
     </div>
   );
 }

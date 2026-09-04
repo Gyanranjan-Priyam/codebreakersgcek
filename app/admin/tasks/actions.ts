@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
+import { requireCoAdmin } from "@/app/data/admin/require-co-admin";
 import { revalidatePath } from "next/cache";
 import { emitSocketEvent } from "@/lib/socket-server";
 
@@ -18,7 +19,7 @@ export interface TaskData {
 }
 
 export async function getAllTasks() {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const tasks = await prisma.task.findMany({
@@ -50,7 +51,7 @@ export async function createTask(data: {
   targetBatchIds?: string[];
   createdBy: string;
 }) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     let finalTaskNumber = data.taskNumber;
@@ -106,7 +107,7 @@ export async function createTask(data: {
 }
 
 export async function getTaskById(id: string) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const task = await prisma.task.findUnique({
@@ -134,7 +135,7 @@ export async function getTaskById(id: string) {
 }
 
 export async function getTaskByNumber(taskNumber: number) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const task = await prisma.task.findUnique({
@@ -173,7 +174,7 @@ export async function updateTask(
     targetBatchIds?: string[];
   }
 ) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     // Check if task number already exists for a different task
@@ -253,7 +254,7 @@ export interface MemberForTask {
 }
 
 export async function getAllMembers() {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const members = await prisma.user.findMany({
@@ -288,7 +289,7 @@ export async function getAllMembers() {
 }
 
 export async function getMembersWithSubmissions(taskId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     // Get all submissions for this task
@@ -337,7 +338,7 @@ export async function getMembersWithSubmissions(taskId: string) {
 }
 
 export async function getTaskSubmissions(taskId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const submissions = await prisma.taskSubmission.findMany({
@@ -387,7 +388,7 @@ export async function evaluateSubmission(
   feedback: string | null,
   evaluatedBy: string
 ) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   // Force points to 0 if status is rejected or pending
   const finalPoints = (status === "rejected" || status === "pending") ? 0 : pointsAwarded;

@@ -26,22 +26,36 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
+import { isSystemAdminRole, isCoAdminRole } from "@/lib/member-roles";
+
 interface WorkspaceSwitcherProps {
-  currentWorkspace: "admin" | "member";
+  currentWorkspace: "admin" | "co-admin" | "member";
+  userRole?: string | null;
 }
 
 export function WorkspaceSwitcher({
   currentWorkspace,
+  userRole,
 }: WorkspaceSwitcherProps) {
   const { isMobile } = useSidebar();
   const router = useRouter();
 
-  const workspaces = [
+  const isAdmin = isSystemAdminRole(userRole) || currentWorkspace === "admin";
+  const isCoAdmin = isCoAdminRole(userRole) || currentWorkspace === "co-admin";
+
+  const allWorkspaces = [
     {
       id: "admin",
       title: "Admin Console",
       subtitle: "Management & Operations",
       url: "/admin",
+      icon: IconUserShield,
+    },
+    {
+      id: "co-admin",
+      title: "Co-Admin Console",
+      subtitle: "Operational Access",
+      url: "/co-admin",
       icon: IconUserShield,
     },
     {
@@ -53,8 +67,17 @@ export function WorkspaceSwitcher({
     },
   ];
 
+  const workspaces = allWorkspaces.filter((ws) => {
+    if (ws.id === "admin") return isAdmin;
+    if (ws.id === "co-admin") return isAdmin || isCoAdmin;
+    if (ws.id === "member") return true;
+    return true;
+  });
+
   const activeWs =
-    workspaces.find((w) => w.id === currentWorkspace) || workspaces[0];
+    workspaces.find((w) => w.id === currentWorkspace) ||
+    allWorkspaces.find((w) => w.id === currentWorkspace) ||
+    workspaces[0];
   const ActiveIcon = activeWs.icon;
 
   return (

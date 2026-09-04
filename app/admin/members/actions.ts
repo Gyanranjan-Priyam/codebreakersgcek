@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
+import { requireCoAdmin } from "@/app/data/admin/require-co-admin";
 import { revalidatePath } from "next/cache";
 import {
   sendMemberWelcomeEmail,
@@ -15,8 +16,66 @@ import {
   serializeMemberRoles,
   parseMemberRoles,
   isSystemAdminRole,
+  isCoAdminRole,
   MAX_MEMBER_ROLES,
 } from "@/lib/member-roles";
+
+export interface CoAdminMemberData {
+  id: string;
+  cbUserId: string | null;
+  name: string;
+  email: string;
+  branch: string | null;
+  batch?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
+  specializedDomain: string | null;
+}
+
+export async function getCoAdminMembers(): Promise<{
+  status: "success" | "error";
+  data: CoAdminMemberData[];
+  message?: string;
+}> {
+  await requireCoAdmin();
+  
+  try {
+    const members = await prisma.user.findMany({
+      select: {
+        id: true,
+        cbUserId: true,
+        name: true,
+        email: true,
+        branch: true,
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+        specializedDomain: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return {
+      status: "success",
+      data: members,
+    };
+  } catch (error) {
+    console.error("Error fetching members for co-admin:", error);
+    return {
+      status: "error",
+      message: "Failed to fetch members",
+      data: [],
+    };
+  }
+}
 
 const CB_USER_ID_PREFIX = "GCEK-CB-";
 
@@ -203,8 +262,14 @@ export async function createMember(input: {
       };
     }
 
+    const hasCoAdmin = (data.roles || []).some(
+      (r) =>
+        r.toLowerCase() === "co-admin" ||
+        r.toLowerCase() === "coadmin" ||
+        r.toLowerCase() === "co_admin"
+    );
     const assignedRoles = data.roles && data.roles.length > 0
-      ? serializeMemberRoles(data.roles)
+      ? serializeMemberRoles(data.roles, false, hasCoAdmin)
       : "Member";
 
     let member;

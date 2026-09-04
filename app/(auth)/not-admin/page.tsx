@@ -22,12 +22,6 @@ export default function NotAdminPage() {
         </div>
       </div>
 
-      {/* Icon Badge */}
-      <div className="flex justify-center">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-purple-500/10 dark:bg-purple-950/40 rounded-full flex items-center justify-center border border-purple-500/20 shadow-xs">
-          <ShieldOff className="w-8 h-8 sm:w-10 sm:h-10 text-purple-600 dark:text-purple-400" />
-        </div>
-      </div>
 
       {/* Heading & Subtitle */}
       <div className="space-y-2">

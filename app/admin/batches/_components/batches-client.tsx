@@ -56,6 +56,7 @@ interface BatchesClientProps {
     totalAssignedMembers: number;
     totalUnassignedMembers: number;
   };
+  canManageBatches?: boolean;
 }
 
 export function BatchesClient({
@@ -66,6 +67,7 @@ export function BatchesClient({
     totalAssignedMembers: 0,
     totalUnassignedMembers: 0,
   },
+  canManageBatches = true,
 }: BatchesClientProps) {
   const router = useRouter();
   const [batches, setBatches] = useState<BatchItem[]>(initialBatches);
@@ -228,17 +230,19 @@ export function BatchesClient({
               </CardDescription>
             </div>
 
-            <Button
-              type="button"
-              onClick={() => {
-                setEditingBatch(null);
-                setIsCreateOpen(true);
-              }}
-              className="h-9 px-4 text-xs font-medium gap-1.5 bg-primary text-primary-foreground cursor-pointer shrink-0"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Create Batch</span>
-            </Button>
+            {canManageBatches && (
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingBatch(null);
+                  setIsCreateOpen(true);
+                }}
+                className="h-9 px-4 text-xs font-medium gap-1.5 bg-primary text-primary-foreground cursor-pointer shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Create Batch</span>
+              </Button>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3">
@@ -381,6 +385,18 @@ export function BatchesClient({
                           <Button
                             type="button"
                             variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                            onClick={() => setAddingMembersBatch(batch)}
+                            title="Add Students to Batch"
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            <span>Add Students</span>
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-foreground"
                             onClick={() => setViewingMembersBatch(batch)}
@@ -389,63 +405,65 @@ export function BatchesClient({
                             <Users className="h-4 w-4" />
                           </Button>
 
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 text-xs">
-                              <DropdownMenuItem
-                                onClick={() => setViewingMembersBatch(batch)}
-                                className="cursor-pointer"
-                              >
-                                <Users className="h-3.5 w-3.5 mr-2 text-primary" />
-                                View Enrolled Students
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => setAddingMembersBatch(batch)}
-                                className="cursor-pointer"
-                              >
-                                <UserPlus className="h-3.5 w-3.5 mr-2 text-emerald-600" />
-                                Add Students to Batch
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setEditingBatch(batch);
-                                  setIsCreateOpen(true);
-                                }}
-                                className="cursor-pointer"
-                              >
-                                <Edit2 className="h-3.5 w-3.5 mr-2" />
-                                Edit Batch Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleToggleActive(batch)}
-                                className="cursor-pointer"
-                              >
-                                {batch.isActive ? (
-                                  <>
-                                    <ToggleLeft className="h-3.5 w-3.5 mr-2 text-amber-600" />
-                                    Deactivate Batch
-                                  </>
-                                ) : (
-                                  <>
-                                    <ToggleRight className="h-3.5 w-3.5 mr-2 text-emerald-600" />
-                                    Activate Batch
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(batch)}
-                                className="cursor-pointer text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                Delete Batch
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {canManageBatches && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 text-xs">
+                                <DropdownMenuItem
+                                  onClick={() => setViewingMembersBatch(batch)}
+                                  className="cursor-pointer"
+                                >
+                                  <Users className="h-3.5 w-3.5 mr-2 text-primary" />
+                                  View Enrolled Students
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setAddingMembersBatch(batch)}
+                                  className="cursor-pointer"
+                                >
+                                  <UserPlus className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                                  Add Students to Batch
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditingBatch(batch);
+                                    setIsCreateOpen(true);
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5 mr-2" />
+                                  Edit Batch Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleActive(batch)}
+                                  className="cursor-pointer"
+                                >
+                                  {batch.isActive ? (
+                                    <>
+                                      <ToggleLeft className="h-3.5 w-3.5 mr-2 text-amber-600" />
+                                      Deactivate Batch
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ToggleRight className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                                      Activate Batch
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(batch)}
+                                  className="cursor-pointer text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                  Delete Batch
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

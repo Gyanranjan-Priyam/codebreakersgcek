@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
+import { requireCoAdmin } from "@/app/data/admin/require-co-admin";
 import type { FormDefinition } from "@/lib/form-types";
 import { sendFormResponseInvoiceEmail } from "@/lib/mailer";
 
@@ -123,7 +124,7 @@ async function ensureUniqueFormId() {
 }
 
 export async function getAllForms() {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const forms = await prisma.form.findMany({
@@ -152,7 +153,7 @@ export async function getAllForms() {
 }
 
 export async function getFormByFormId(formId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const form = await prisma.form.findUnique({

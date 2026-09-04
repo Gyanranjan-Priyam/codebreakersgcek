@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/app/data/admin/require-admin";
+import { requireCoAdmin } from "@/app/data/admin/require-co-admin";
 import { revalidatePath } from "next/cache";
 import { emitSocketEvent, emitSocketEventToRooms } from "@/lib/socket-server";
 
@@ -45,7 +46,7 @@ export interface QuizQuestion {
 }
 
 export async function getAllQuizzes() {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const quizzes = await prisma.quiz.findMany({
@@ -68,7 +69,7 @@ export async function getAllQuizzes() {
 }
 
 export async function getQuizById(id: string) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const quiz = await prisma.quiz.findUnique({
@@ -99,7 +100,7 @@ export async function getQuizById(id: string) {
 }
 
 export async function getQuizByQuizId(quizId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
   
   try {
     const quiz = await prisma.quiz.findUnique({
@@ -583,7 +584,7 @@ export async function unregisterExternalSystem(systemCode: string) {
 }
 
 export async function deleteExternalSystem(systemId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const system = await prisma.externalQuizSystem.findUnique({
@@ -613,7 +614,7 @@ export async function deleteExternalSystem(systemId: string) {
 }
 
 export async function clearAllExternalSystems(quizId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const quiz = await prisma.quiz.findUnique({
@@ -699,7 +700,7 @@ export async function assignStudentToSystem({
   assignedShift?: number;
   assignedShiftName?: string;
 }) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     let whereClause: any = {};
@@ -808,7 +809,7 @@ export async function assignStudentToSystem({
  * Mark Shift X as Completed, reset active student assignments on connected systems, and advance to next shift.
  */
 export async function completeQuizShift(quizId: string, shiftNumber: number) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const quiz = await prisma.quiz.findFirst({
@@ -1011,7 +1012,7 @@ export async function completeQuizShift(quizId: string, shiftNumber: number) {
  * Manually switch or activate a specific Shift
  */
 export async function setActiveQuizShift(quizId: string, targetShiftNumber: number) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const quiz = await prisma.quiz.findFirst({
@@ -1126,7 +1127,7 @@ export async function setActiveQuizShift(quizId: string, targetShiftNumber: numb
 }
 
 export async function unassignStudentFromSystem(systemId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const system = await prisma.externalQuizSystem.update({
@@ -1153,7 +1154,7 @@ export async function unassignStudentFromSystem(systemId: string) {
 }
 
 export async function autoShuffleAndAssignSets(quizId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const quiz = await prisma.quiz.findFirst({
@@ -1247,7 +1248,7 @@ export async function autoShuffleAndAssignSets(quizId: string) {
 }
 
 export async function startSystemQuiz(systemId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const system = await prisma.externalQuizSystem.update({
@@ -1272,7 +1273,7 @@ export async function startSystemQuiz(systemId: string) {
 }
 
 export async function startAllSystems(quizId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     // First fetch all ASSIGNED systems so we can send per-system events
@@ -1909,7 +1910,7 @@ export async function setSystemAttemptingAction(systemCode: string) {
 }
 
 export async function unblockQuizCandidate(quizId: string, userId: string) {
-  await requireAdmin();
+  await requireCoAdmin();
 
   try {
     const rawId = userId.replace("ext_", "");

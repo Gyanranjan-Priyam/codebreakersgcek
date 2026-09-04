@@ -15,7 +15,7 @@ export default async function AdminRoadmapsPage() {
   const roadmaps = result.status === "success" ? result.data : [];
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 lg:px-2 py-3 sm:py-6 max-w-8xl space-y-6">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full">
       <PageHeader
         title="Visual Roadmaps"
         description="Create and customize interactive node roadmaps. Changes take effect immediately without redeploying."
