@@ -1,17 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  const host = request.headers.get('host') || '';
+  const pathname = request.nextUrl.pathname;
+
+  // Handle forms subdomain: forms.cbgcek.dev (e.g. forms.cbgcek.dev/xyz -> /forms/xyz)
+  if (host.startsWith('forms.') || host.includes('forms.cbgcek.dev')) {
+    if (pathname === '/') {
+      return NextResponse.next();
+    }
+    if (
+      !pathname.startsWith('/forms') &&
+      !pathname.startsWith('/api') &&
+      !pathname.startsWith('/_next')
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/forms${pathname}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
   // Handle image optimization requests with better error handling
-  if (request.nextUrl.pathname.startsWith('/_next/image')) {
+  if (pathname.startsWith('/_next/image')) {
     try {
       // Set cache headers for better performance
       const response = NextResponse.next();
       response.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400');
-      
       return response;
     } catch (error) {
       console.error('Image middleware error:', error);
-      // Return a proper error response instead of hanging
       return new NextResponse('Image processing error', { 
         status: 500,
         headers: {
@@ -21,19 +38,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Note: Auth checking is handled at the page level instead of middleware
-  // to avoid Edge Runtime compatibility issues with Better Auth.
-  // Pages use server-side protection through:
-  // - auth.api.getSession() in server components
-  // - Admin layout protection
-  // - Callback route checks
-
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    // Only match image optimization requests
-    '/_next/image',
+    /*
+     * Match all request paths except static files
+     */
+    '/((?!_next/static|favicon.ico|assets).*)',
   ],
 };

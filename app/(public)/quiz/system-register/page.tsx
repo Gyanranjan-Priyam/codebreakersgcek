@@ -1,8 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,15 +7,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { registerExternalSystem, getSystemState, unregisterExternalSystem } from "@/app/admin/quizzes/actions";
-import { Monitor, Key, Loader2, CheckCircle2, Clock, AlertTriangle, Layers } from "lucide-react";
-import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
+import {
+  registerExternalSystem,
+  getSystemState,
+  unregisterExternalSystem,
+  getIsExternalQuizActiveAction,
+} from "@/app/admin/quizzes/actions";
+import { Monitor, Key, Loader2, CheckCircle2, Clock, AlertTriangle, Layers, PowerOff, RefreshCw } from "lucide-react";
+import { getSocket, initSocket, joinRoom, disconnectSocket } from "@/lib/socket-client";
 
 export default function SystemRegisterPage() {
   const router = useRouter();
   const [accessCode, setAccessCode] = useState("");
   const [systemNumber, setSystemNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // External quiz activation status
+  const [isQuizSystemActive, setIsQuizSystemActive] = useState<boolean | null>(null);
+  const [isCheckingActive, setIsCheckingActive] = useState(true);
 
   const [activeSession, setActiveSession] = useState<{
     systemCode: string;
@@ -29,6 +34,29 @@ export default function SystemRegisterPage() {
   } | null>(null);
 
   const [liveState, setLiveState] = useState<any>(null);
+
+  // Check if external quiz system is active on mount
+  const checkQuizSystemActive = useCallback(async () => {
+    setIsCheckingActive(true);
+    try {
+      const res = await getIsExternalQuizActiveAction();
+      const active = res.status === "success" ? !!res.data : false;
+      setIsQuizSystemActive(active);
+      if (!active) {
+        // Disconnect any active socket connections
+        disconnectSocket();
+      }
+    } catch {
+      setIsQuizSystemActive(false);
+      disconnectSocket();
+    } finally {
+      setIsCheckingActive(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkQuizSystemActive();
+  }, [checkQuizSystemActive]);
 
   // Always force light mode on external kiosk screens irrespective of system/browser theme
   useEffect(() => {
@@ -49,9 +77,10 @@ export default function SystemRegisterPage() {
     }
   }, []);
 
-  // Real-time Socket.IO subscription + fast polling fallback for quiz start & assign
+  // Real-time Socket.IO subscription + fast polling fallback for quiz start & assign (ONLY WHEN ACTIVE)
   useEffect(() => {
-    if (!activeSession?.systemCode) return;
+    if (!isQuizSystemActive || !activeSession?.systemCode) return;
+
 
     const checkState = async () => {
       const res = await getSystemState(activeSession.systemCode);
@@ -117,10 +146,19 @@ export default function SystemRegisterPage() {
       if (activeSession.quizId) {
         leaveQuizRoom = joinRoom(`quiz-${activeSession.quizId}`);
       }
+      const leaveGlobalRoom = joinRoom("quiz-external-global");
 
       handleConnect = () => {
         // Immediate server sync on socket reconnection
         checkState();
+      };
+
+      const handleGlobalStatus = (data: { enabled: boolean }) => {
+        if (!data?.enabled) {
+          setIsQuizSystemActive(false);
+          disconnectSocket();
+          toast.info("External Quiz System has been deactivated by administrator");
+        }
       };
 
       handleStatusChanged = (data: any) => {
@@ -191,14 +229,17 @@ export default function SystemRegisterPage() {
       socket.on("shift-changed", handleShiftChanged);
       socket.on("system-updated", handleSystemUpdated);
       socket.on("quiz-started", handleQuizStarted);
+      socket.on("external-quiz-status", handleGlobalStatus);
     });
 
-    // Fast polling fallback (3s) — guarantees start detection even if Socket.IO misses
-    const pollInterval = setInterval(() => {
+    // Re-check state when tab visibility changes or gains focus
+    const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         checkState();
       }
-    }, 3000);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
 
     return () => {
       if (leaveSystemRoom) leaveSystemRoom();
@@ -211,13 +252,15 @@ export default function SystemRegisterPage() {
         if (handleShiftChanged) socket.off("shift-changed", handleShiftChanged);
         if (handleSystemUpdated) socket.off("system-updated", handleSystemUpdated);
         if (handleQuizStarted) socket.off("quiz-started", handleQuizStarted);
+        socket.off("external-quiz-status");
       }
       window.removeEventListener("click", handleAutoFullscreenInteraction, { capture: true });
       window.removeEventListener("pointerdown", handleAutoFullscreenInteraction, { capture: true });
       window.removeEventListener("keydown", handleAutoFullscreenInteraction, { capture: true });
-      clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
     };
-  }, [activeSession, router]);
+  }, [activeSession, router, isQuizSystemActive]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,6 +314,74 @@ export default function SystemRegisterPage() {
     setLiveState(null);
     toast.info("System registration cleared and removed from admin dashboard");
   };
+
+  // ── Deactivated Screen when External Quiz System is Disabled ──
+  if (isQuizSystemActive === false) {
+    return (
+      <div className="light min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-slate-50 to-slate-200 text-slate-900">
+        <Card className="max-w-md w-full bg-white text-slate-900 border-slate-200 shadow-lg overflow-hidden text-center p-6 space-y-5">
+          <div className="flex flex-col items-center">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2">
+              <Image
+                src="/assets/logo.png"
+                alt="CodeBreakers Logo"
+                width={54}
+                height={54}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-slate-900">CodeBreakers</span>
+          </div>
+
+          <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+            <PowerOff className="h-8 w-8" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-bold text-slate-900">External Quiz System Offline</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The external quiz kiosk portal and real-time exam services are currently deactivated by the administrator.
+            </p>
+          </div>
+
+          <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-800 text-xs text-left">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+            <AlertDescription>
+              Please contact your quiz proctor or exam coordinator to activate the external quiz system in Admin Settings.
+            </AlertDescription>
+          </Alert>
+
+          <Button
+            variant="outline"
+            onClick={checkQuizSystemActive}
+            disabled={isCheckingActive}
+            className="w-full gap-2 font-semibold"
+          >
+            {isCheckingActive ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Check Status Again
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Initial Status Check Loading ──
+  if (isCheckingActive && isQuizSystemActive === null) {
+    return (
+      <div className="light min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-slate-50 to-slate-200 text-slate-900">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm font-medium text-muted-foreground">Checking external quiz system status...</p>
+        </div>
+      </div>
+    );
+  }
+
 
   // ── Registered & Waiting Screen ──
   if (activeSession) {

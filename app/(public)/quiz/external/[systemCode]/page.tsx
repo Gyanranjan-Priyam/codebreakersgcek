@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { isExternalQuizEnabled } from "@/lib/system-settings";
 import ExternalQuizWrapper from "./_components/external-quiz-wrapper";
 
 export default async function ExternalExamRoomPage({
@@ -8,6 +9,11 @@ export default async function ExternalExamRoomPage({
 }: {
   params: Promise<{ systemCode: string }>;
 }) {
+  const isEnabled = await isExternalQuizEnabled();
+  if (!isEnabled) {
+    redirect("/quiz/system-register");
+  }
+
   const { systemCode } = await params;
 
   const system = await prisma.externalQuizSystem.findUnique({
@@ -23,6 +29,7 @@ export default async function ExternalExamRoomPage({
   if (system.status === "REGISTERED" || system.status === "ASSIGNED") {
     redirect("/quiz/system-register");
   }
+
 
   // When candidate enters exam room, promote status from IN_PROGRESS to ATTEMPTING
   if (system.status === "IN_PROGRESS") {

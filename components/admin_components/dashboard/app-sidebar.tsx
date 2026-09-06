@@ -14,7 +14,7 @@ import {
   QrCode,
   Receipt,
   Compass,
-  MonitorCog 
+  MonitorCog,
 } from "lucide-react";
 
 import { NavMain } from "@/components/admin_components/dashboard/nav-main";
@@ -141,7 +141,10 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
               tooltip="CodeBreakers"
               className="data-[slot=sidebar-menu-button]:p-1.5 hover:bg-sidebar-accent transition-colors"
             >
-              <Link href="/admin" className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
+              <Link
+                href="/admin"
+                className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
+              >
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
                   <Image
                     src="/assets/logo.png"

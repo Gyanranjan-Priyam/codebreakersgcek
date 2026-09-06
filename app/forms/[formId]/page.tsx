@@ -37,35 +37,32 @@ export async function generateMetadata({ params }: PublicFormPageProps): Promise
   const description = result.status === "success" && result.data.description
     ? extractPlainText(result.data.description)
     : "Fill out this form published by CodeBreakers GCEK.";
-  const formUrl = `https://www.codebreakersgcek.tech/forms/${formId}`;
+  const formUrl = `https://forms.cbgcek.dev/${formId}`;
 
   return {
     title,
     description,
+    alternates: {
+      canonical: formUrl,
+    },
     openGraph: {
       type: "website",
       url: formUrl,
       title,
       description,
-      siteName: "CodeBreakers GCEK",
-      images: [
-        {
-          url: "/assets/logo.png",
-          width: 1200,
-          height: 630,
-          alt: title,
-        },
-      ],
+      siteName: "CodeBreakers Forms",
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/assets/logo.png"],
       creator: "@codebreakers_gcek",
     },
   };
 }
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function PublicFormPage({ params }: PublicFormPageProps) {
   const { formId } = await params;
@@ -75,5 +72,5 @@ export default async function PublicFormPage({ params }: PublicFormPageProps) {
     notFound();
   }
 
-  return <PublicForm form={result.data} />;
+  return <PublicForm key={result.data.formId || result.data.id} form={result.data} />;
 }

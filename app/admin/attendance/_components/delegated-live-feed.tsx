@@ -123,8 +123,17 @@ export default function DelegatedLiveFeed({ activeCodes }: DelegatedLiveFeedProp
 
   useEffect(() => {
     fetchDelegatedScans();
-    const interval = setInterval(fetchDelegatedScans, 3000);
-    return () => clearInterval(interval);
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchDelegatedScans();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, [fetchDelegatedScans]);
 
   useEffect(() => {

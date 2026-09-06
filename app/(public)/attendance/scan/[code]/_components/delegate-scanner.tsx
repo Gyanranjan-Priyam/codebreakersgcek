@@ -246,11 +246,20 @@ export default function DelegateScanner({ code }: DelegateScannerProps) {
     }
   }, [isValidCode, hasSetName, code, scannerName]);
 
-  // Initial fetch and 3-second sync poll
+  // Initial fetch and focus/visibility refresh
   useEffect(() => {
     fetchSessionScans();
-    const interval = setInterval(fetchSessionScans, 3000);
-    return () => clearInterval(interval);
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchSessionScans();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, [fetchSessionScans]);
 
   // Socket.IO — join delegate room for real-time sync

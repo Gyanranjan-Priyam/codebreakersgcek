@@ -444,14 +444,35 @@ export async function toggleQuizStatus(id: string, isActive: boolean) {
 // EXTERNAL QUIZ SYSTEM ACTIONS & REAL-TIME MANAGEMENT
 // ----------------------------------------------------
 
+export async function getIsExternalQuizActiveAction() {
+  try {
+    const { isExternalQuizEnabled } = await import("@/lib/system-settings");
+    const enabled = await isExternalQuizEnabled();
+    return { status: "success" as const, data: enabled };
+  } catch (error) {
+    console.error("Error checking if external quiz is active:", error);
+    return { status: "error" as const, message: "Failed to check status", data: false };
+  }
+}
+
 export async function registerExternalSystem(accessCode: string, systemNumber: string) {
   try {
+    const { isExternalQuizEnabled } = await import("@/lib/system-settings");
+    const isEnabled = await isExternalQuizEnabled();
+    if (!isEnabled) {
+      return {
+        status: "error" as const,
+        message: "External Quiz System is currently disabled by administrator.",
+      };
+    }
+
     const cleanCode = accessCode.trim();
     const cleanSysNumber = systemNumber.trim();
 
     if (!cleanCode || !cleanSysNumber) {
       return { status: "error" as const, message: "Quiz Access Code and System Number are required" };
     }
+
 
     const quiz = await prisma.quiz.findFirst({
       where: {
@@ -1329,6 +1350,12 @@ export async function startAllSystems(quizId: string) {
 
 export async function getSystemState(systemCode: string) {
   try {
+    const { isExternalQuizEnabled } = await import("@/lib/system-settings");
+    const isEnabled = await isExternalQuizEnabled();
+    if (!isEnabled) {
+      return { status: "error" as const, message: "External Quiz System is currently disabled by administrator." };
+    }
+
     const system = await prisma.externalQuizSystem.findUnique({
       where: { systemCode },
       include: {

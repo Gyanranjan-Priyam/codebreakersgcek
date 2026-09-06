@@ -9,6 +9,8 @@ import { Monitor, RefreshCw, Clock, CheckCircle2, User, AlertTriangle } from "lu
 import Link from "next/link";
 import { getExternalSystems } from "@/app/admin/quizzes/actions";
 
+import { initSocket, joinRoom } from "@/lib/socket-client";
+
 interface System {
   id: string;
   systemCode: string;
@@ -49,10 +51,30 @@ export default function SystemsListPanel({ quizId, quizSlug, initialSystems }: S
     });
   };
 
-  // Poll every 3 seconds
+  // Realtime updates via Supabase WebSocket
   useEffect(() => {
-    const timer = setInterval(refresh, 3000);
-    return () => clearInterval(timer);
+    let leaveRoom: (() => void) | undefined;
+    initSocket().then((socket) => {
+      if (!socket) return;
+      leaveRoom = joinRoom(`quiz-${quizId}`);
+      socket.on("system-updated", refresh);
+      socket.on("shift-changed", refresh);
+      socket.on("shift-completed", refresh);
+    });
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    window.addEventListener("focus", handleVisibility);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      if (leaveRoom) leaveRoom();
+      window.removeEventListener("focus", handleVisibility);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [quizId]);
 
   if (systems.length === 0) {

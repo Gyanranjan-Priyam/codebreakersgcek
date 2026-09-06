@@ -122,6 +122,7 @@ export default function ExternalQuizWrapper({
       leaveRoomFns.push(joinRoom(`system-${systemCode}`));
       if (quiz.id) leaveRoomFns.push(joinRoom(`quiz-${quiz.id}`));
       if (quiz.quizId) leaveRoomFns.push(joinRoom(`quiz-${quiz.quizId}`));
+      leaveRoomFns.push(joinRoom("quiz-external-global"));
 
       handleConnect = async () => {
         const res = await getSystemState(systemCode);
@@ -139,6 +140,8 @@ export default function ExternalQuizWrapper({
           ) {
             setLiveIsBlocked(false);
           }
+        } else if (res.status === "error") {
+          cleanupAndRedirect();
         }
       };
 
@@ -177,34 +180,49 @@ export default function ExternalQuizWrapper({
         cleanupAndRedirect();
       };
 
+      const handleGlobalStatus = (data: { enabled: boolean }) => {
+        if (!data?.enabled) {
+          cleanupAndRedirect();
+        }
+      };
+
       socket.on("connect", handleConnect);
       socket.on("unblocked", handleUnblocked);
       socket.on("status-changed", handleStatusChanged);
       socket.on("shift-completed", handleShiftCompleted);
       socket.on("shift-changed", handleShiftChanged);
+      socket.on("external-quiz-status", handleGlobalStatus);
     });
 
-    // Active 2s polling heartbeat to guarantee instant unblock and shift end detection in production
-    const pollTimer = setInterval(async () => {
-      const res = await getSystemState(systemCode);
-      if (res.status === "success" && res.data) {
-        if (
-          res.data.status === "REGISTERED" ||
-          res.data.status === "ASSIGNED"
-        ) {
-          cleanupAndRedirect();
-        } else if (
-          res.data.status === "ATTEMPTING" ||
-          res.data.status === "IN_PROGRESS"
-        ) {
-          setLiveIsBlocked(false);
-        } else if (res.data.status === "BLOCKED") {
-          setLiveIsBlocked(true);
+
+    // Visibility / focus listener to recheck state if tab becomes active
+    const checkStateOnFocus = async () => {
+      if (document.visibilityState === "visible") {
+        const res = await getSystemState(systemCode);
+        if (res.status === "success" && res.data) {
+          if (
+            res.data.status === "REGISTERED" ||
+            res.data.status === "ASSIGNED"
+          ) {
+            cleanupAndRedirect();
+          } else if (
+            res.data.status === "ATTEMPTING" ||
+            res.data.status === "IN_PROGRESS"
+          ) {
+            setLiveIsBlocked(false);
+          } else if (res.data.status === "BLOCKED") {
+            setLiveIsBlocked(true);
+          }
         }
       }
-    }, 2000);
+    };
+
+    window.addEventListener("focus", checkStateOnFocus);
+    document.addEventListener("visibilitychange", checkStateOnFocus);
 
     return () => {
+      window.removeEventListener("focus", checkStateOnFocus);
+      document.removeEventListener("visibilitychange", checkStateOnFocus);
       leaveRoomFns.forEach((fn) => fn());
       const socket = getSocket();
       if (socket) {
@@ -216,7 +234,6 @@ export default function ExternalQuizWrapper({
           socket.off("shift-completed", handleShiftCompleted);
         if (handleShiftChanged) socket.off("shift-changed", handleShiftChanged);
       }
-      clearInterval(pollTimer);
     };
   }, [systemCode, quiz.id, quiz.quizId, liveIsBlocked]);
 

@@ -3,6 +3,7 @@ import { SettingsShell } from "./_components/settings-shell";
 import {
   getCurrentUserProfile,
   getRegistrationSetting,
+  getExternalQuizSetting,
   getGitHubOrgSetting,
   getGoogleDriveStatusAction,
   getAdminAndCoAdminSessionsAction,
@@ -11,6 +12,7 @@ import {
 export default async function AdminSettingsPage() {
   const profileResult = await getCurrentUserProfile();
   const registrationSettingResult = await getRegistrationSetting();
+  const externalQuizResult = await getExternalQuizSetting();
   const githubOrgResult = await getGitHubOrgSetting();
   const googleDriveResult = await getGoogleDriveStatusAction();
   const sessionsResult = await getAdminAndCoAdminSessionsAction();
@@ -24,6 +26,10 @@ export default async function AdminSettingsPage() {
     registrationSettingResult.status === "success"
       ? registrationSettingResult.data
       : true;
+  const isExternalQuizEnabled =
+    externalQuizResult.status === "success"
+      ? externalQuizResult.data
+      : false;
   const githubOrgName =
     githubOrgResult.status === "success" ? githubOrgResult.data : "";
   const googleDriveStatus =
@@ -49,6 +55,7 @@ export default async function AdminSettingsPage() {
     <SettingsShell
       userProfile={userProfile}
       isRegistrationEnabled={isRegistrationEnabled}
+      isExternalQuizEnabled={isExternalQuizEnabled}
       githubOrgName={githubOrgName}
       googleDriveStatus={googleDriveStatus}
       sessionsData={sessionsData}

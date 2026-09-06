@@ -1,86 +1,48 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { io, Socket } from "socket.io-client";
+import { RealtimeChannel } from "@supabase/supabase-js";
+import { getMainSupabaseClient, getQuizSupabaseClient } from "./supabase-client";
 
-// Global singleton Socket.IO client instance
-let socketInstance: Socket | null = null;
-let isInitializing = false;
-
-// Track all active room subscriptions so they can be re-joined on reconnect
-const activeRooms = new Set<string>();
+// Active channels map: roomName -> RealtimeChannel
+const activeChannels = new Map<string, RealtimeChannel>();
+// Event listeners map: eventName -> Set of callbacks
+const eventListeners = new Map<string, Set<(...args: any[]) => void>>();
 const connectionListeners = new Set<(connected: boolean) => void>();
 
-function notifyConnectionStatus(connected: boolean) {
-  connectionListeners.forEach((cb) => {
-    try {
-      cb(connected);
-    } catch {}
-  });
+function getClientForRoom(room: string) {
+  const isQuizRoom = room.startsWith("quiz-") || room.startsWith("system-");
+  return isQuizRoom ? getQuizSupabaseClient() : getMainSupabaseClient();
 }
 
 /**
- * Initialize and return the Socket.IO client singleton.
+ * Initialize Supabase Realtime connection.
  */
-export function getSocket(): Socket | null {
+export async function initSocket(): Promise<any> {
   if (typeof window === "undefined") return null;
-
-  if (!socketInstance) {
-    const origin = window.location.origin;
-    socketInstance = io(origin, {
-      path: "/api/socketio",
-      addTrailingSlash: false,
-      transports: ["polling", "websocket"],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-    });
-
-    socketInstance.on("connect", () => {
-      console.log("🔌 [SocketClient] Connected to server, ID:", socketInstance?.id);
-      notifyConnectionStatus(true);
-
-      // Re-join all active rooms on connect or reconnection
-      activeRooms.forEach((room) => {
-        console.log(`🔌 [SocketClient] Joining room on connect: ${room}`);
-        socketInstance?.emit("join-room", room);
-      });
-    });
-
-    socketInstance.on("disconnect", (reason) => {
-      console.log("🔌 [SocketClient] Disconnected:", reason);
-      notifyConnectionStatus(false);
-    });
-
-    socketInstance.on("connect_error", (err) => {
-      console.warn("🔌 [SocketClient] Connect error:", err.message);
-      notifyConnectionStatus(false);
-    });
-  }
-
-  return socketInstance;
+  return getQuizSupabaseClient();
 }
 
 /**
- * Initialize the Socket.IO connection by first ensuring the server endpoint is ready.
+ * Returns a mock socket client for legacy calls.
  */
-export async function initSocket(): Promise<Socket | null> {
+export function getSocket(): any {
   if (typeof window === "undefined") return null;
-
-  const socket = getSocket();
-  if (socket?.connected) return socket;
-
-  if (!isInitializing) {
-    isInitializing = true;
-    try {
-      // Warm up the /api/socketio route on Next.js server
-      await fetch("/api/socketio").catch(() => {});
-    } finally {
-      isInitializing = false;
-    }
-  }
-
-  return socket;
+  return {
+    connected: true,
+    emit: (event: string, ...args: any[]) => {
+      console.log(`🔌 [SupabaseRealtime Bridge] emit: ${event}`, args);
+    },
+    on: (event: string, callback: (...args: any[]) => void) => {
+      onSocketEvent(event, callback);
+    },
+    off: (event: string, callback?: (...args: any[]) => void) => {
+      if (callback) {
+        const listeners = eventListeners.get(event);
+        if (listeners) listeners.delete(callback);
+      } else {
+        eventListeners.delete(event);
+      }
+    },
+  };
 }
 
 /**
@@ -88,65 +50,110 @@ export async function initSocket(): Promise<Socket | null> {
  */
 export function onSocketConnectionChange(callback: (connected: boolean) => void): () => void {
   connectionListeners.add(callback);
-  const socket = getSocket();
-  if (socket) {
-    callback(socket.connected);
-  }
+  callback(true);
   return () => {
     connectionListeners.delete(callback);
   };
 }
 
+// Channel subscriber reference counts
+const channelRefCount = new Map<string, number>();
+
 /**
- * Subscribe to a room (channel).
- * Returns a cleanup function to leave the room.
+ * Join a room (Supabase Realtime Channel).
+ * Returns a cleanup function that automatically unsubscribes and removes the channel when all listeners detach.
  */
 export function joinRoom(room: string): () => void {
-  if (!room) return () => {};
+  if (!room || typeof window === "undefined") return () => {};
 
-  activeRooms.add(room);
-  const socket = getSocket();
+  const client = getClientForRoom(room);
+  const currentCount = channelRefCount.get(room) || 0;
+  channelRefCount.set(room, currentCount + 1);
 
-  if (socket?.connected) {
-    console.log(`🔌 [SocketClient] Emitting join-room: ${room}`);
-    socket.emit("join-room", room);
+  let channel = activeChannels.get(room);
+  if (!channel) {
+    channel = client.channel(room, {
+      config: {
+        broadcast: { ack: false, self: false },
+      },
+    });
+
+    // Attach wildcard broadcast listener to distribute events to registered callbacks
+    channel.on("broadcast", { event: "*" }, (payloadObj: any) => {
+      const eventName = payloadObj?.event;
+      const data = payloadObj?.payload;
+      if (eventName) {
+        const callbacks = eventListeners.get(eventName);
+        if (callbacks) {
+          callbacks.forEach((cb) => {
+            try {
+              cb(data);
+            } catch (err) {
+              console.error(`Error in Supabase Realtime listener for "${eventName}":`, err);
+            }
+          });
+        }
+      }
+    });
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        console.log(`🔌 [Supabase Realtime] Subscribed to channel: ${room}`);
+      }
+    });
+
+    activeChannels.set(room, channel);
   }
 
   return () => {
-    activeRooms.delete(room);
-    const s = getSocket();
-    if (s?.connected) {
-      console.log(`🔌 [SocketClient] Emitting leave-room: ${room}`);
-      s.emit("leave-room", room);
+    const count = (channelRefCount.get(room) || 1) - 1;
+    if (count <= 0) {
+      channelRefCount.delete(room);
+      const ch = activeChannels.get(room);
+      if (ch) {
+        client.removeChannel(ch).then(() => {
+          activeChannels.delete(room);
+          console.log(`🔌 [Supabase Realtime] Unsubscribed from channel: ${room}`);
+        }).catch(() => {});
+      }
+    } else {
+      channelRefCount.set(room, count);
     }
   };
 }
 
 /**
- * Subscribe to an event on the socket.
- * Returns a cleanup function to remove the listener.
+ * Register a listener for an event across all joined channels.
  */
 export function onSocketEvent(event: string, callback: (...args: any[]) => void): () => void {
-  const socket = getSocket();
-  if (socket) {
-    socket.on(event, callback);
+  if (!eventListeners.has(event)) {
+    eventListeners.set(event, new Set());
   }
+  eventListeners.get(event)!.add(callback);
+
   return () => {
-    const s = getSocket();
-    if (s) {
-      s.off(event, callback);
+    const listeners = eventListeners.get(event);
+    if (listeners) {
+      listeners.delete(callback);
+      if (listeners.size === 0) {
+        eventListeners.delete(event);
+      }
     }
   };
 }
 
 /**
- * Disconnect and cleanup the socket instance.
+ * Disconnect and unsubscribe from all active channels.
  */
 export function disconnectSocket(): void {
-  if (socketInstance) {
-    socketInstance.disconnect();
-    socketInstance = null;
-    activeRooms.clear();
-    connectionListeners.clear();
-  }
+  activeChannels.forEach((channel, room) => {
+    const client = getClientForRoom(room);
+    client.removeChannel(channel).catch(() => {});
+  });
+  activeChannels.clear();
+  eventListeners.clear();
+  connectionListeners.clear();
+  console.log("🔌 [Supabase Realtime] Disconnected and cleaned all channels.");
 }
+
+

@@ -525,6 +525,105 @@ export async function updateRegistrationSetting(enabled: boolean) {
   }
 }
 
+export async function getExternalQuizSetting() {
+  try {
+    let setting = await prisma.systemSettings.findUnique({
+      where: { key: "external_quiz_enabled" },
+    });
+
+    if (!setting) {
+      setting = await prisma.systemSettings.create({
+        data: {
+          key: "external_quiz_enabled",
+          value: "false",
+          description: "Controls whether the external quiz system, kiosk registration, and real-time socket services are active",
+        },
+      });
+    }
+
+    return {
+      status: "success" as const,
+      data: setting.value === "true",
+    };
+  } catch (error) {
+    console.error("Error fetching external quiz setting:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to fetch external quiz setting",
+      data: false,
+    };
+  }
+}
+
+export async function updateExternalQuizSetting(enabled: boolean) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        status: "error" as const,
+        message: "Authentication required",
+      };
+    }
+
+    // Check if user has admin role
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (!isSystemAdminRole(user?.role)) {
+      return {
+        status: "error" as const,
+        message: "Admin access required",
+      };
+    }
+
+    // Upsert the external quiz setting
+    await prisma.systemSettings.upsert({
+      where: { key: "external_quiz_enabled" },
+      update: {
+        value: enabled.toString(),
+        updatedAt: new Date(),
+      },
+      create: {
+        key: "external_quiz_enabled",
+        value: enabled.toString(),
+        description: "Controls whether the external quiz system, kiosk registration, and real-time socket services are active",
+      },
+    });
+
+    // Broadcast change to all connected clients & kiosks via Socket.IO
+    try {
+      const { emitSocketEvent } = await import("@/lib/socket-server");
+      emitSocketEvent("quiz-external-global", "external-quiz-status", { enabled });
+    } catch (e) {
+      console.error("Error broadcasting external quiz status event:", e);
+    }
+
+    // Revalidate relevant pages
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/system-settings");
+    revalidatePath("/quiz/system-register");
+    revalidatePath("/system-register");
+    revalidatePath("/admin/quizzes");
+
+    return {
+      status: "success" as const,
+      message: `External Quiz System ${enabled ? "activated" : "deactivated"} successfully`,
+    };
+  } catch (error) {
+    console.error("Error updating external quiz setting:", error);
+    return {
+      status: "error" as const,
+      message: "Failed to update external quiz setting. Please try again.",
+    };
+  }
+}
+
+
 export async function getGitHubOrgSetting() {
   try {
     const setting = await prisma.systemSettings.findUnique({

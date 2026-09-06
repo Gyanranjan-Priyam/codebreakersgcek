@@ -70,13 +70,18 @@ export default function LiveAttendanceList({ sessionId, isActive }: LiveAttendan
       });
     });
 
-    // Fallback polling every 5 seconds for resilience
-    const interval = setInterval(() => {
-      fetchAttendances();
-    }, 5000);
+    // Window focus listener for fresh data when tab is active
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchAttendances();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
 
     return () => {
-      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
       cleanupListener?.();
       cleanupRoom?.();
     };

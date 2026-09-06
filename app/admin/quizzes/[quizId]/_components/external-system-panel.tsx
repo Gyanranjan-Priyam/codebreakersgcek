@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import Link from "next/link";
 import {
   assignStudentToSystem,
   unassignStudentFromSystem,
@@ -45,6 +46,7 @@ import {
   autoShuffleAndAssignSets,
   completeQuizShift,
   setActiveQuizShift,
+  getIsExternalQuizActiveAction,
 } from "../../actions";
 import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 import {
@@ -203,9 +205,16 @@ export function ExternalSystemPanel({
     }, 300);
   };
 
+  // External quiz system enabled/disabled status
+  const [isExternalQuizActive, setIsExternalQuizActive] = useState<boolean>(true);
+
   // Real-time Socket.IO subscription + fast fallback polling
   useEffect(() => {
     fetchMonitorData();
+
+    getIsExternalQuizActiveAction().then((res) => {
+      setIsExternalQuizActive(res.status === "success" ? !!res.data : false);
+    });
 
     // Initialize Socket.IO and subscribe to quiz room
     let leaveRoom: (() => void) | null = null;
@@ -217,6 +226,9 @@ export function ExternalSystemPanel({
 
       socket.on("connect", () => {
         fetchMonitorData();
+      });
+      socket.on("external-quiz-status", (data: any) => {
+        setIsExternalQuizActive(Boolean(data?.enabled));
       });
       socket.on("system-updated", debouncedFetch);
       socket.on("shift-changed", (data: any) => {
@@ -235,36 +247,19 @@ export function ExternalSystemPanel({
       socket.on("quiz-started-all", debouncedFetch);
     });
 
-    // Fast fallback polling (5s) — ensures updates even if Socket.IO event is missed
-    let intervalId: NodeJS.Timeout | null = null;
-    const startPolling = () => {
-      if (!intervalId) {
-        intervalId = setInterval(() => {
-          if (document.visibilityState === "visible") {
-            fetchMonitorData();
-          }
-        }, 5000);
-      }
-    };
-    const stopPolling = () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
+    // Focus and visibility listener to ensure latest data when tab is active
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         fetchMonitorData();
-        startPolling();
-      } else {
-        stopPolling();
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    startPolling();
+    window.addEventListener("focus", handleVisibilityChange);
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
       if (leaveRoom) leaveRoom();
       const socket = getSocket();
       if (socket) {
@@ -275,8 +270,6 @@ export function ExternalSystemPanel({
         socket.off("quiz-started-all", debouncedFetch);
       }
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      stopPolling();
     };
   }, [quizId]);
 
@@ -485,8 +478,28 @@ export function ExternalSystemPanel({
   const blockedCount = blockedMembers.length;
 
   return (
-    <Card className="rounded-xl border shadow-sm bg-card overflow-hidden">
-      <CardHeader className="border-b pb-4">
+    <div className="space-y-4">
+      {!isExternalQuizActive && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-500">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <p className="font-semibold text-amber-400 text-sm">External Quiz System is Currently Deactivated</p>
+              <p className="text-xs text-muted-foreground">
+                Candidates cannot register systems or take external exams until enabled by an administrator.
+              </p>
+            </div>
+          </div>
+          <Link href="/admin/system-settings" className="shrink-0">
+            <Button variant="outline" size="sm" className="border-amber-500/40 hover:bg-amber-500/20 text-amber-300 text-xs">
+              Open System Settings
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      <Card className="rounded-xl border shadow-sm bg-card overflow-hidden">
+        <CardHeader className="border-b pb-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -1299,5 +1312,6 @@ export function ExternalSystemPanel({
         </DialogContent>
       </Dialog>
     </Card>
+    </div>
   );
 }

@@ -1743,8 +1743,8 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
             <Button variant="ghost" size="icon" onClick={() => setIsBannerSidebarOpen(true)} className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/70" title="Banner Settings">
               <Palette className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => { if (initialForm?.formId) window.open(`/forms/${initialForm.formId}`, "_blank"); else toast.info("Save first to preview"); }} className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/70" title="Preview"><Eye className="h-4 w-4" /></Button>
-            {initialForm && <Button variant="ghost" size="icon" onClick={async () => { await navigator.clipboard.writeText(`${window.location.origin}/forms/${initialForm.formId}`); toast.success("Link copied!"); }} className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/70" title="Copy link"><Link2 className="h-4 w-4" /></Button>}
+            <Button variant="ghost" size="icon" onClick={() => { if (initialForm?.formId) window.open(`https://forms.cbgcek.dev/${initialForm.formId}`, "_blank"); else toast.info("Save first to preview"); }} className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/70" title="Preview"><Eye className="h-4 w-4" /></Button>
+            {initialForm && <Button variant="ghost" size="icon" onClick={async () => { await navigator.clipboard.writeText(`https://forms.cbgcek.dev/${initialForm.formId}`); toast.success("Short URL (forms.cbgcek.dev) copied!"); }} className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/70" title="Copy link"><Link2 className="h-4 w-4" /></Button>}
             <Button onClick={handleSave} disabled={isSaving} variant="outline" size="sm" className="hidden sm:flex h-8 rounded-xl border-border/70 text-xs font-medium">
               {isSaving ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Save className="mr-1.5 h-3 w-3" />}Save
             </Button>
@@ -2167,7 +2167,7 @@ export default function FormBuilder({ initialDefinition, initialForm }: FormBuil
                   <div className="flex justify-between items-center"><span className="text-muted-foreground">Form ID</span><span className="font-mono text-xs bg-muted px-2 py-1 rounded-lg">{initialForm.formId}</span></div>
                   <div className="flex justify-between items-center"><span className="text-muted-foreground">Sections</span><span className="text-xs font-medium">{definition.sections.length}</span></div>
                   <div className="flex justify-between items-center"><span className="text-muted-foreground">Status</span><Badge variant={isPublished ? "default" : "secondary"} className="rounded-lg text-xs">{isPublished ? "Published" : "Draft"}</Badge></div>
-                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Public URL</span><Button variant="ghost" size="sm" className="h-7 text-xs rounded-lg text-primary" onClick={async () => { await navigator.clipboard.writeText(`${window.location.origin}/forms/${initialForm.formId}`); toast.success("Copied!"); }}><Link2 className="mr-1 h-3 w-3" /> Copy</Button></div>
+                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Public URL</span><Button variant="ghost" size="sm" className="h-7 text-xs rounded-lg text-primary" onClick={async () => { await navigator.clipboard.writeText(`https://forms.cbgcek.dev/${initialForm.formId}`); toast.success("Copied!"); }}><Link2 className="mr-1 h-3 w-3" /> Copy</Button></div>
                 </div>
               </div>
             )}

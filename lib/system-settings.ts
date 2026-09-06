@@ -27,6 +27,30 @@ export async function isRegistrationEnabled(): Promise<boolean> {
   }
 }
 
+export async function isExternalQuizEnabled(): Promise<boolean> {
+  try {
+    let setting = await prisma.systemSettings.findUnique({
+      where: { key: "external_quiz_enabled" },
+    });
+
+    if (!setting) {
+      setting = await prisma.systemSettings.create({
+        data: {
+          key: "external_quiz_enabled",
+          value: "false",
+          description:
+            "Controls whether the external quiz system, kiosk registration, and real-time socket services are active",
+        },
+      });
+    }
+
+    return setting.value === "true";
+  } catch (error) {
+    console.error("Error checking external quiz system status:", error);
+    return false;
+  }
+}
+
 export async function getSystemSetting(
   key: string,
   defaultValue?: string,
@@ -42,3 +66,4 @@ export async function getSystemSetting(
     return defaultValue || null;
   }
 }
+

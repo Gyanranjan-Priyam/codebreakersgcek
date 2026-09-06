@@ -127,11 +127,20 @@ export default function StudentQRScanner({
     }
   }, [sessionId]);
 
-  // Initial fetch and 3-second sync poll
+  // Initial fetch and focus/visibility refresh
   useEffect(() => {
     fetchSessionRecords();
-    const interval = setInterval(fetchSessionRecords, 3000);
-    return () => clearInterval(interval);
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchSessionRecords();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, [fetchSessionRecords]);
 
   // Socket.IO — Listen to live scans for this session in real-time

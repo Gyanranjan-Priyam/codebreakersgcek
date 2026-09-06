@@ -1,107 +1,29 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Server as SocketIOServer } from "socket.io";
+import { emitRealtimeEvent, emitRealtimeEventToRooms } from "./supabase-server";
 
 /**
- * Get the Socket.IO server instance from the global scope if present in current thread.
- */
-function getIO(): SocketIOServer | null {
-  return (globalThis as any).__socketio || null;
-}
-
-function getCandidateUrls(): string[] {
-  const urls = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    `http://127.0.0.1:${process.env.PORT || 3000}`,
-    `http://localhost:${process.env.PORT || 3000}`,
-    "http://127.0.0.1:3000",
-    "http://localhost:3000",
-  ].filter(Boolean) as string[];
-
-  return Array.from(new Set(urls.map((u) => u.replace(/\/$/, ""))));
-}
-
-/**
- * Emit a Socket.IO event to a specific room (channel).
- * Works reliably from Next.js App Router, Server Actions, Route Handlers, and background jobs.
- *
- * @param room - The room/channel to emit to (e.g., "user-abc123", "leaderboard")
- * @param event - The event name (e.g., "attendance-marked", "task-evaluated")
- * @param data - The event payload
+ * Emit a Real-time event to a specific room/channel using Supabase Realtime.
+ * Automatically routes quiz/system channels to the dedicated Quiz cluster and others to Main.
  */
 export async function emitSocketEvent(room: string, event: string, data: any): Promise<void> {
-  try {
-    let emitted = false;
-    const io = getIO();
-    if (io) {
-      io.to(room).emit(event, data);
-      emitted = true;
-    }
-
-    // Always attempt the HTTP broadcast bridge to guarantee delivery across isolated Next.js worker scopes
-    const candidateUrls = getCandidateUrls();
-    for (const url of candidateUrls) {
-      try {
-        const res = await fetch(`${url}/api/socket/emit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ room, event, data }),
-          cache: "no-store",
-        });
-        if (res.ok) {
-          emitted = true;
-          break;
-        }
-      } catch {
-        // Try next candidate URL
-      }
-    }
-
-    if (!emitted) {
-      console.warn(`⚠️ Socket.IO broadcast warning: Event "${event}" for room "${room}" could not be bridged.`);
-    }
-  } catch (error: any) {
-    console.error("Socket.IO emit error:", error?.message || error);
-  }
+  const isQuizRoom = room.startsWith("quiz-") || room.startsWith("system-");
+  const clientType = isQuizRoom ? "quiz" : "main";
+  await emitRealtimeEvent(room, event, data, clientType);
 }
 
 /**
- * Emit events to multiple rooms at once (batch emit).
+ * Emit events to multiple rooms at once (batch emit) using Supabase Realtime.
  */
 export async function emitSocketEventToRooms(
   rooms: string[],
   event: string,
   data: any
 ): Promise<void> {
-  try {
-    let emitted = false;
-    const io = getIO();
-    if (io) {
-      io.to(rooms).emit(event, data);
-      emitted = true;
-    }
+  const quizRooms = rooms.filter((r) => r.startsWith("quiz-") || r.startsWith("system-"));
+  const mainRooms = rooms.filter((r) => !r.startsWith("quiz-") && !r.startsWith("system-"));
 
-    const candidateUrls = getCandidateUrls();
-    for (const url of candidateUrls) {
-      try {
-        const res = await fetch(`${url}/api/socket/emit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rooms, event, data }),
-          cache: "no-store",
-        });
-        if (res.ok) {
-          emitted = true;
-          break;
-        }
-      } catch {
-        // Try next candidate URL
-      }
-    }
-
-    if (!emitted) {
-      console.warn(`⚠️ Socket.IO batch emit warning for event "${event}".`);
-    }
-  } catch (error: any) {
-    console.error("Socket.IO batch emit error:", error?.message || error);
-  }
+  await Promise.all([
+    quizRooms.length > 0 ? emitRealtimeEventToRooms(quizRooms, event, data, "quiz") : Promise.resolve(),
+    mainRooms.length > 0 ? emitRealtimeEventToRooms(mainRooms, event, data, "main") : Promise.resolve(),
+  ]);
 }
