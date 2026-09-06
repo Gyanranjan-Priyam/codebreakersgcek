@@ -4,11 +4,13 @@ export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
 
-  // Handle forms subdomain: forms.cbgcek.dev (e.g. forms.cbgcek.dev/xyz -> /forms/xyz)
+  // Handle forms subdomain: forms.cbgcek.dev
   if (host.startsWith('forms.') || host.includes('forms.cbgcek.dev')) {
-    if (pathname === '/') {
-      return NextResponse.next();
+    // If accessing root only (forms.cbgcek.dev or forms.cbgcek.dev/), redirect to main app login/dashboard
+    if (pathname === '/' || pathname === '') {
+      return NextResponse.redirect('https://app.codebreakersgcek.tech/login');
     }
+    // If accessing /[formId] directly without /forms prefix, rewrite internally
     if (
       !pathname.startsWith('/forms') &&
       !pathname.startsWith('/api') &&
