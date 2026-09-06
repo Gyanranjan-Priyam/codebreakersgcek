@@ -7,6 +7,7 @@ import { ProfileImageUpload } from "./profile-image-upload";
 import { ProfileForm } from "./profile-form";
 import { LinkedAccountsSection } from "./linked-accounts-section";
 import { RegistrationToggle } from "./registration-toggle";
+import { ExternalQuizToggle } from "./external-quiz-toggle";
 import { GitHubOrgSettings } from "./github-org-settings";
 import { DataCleanup } from "./data-cleanup";
 import { GoogleDriveSettingsCard } from "./google-drive-settings-card";
@@ -68,6 +69,7 @@ interface SettingsShellProps {
     customLinks?: any;
   };
   isRegistrationEnabled: boolean;
+  isExternalQuizEnabled: boolean;
   githubOrgName: string;
   googleDriveStatus?: {
     isConnected: boolean;
@@ -87,6 +89,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
 export function SettingsShell({
   userProfile,
   isRegistrationEnabled,
+  isExternalQuizEnabled,
   githubOrgName,
   googleDriveStatus,
   sessionsData,
@@ -299,6 +302,17 @@ export function SettingsShell({
 
             <Separator />
 
+            {/* External Quiz System toggle */}
+            <div className="space-y-2">
+              <SectionHeading>External Quiz System &amp; Live Sockets</SectionHeading>
+              <p className="text-sm text-muted-foreground mb-3">
+                Activate or shut down external kiosk registration terminals, candidate exam rooms, and real-time Socket.IO event monitors.
+              </p>
+              <ExternalQuizToggle initialValue={isExternalQuizEnabled} />
+            </div>
+
+            <Separator />
+
             {/* GitHub Org */}
             <div className="space-y-2">
               <SectionHeading>GitHub Organization</SectionHeading>
@@ -307,6 +321,7 @@ export function SettingsShell({
               </p>
               <GitHubOrgSettings initialValue={githubOrgName} />
             </div>
+
 
             <Separator />
 

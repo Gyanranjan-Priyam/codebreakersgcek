@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { randomUUID } from "node:crypto";
@@ -29,7 +30,9 @@ function hasPaymentField(definition: FormDefinition) {
 export async function getPublishedFormByFormId(formId: string) {
   try {
     const form = await prisma.form.findFirst({
-      where: { formId },
+      where: {
+        OR: [{ formId }, { id: formId }],
+      },
       select: {
         id: true,
         formId: true,
@@ -83,7 +86,9 @@ export async function submitFormResponse(input: {
 }) {
   try {
     const form = await prisma.form.findFirst({
-      where: { formId: input.formId },
+      where: {
+        OR: [{ formId: input.formId }, { id: input.formId }],
+      },
       select: {
         id: true,
         formId: true,
@@ -104,6 +109,7 @@ export async function submitFormResponse(input: {
     }
 
     const formDef = form.definition as unknown as FormDefinition;
+    const allowMultiple = Boolean(formDef.settings?.allowMultipleSubmissions);
 
     if (hasPaymentField(formDef) && !input.transactionId?.trim()) {
       return {
@@ -116,47 +122,63 @@ export async function submitFormResponse(input: {
       headers: await headers(),
     }).catch(() => null);
 
-    const submitterEmail = extractEmailFromAnswers(input.answers) || session?.user?.email?.toLowerCase() || null;
+    const submitterEmail =
+      extractEmailFromAnswers(input.answers) ||
+      (formDef.settings?.collectEmail ? session?.user?.email?.toLowerCase() : null) ||
+      null;
     const submitterUserId = session?.user?.id || null;
     const submitterTxId = input.transactionId?.trim().toLowerCase() || null;
 
-    // Duplicate Check: Each form cannot have duplicate email, user ID, or transaction ID
-    const existingResponses = await prisma.formResponse.findMany({
-      where: { formId: form.id },
-      select: {
-        id: true,
-        answers: true,
-        transactionId: true,
-        submittedById: true,
-        createdAt: true,
-        paymentStatus: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    let duplicateFound: {
+      id: string;
+      createdAt: Date;
+      paymentStatus: string;
+      transactionId?: string | null;
+    } | null = null;
 
-    let duplicateFound: (typeof existingResponses)[0] | null = null;
-
-    for (const prev of existingResponses) {
-      // 1. Check matching user ID
-      if (submitterUserId && prev.submittedById === submitterUserId) {
-        duplicateFound = prev;
-        break;
+    // 1. Check duplicate Transaction ID for payment forms
+    if (submitterTxId) {
+      const existingTx = await prisma.formResponse.findFirst({
+        where: {
+          formId: form.id,
+          transactionId: {
+            equals: input.transactionId?.trim(),
+            mode: "insensitive",
+          },
+        },
+        select: {
+          id: true,
+          createdAt: true,
+          paymentStatus: true,
+          transactionId: true,
+        },
+      });
+      if (existingTx) {
+        duplicateFound = existingTx;
       }
+    }
 
-      // 2. Check matching email
-      if (submitterEmail) {
+    // 2. If multiple submissions are NOT allowed for this form, check email duplicate within this specific form
+    if (!duplicateFound && !allowMultiple && submitterEmail) {
+      const existingResponses = await prisma.formResponse.findMany({
+        where: { formId: form.id },
+        select: {
+          id: true,
+          answers: true,
+          submittedById: true,
+          createdAt: true,
+          paymentStatus: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      for (const prev of existingResponses) {
         const prevAnswers = (prev.answers || {}) as Record<string, unknown>;
         const prevEmail = extractEmailFromAnswers(prevAnswers);
-        if (prevEmail && prevEmail === submitterEmail) {
+        if (prevEmail && prevEmail.toLowerCase() === submitterEmail.toLowerCase()) {
           duplicateFound = prev;
           break;
         }
-      }
-
-      // 3. Check matching transaction ID if payment
-      if (submitterTxId && prev.transactionId && prev.transactionId.trim().toLowerCase() === submitterTxId) {
-        duplicateFound = prev;
-        break;
       }
     }
 
@@ -336,6 +358,7 @@ export async function submitFormResponse(input: {
 
     const { emitSocketEvent } = await import("@/lib/socket-server");
     emitSocketEvent(`form-${form.id}`, "response-submitted", { responseId: response.id, formId: form.id });
+    emitSocketEvent(`form-${form.formId}`, "response-submitted", { responseId: response.id, formId: form.formId });
 
     // Trigger submission confirmation email asynchronously if recipient email is present
     let recipientEmail = "";

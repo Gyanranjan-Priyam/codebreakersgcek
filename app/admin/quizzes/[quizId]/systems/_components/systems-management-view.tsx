@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import Link from "next/link";
 import {
   getExternalSystems,
   assignStudentToSystem,
@@ -20,6 +21,7 @@ import {
   completeQuizShift,
   setActiveQuizShift,
   getQuizMonitorData,
+  getIsExternalQuizActiveAction,
 } from "@/app/admin/quizzes/actions";
 import { getSocket, initSocket, joinRoom } from "@/lib/socket-client";
 import {
@@ -209,8 +211,15 @@ export default function SystemsManagementView({
     });
   };
 
+  // External quiz system enabled/disabled status
+  const [isExternalQuizActive, setIsExternalQuizActive] = useState<boolean>(true);
+
   useEffect(() => {
     refreshSystems();
+
+    getIsExternalQuizActiveAction().then((res) => {
+      setIsExternalQuizActive(res.status === "success" ? !!res.data : false);
+    });
 
     let leaveRoom: (() => void) | null = null;
 
@@ -221,6 +230,9 @@ export default function SystemsManagementView({
 
       socket.on("connect", () => {
         refreshSystems();
+      });
+      socket.on("external-quiz-status", (data: any) => {
+        setIsExternalQuizActive(Boolean(data?.enabled));
       });
       socket.on("system-updated", refreshSystems);
       socket.on("shift-changed", (data: any) => {
@@ -238,17 +250,26 @@ export default function SystemsManagementView({
       socket.on("quiz-started-all", refreshSystems);
     });
 
-    const timer = setInterval(refreshSystems, 4000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshSystems();
+      }
+    };
+    window.addEventListener("focus", handleVisibility);
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
+      window.removeEventListener("focus", handleVisibility);
+      document.removeEventListener("visibilitychange", handleVisibility);
       if (leaveRoom) leaveRoom();
       const socket = getSocket();
       if (socket) {
+        socket.off("external-quiz-status");
         socket.off("system-updated", refreshSystems);
         socket.off("shift-changed");
         socket.off("shift-completed");
         socket.off("quiz-started-all", refreshSystems);
       }
-      clearInterval(timer);
     };
   }, [quizId]);
 
@@ -440,6 +461,25 @@ export default function SystemsManagementView({
 
   return (
     <div className="space-y-6">
+      {!isExternalQuizActive && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-500">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <p className="font-semibold text-amber-400 text-sm">External Quiz System is Currently Deactivated</p>
+              <p className="text-xs text-muted-foreground">
+                Candidates cannot register systems or take external exams until enabled by an administrator.
+              </p>
+            </div>
+          </div>
+          <Link href="/admin/system-settings" className="shrink-0">
+            <Button variant="outline" size="sm" className="border-amber-500/40 hover:bg-amber-500/20 text-amber-300 text-xs">
+              Open System Settings
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {/* Multi-Shift Operations & Quick Shift Completer Banner */}
       {shiftsConfig.length > 0 && (
         <Card className="border-border/80 bg-muted/20">

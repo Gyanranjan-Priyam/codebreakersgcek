@@ -27,18 +27,17 @@ export default function QuizzesPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBlockedDialog, setShowBlockedDialog] = useState(false);
 
-  // Poll for ban status changes every 5 seconds
+  // Check for ban status changes on visibility change or window focus
   useEffect(() => {
     if (!user) return;
 
-    const pollInterval = setInterval(async () => {
+    const checkBanStatus = async () => {
       try {
         const result = await getQuizzesData();
         if (result.status === "success") {
           const wasBanned = user.banned;
           const isNowBanned = result.data.user.banned;
           
-          // If ban status changed
           if (wasBanned !== isNowBanned) {
             setUser(result.data.user);
             setQuizzes(result.data.quizzes);
@@ -50,17 +49,22 @@ export default function QuizzesPage() {
             } else {
               setShowBlockedDialog(false);
               toast.success("You have been unblocked! You can now access quizzes.");
-              // Refresh the router to update all server components
               router.refresh();
             }
           }
         }
       } catch (error) {
-        console.error("Error polling ban status:", error);
+        console.error("Error checking ban status:", error);
       }
-    }, 5000); // Check every 5 seconds
+    };
 
-    return () => clearInterval(pollInterval);
+    window.addEventListener("focus", checkBanStatus);
+    document.addEventListener("visibilitychange", checkBanStatus);
+
+    return () => {
+      window.removeEventListener("focus", checkBanStatus);
+      document.removeEventListener("visibilitychange", checkBanStatus);
+    };
   }, [user, router]);
 
   // Update current time every second for countdown

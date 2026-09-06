@@ -149,12 +149,12 @@ export default function QuizProctorInterface({
     }
   }, [systemCode]);
 
-  // Active shift sync heartbeat during exam attempt to guarantee instant shift end in production
+  // Active shift sync on tab visibility change (Realtime handles instant push events)
   useEffect(() => {
     if (!systemCode) return;
 
     const currentShift = quiz.shift || 1;
-    const interval = setInterval(async () => {
+    const checkShiftSync = async () => {
       try {
         const res = await getSystemState(systemCode);
         if (res.status === "success" && res.data) {
@@ -162,7 +162,6 @@ export default function QuizProctorInterface({
           const assignedShift = sys.assignedShift || 1;
           const activeShift = sys.quiz?.activeShift || 1;
           
-          // If shift completed, status changed to REGISTERED / ASSIGNED, or shift moved to next shift
           if (sys.status === "REGISTERED" || sys.status === "ASSIGNED" || assignedShift > currentShift || activeShift > currentShift) {
             if (currentStep === 'quiz-submitted') {
               try {
@@ -184,11 +183,17 @@ export default function QuizProctorInterface({
           }
         }
       } catch (err) {
-        console.error("Heartbeat sync error:", err);
+        console.error("Shift sync error:", err);
       }
-    }, 2000);
+    };
 
-    return () => clearInterval(interval);
+    document.addEventListener("visibilitychange", checkShiftSync);
+    window.addEventListener("focus", checkShiftSync);
+
+    return () => {
+      document.removeEventListener("visibilitychange", checkShiftSync);
+      window.removeEventListener("focus", checkShiftSync);
+    };
   }, [systemCode, currentStep, quiz.shift]);
 
   // Real-time Socket.IO unblock & shift completed listener inside QuizProctorInterface

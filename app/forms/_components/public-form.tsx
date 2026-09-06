@@ -879,6 +879,8 @@ export default function PublicForm({ form }: PublicFormProps) {
   const [submittedDetails, setSubmittedDetails] = useState<{
     name?: string;
     email?: string;
+    responseId?: string;
+    referenceNumber?: string;
   } | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [name, setName] = useState("");
@@ -894,6 +896,19 @@ export default function PublicForm({ form }: PublicFormProps) {
 
   // ─── Draft Restore & Submission Check ───
   useEffect(() => {
+    // Reset transient states to prevent cross-form state leaks
+    setDuplicateInfo(null);
+    setSuccess(false);
+    setSubmittedDetails(null);
+    setSubmitAttempted(false);
+    setName("");
+    setEmail("");
+    setTransactionId("");
+    setAnswers({});
+    setTouched({});
+    setCurrentSectionIdx(0);
+    setSectionHistory([]);
+
     try {
       const submittedKey = `public_form_submitted_${form.formId}`;
       const isAlreadySubmitted = localStorage.getItem(submittedKey);
@@ -904,7 +919,16 @@ export default function PublicForm({ form }: PublicFormProps) {
           localStorage.getItem(`public_form_submitted_name_${form.formId}`) || "";
         const savedEmail =
           localStorage.getItem(`public_form_submitted_email_${form.formId}`) || "";
-        setSubmittedDetails({ name: savedName, email: savedEmail });
+        const savedRespId =
+          localStorage.getItem(`public_form_submitted_response_id_${form.formId}`) || "";
+        setSubmittedDetails({
+          name: savedName,
+          email: savedEmail,
+          responseId: savedRespId,
+          referenceNumber: savedRespId
+            ? `#${savedRespId.replace(/-/g, "").slice(0, 8).toUpperCase()}`
+            : "",
+        });
         setSuccess(true);
         localStorage.removeItem(`public_form_draft_${form.formId}`);
         setIsMounted(true);
@@ -927,7 +951,7 @@ export default function PublicForm({ form }: PublicFormProps) {
     } finally {
       setIsMounted(true);
     }
-  }, [form.formId, form.definition.settings.allowMultipleSubmissions]);
+  }, [form.formId, form.id, form.definition.settings.allowMultipleSubmissions]);
 
   // ─── Auto-Save Draft ───
   useEffect(() => {
@@ -1233,11 +1257,22 @@ export default function PublicForm({ form }: PublicFormProps) {
     } else if (result.status === "success") {
       const submittedName = name.trim();
       const submittedEmail = email.trim();
-      setSubmittedDetails({ name: submittedName, email: submittedEmail });
+      const respId = (result as any).data?.id || "";
+      const refNum = respId ? `#${respId.replace(/-/g, "").slice(0, 8).toUpperCase()}` : "";
+
+      setDuplicateInfo(null);
+      setSubmittedDetails({
+        name: submittedName,
+        email: submittedEmail,
+        responseId: respId,
+        referenceNumber: refNum,
+      });
       setSuccess(true);
       try {
         localStorage.removeItem(`public_form_draft_${form.formId}`);
         localStorage.setItem(`public_form_submitted_${form.formId}`, "true");
+        if (respId)
+          localStorage.setItem(`public_form_submitted_response_id_${form.formId}`, respId);
         if (submittedName)
           localStorage.setItem(
             `public_form_submitted_name_${form.formId}`,
@@ -1584,6 +1619,28 @@ export default function PublicForm({ form }: PublicFormProps) {
                   `Confirmation sent to ${submittedDetails?.email || email || "your email"}. See you at CodeBreakers.`}
               </p>
 
+              {/* Response Details Box */}
+              {submittedDetails?.referenceNumber && (
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    maxWidth: 380,
+                    margin: "0 auto 28px",
+                    background: "#F8F9FA",
+                    borderRadius: 8,
+                    border: "1px solid #E9ECEF",
+                    textAlign: "center",
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: "#666", fontWeight: 500, display: "block", marginBottom: 4 }}>
+                    Response Reference ID
+                  </span>
+                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: "monospace", color: "#107C10", letterSpacing: "0.05em" }}>
+                    {submittedDetails.referenceNumber}
+                  </span>
+                </div>
+              )}
+
               {form.definition.settings.allowMultipleSubmissions && (
                 <div style={{ marginTop: 20 }}>
                   <button
@@ -1592,11 +1649,15 @@ export default function PublicForm({ form }: PublicFormProps) {
                     onClick={() => {
                       try {
                         localStorage.removeItem(`public_form_submitted_${form.formId}`);
+                        localStorage.removeItem(`public_form_submitted_response_id_${form.formId}`);
+                        localStorage.removeItem(`public_form_submitted_name_${form.formId}`);
+                        localStorage.removeItem(`public_form_submitted_email_${form.formId}`);
                         localStorage.removeItem(`public_form_draft_${form.formId}`);
                       } catch {
                         // ignore storage error
                       }
                       setSuccess(false);
+                      setDuplicateInfo(null);
                       setSubmittedDetails(null);
                     }}
                   >

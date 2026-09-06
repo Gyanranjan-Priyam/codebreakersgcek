@@ -3,15 +3,17 @@ import { requireAdmin } from "@/app/data/admin/require-admin";
 import {
   getAdminAndCoAdminSessionsAction,
   getRegistrationSetting,
+  getExternalQuizSetting,
   getGitHubOrgSetting,
 } from "@/app/admin/settings/actions";
 import { AdminSessionsManager } from "@/app/admin/settings/_components/admin-sessions-manager";
 import { RegistrationToggle } from "@/app/admin/settings/_components/registration-toggle";
+import { ExternalQuizToggle } from "@/app/admin/settings/_components/external-quiz-toggle";
 import { GitHubOrgSettings } from "@/app/admin/settings/_components/github-org-settings";
 import { DataCleanup } from "@/app/admin/settings/_components/data-cleanup";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Settings2, ShieldCheck, UserPlus, GitFork, Trash2 } from "lucide-react";
+import { Settings2, ShieldCheck, UserPlus, GitFork, Trash2, Monitor } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -24,6 +26,7 @@ export default async function SystemSettingsPage() {
 
   const sessionsResult = await getAdminAndCoAdminSessionsAction();
   const registrationResult = await getRegistrationSetting();
+  const externalQuizResult = await getExternalQuizSetting();
   const githubOrgResult = await getGitHubOrgSetting();
 
   const sessionsData =
@@ -43,6 +46,8 @@ export default async function SystemSettingsPage() {
 
   const isRegistrationEnabled =
     registrationResult.status === "success" ? registrationResult.data : true;
+  const isExternalQuizEnabled =
+    externalQuizResult.status === "success" ? externalQuizResult.data : false;
   const githubOrgName =
     githubOrgResult.status === "success" ? githubOrgResult.data : "";
 
@@ -96,8 +101,24 @@ export default async function SystemSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* GitHub Organization */}
+        {/* External Quiz System Toggle */}
         <Card className="border border-border/80 bg-card shadow-xs">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Monitor className="h-4 w-4 text-primary" />
+              External Quiz System &amp; Live Sockets
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Activate or deactivate external kiosk registration, candidate kiosks, and Socket.IO real-time monitor.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExternalQuizToggle initialValue={isExternalQuizEnabled} />
+          </CardContent>
+        </Card>
+
+        {/* GitHub Organization */}
+        <Card className="border border-border/80 bg-card shadow-xs md:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <GitFork className="h-4 w-4 text-primary" />
@@ -112,6 +133,7 @@ export default async function SystemSettingsPage() {
           </CardContent>
         </Card>
       </div>
+
 
       <Separator />
 

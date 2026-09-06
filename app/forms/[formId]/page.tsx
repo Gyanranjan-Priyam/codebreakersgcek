@@ -67,6 +67,9 @@ export async function generateMetadata({ params }: PublicFormPageProps): Promise
   };
 }
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function PublicFormPage({ params }: PublicFormPageProps) {
   const { formId } = await params;
   const result = await getPublishedFormByFormId(formId);
@@ -75,5 +78,5 @@ export default async function PublicFormPage({ params }: PublicFormPageProps) {
     notFound();
   }
 
-  return <PublicForm form={result.data} />;
+  return <PublicForm key={result.data.formId || result.data.id} form={result.data} />;
 }

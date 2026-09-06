@@ -19,11 +19,16 @@ interface ExternalSubmitData {
 
 function findCorrectAnswerIndex(question: any): number {
   if (!question || !Array.isArray(question.options)) return -1;
-  const rawAnswer = question.answer !== undefined ? question.answer : question.correctAnswer;
+  const rawAnswer =
+    question.answer !== undefined ? question.answer : question.correctAnswer;
   if (rawAnswer === undefined || rawAnswer === null) return -1;
 
   // 1. Direct number index (e.g. 0, 1, 2)
-  if (typeof rawAnswer === "number" && rawAnswer >= 0 && rawAnswer < question.options.length) {
+  if (
+    typeof rawAnswer === "number" &&
+    rawAnswer >= 0 &&
+    rawAnswer < question.options.length
+  ) {
     return rawAnswer;
   }
 
@@ -47,7 +52,8 @@ function findCorrectAnswerIndex(question: any): number {
   if (typeof rawAnswer === "string") {
     const cleaned = rawAnswer.trim().toLowerCase();
     const matchIdx = question.options.findIndex(
-      (opt: string) => typeof opt === "string" && opt.trim().toLowerCase() === cleaned
+      (opt: string) =>
+        typeof opt === "string" && opt.trim().toLowerCase() === cleaned,
     );
     if (matchIdx !== -1) return matchIdx;
   }
@@ -56,27 +62,41 @@ function findCorrectAnswerIndex(question: any): number {
   return question.options.findIndex((opt: string) => opt == rawAnswer);
 }
 
-export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmitData) {
+export async function submitExternalQuizAttemptFromInterface(
+  data: ExternalSubmitData,
+) {
   try {
     const system = await prisma.externalQuizSystem.findUnique({
       where: { systemCode: data.systemCode },
     });
 
     if (!system) {
-      return { status: "error" as const, message: "External system session not found" };
+      return {
+        status: "error" as const,
+        message: "External system session not found",
+      };
     }
 
     const shiftNumber = data.shiftNumber || system.assignedShift || 1;
     const shiftName = `Shift ${shiftNumber}`;
     const studentEmail = data.participantEmail || system.assignedStudentEmail;
-    const studentName = data.participantName || system.assignedStudentName || "Candidate";
+    const studentName =
+      data.participantName || system.assignedStudentName || "Candidate";
 
     // Parse shift-isolated questions for the assigned set
-    const { getQuestionsForShiftAndSet } = await import("@/app/admin/quizzes/utils");
-    const questions = getQuestionsForShiftAndSet(data.questionsJson, shiftNumber, data.assignedSet);
+    const { getQuestionsForShiftAndSet } =
+      await import("@/app/admin/quizzes/utils");
+    const questions = getQuestionsForShiftAndSet(
+      data.questionsJson,
+      shiftNumber,
+      data.assignedSet,
+    );
 
     if (!Array.isArray(questions) || questions.length === 0) {
-      return { status: "error" as const, message: `No questions found for Shift ${shiftNumber} Set ${data.assignedSet}` };
+      return {
+        status: "error" as const,
+        message: `No questions found for Shift ${shiftNumber} Set ${data.assignedSet}`,
+      };
     }
 
     // Calculate score accurately based on attempted answers
@@ -96,7 +116,8 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
       if (!question) return;
 
       const correctAnswerIndex = findCorrectAnswerIndex(question);
-      const isCorrect = correctAnswerIndex !== -1 && correctAnswerIndex === answerIndex;
+      const isCorrect =
+        correctAnswerIndex !== -1 && correctAnswerIndex === answerIndex;
       if (isCorrect) correctAnswers++;
 
       detailedResults.push({
@@ -110,7 +131,10 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
     });
 
     const totalQuestions = questions.length;
-    const score = totalQuestions > 0 ? Number(((correctAnswers / totalQuestions) * 100).toFixed(2)) : 0;
+    const score =
+      totalQuestions > 0
+        ? Number(((correctAnswers / totalQuestions) * 100).toFixed(2))
+        : 0;
 
     const quiz = await prisma.quiz.findUnique({
       where: { id: data.quizDbId },
@@ -126,7 +150,9 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
       answers: Object.entries(data.answers).map(([qIndex, aIndex]) => ({
         questionIndex: parseInt(qIndex),
         answerIndex: aIndex,
-        correct: detailedResults.find((r) => r.questionIndex === parseInt(qIndex))?.isCorrect ?? false,
+        correct:
+          detailedResults.find((r) => r.questionIndex === parseInt(qIndex))
+            ?.isCorrect ?? false,
       })),
       tabSwitches: data.tabSwitches,
       submittedAt: new Date().toISOString(),
@@ -202,9 +228,20 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
     }
 
     const { emitSocketEvent } = await import("@/lib/socket-server");
-    emitSocketEvent(`quiz-${data.quizDbId}`, "system-updated", { systemCode: data.systemCode, status: "COMPLETED", shiftNumber });
-    emitSocketEvent(`quiz-${data.quizId}`, "system-updated", { systemCode: data.systemCode, status: "COMPLETED", shiftNumber });
-    emitSocketEvent(`system-${data.systemCode}`, "status-changed", { status: "COMPLETED", shiftNumber });
+    emitSocketEvent(`quiz-${data.quizDbId}`, "system-updated", {
+      systemCode: data.systemCode,
+      status: "COMPLETED",
+      shiftNumber,
+    });
+    emitSocketEvent(`quiz-${data.quizId}`, "system-updated", {
+      systemCode: data.systemCode,
+      status: "COMPLETED",
+      shiftNumber,
+    });
+    emitSocketEvent(`system-${data.systemCode}`, "status-changed", {
+      status: "COMPLETED",
+      shiftNumber,
+    });
 
     revalidatePath(`/admin/quizzes/results/${data.quizId}`);
 
@@ -221,6 +258,9 @@ export async function submitExternalQuizAttemptFromInterface(data: ExternalSubmi
     };
   } catch (error) {
     console.error("Error submitting external quiz:", error);
-    return { status: "error" as const, message: "Failed to submit quiz. Please try again." };
+    return {
+      status: "error" as const,
+      message: "Failed to submit quiz. Please try again.",
+    };
   }
 }
