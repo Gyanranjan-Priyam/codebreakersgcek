@@ -155,7 +155,7 @@ export async function submitFormResponse(input: {
     if (isActualTxReference) {
       const existingTx = await prisma.formResponse.findFirst({
         where: {
-          formId: form.id,
+          formId: { in: [form.id, form.formId] },
           transactionId: {
             equals: rawTxId,
             mode: "insensitive",
@@ -177,7 +177,9 @@ export async function submitFormResponse(input: {
     if (!duplicateFound && !allowMultiple) {
       if (submitterEmail) {
         const existingResponses = await prisma.formResponse.findMany({
-          where: { formId: form.id },
+          where: {
+            formId: { in: [form.id, form.formId] },
+          },
           select: {
             id: true,
             answers: true,
@@ -203,7 +205,7 @@ export async function submitFormResponse(input: {
       } else if (submitterUserId) {
         const existingUserResp = await prisma.formResponse.findFirst({
           where: {
-            formId: form.id,
+            formId: { in: [form.id, form.formId] },
             submittedById: submitterUserId,
           },
           select: {
@@ -393,8 +395,17 @@ export async function submitFormResponse(input: {
     });
 
     const { emitSocketEvent } = await import("@/lib/socket-server");
+    const { revalidatePath } = await import("next/cache");
+
     emitSocketEvent(`form-${form.id}`, "response-submitted", { responseId: response.id, formId: form.id });
     emitSocketEvent(`form-${form.formId}`, "response-submitted", { responseId: response.id, formId: form.formId });
+
+    revalidatePath(`/admin/forms/${form.id}/responses`);
+    revalidatePath(`/admin/forms/${form.formId}/responses`);
+    revalidatePath(`/admin/forms`);
+    revalidatePath(`/co-admin/forms/${form.id}/responses`);
+    revalidatePath(`/co-admin/forms/${form.formId}/responses`);
+    revalidatePath(`/co-admin/forms`);
 
     // Trigger submission confirmation email asynchronously if recipient email is present
     let recipientEmail = "";
