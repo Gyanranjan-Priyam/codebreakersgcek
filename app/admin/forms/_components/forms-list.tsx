@@ -62,8 +62,8 @@ export default function FormsList({
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCopy = async (formId: string) => {
-    await navigator.clipboard.writeText(`${window.location.origin}/forms/${formId}`);
-    toast.success("Short URL copied to clipboard");
+    await navigator.clipboard.writeText(`https://forms.cbgcek.dev/${formId}`);
+    toast.success("Short URL (forms.cbgcek.dev) copied to clipboard");
   };
 
   const handlePublishToggle = async (form: FormRow) => {
