@@ -16,6 +16,9 @@ export async function generateMetadata({ params }: ResponsesPageProps): Promise<
   };
 }
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function FormResponsesPage({ params }: ResponsesPageProps) {
   const { formId } = await params;
   const result = await getFormByFormId(formId);

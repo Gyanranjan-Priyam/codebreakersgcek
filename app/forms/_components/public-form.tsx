@@ -910,17 +910,18 @@ export default function PublicForm({ form }: PublicFormProps) {
     setSectionHistory([]);
 
     try {
-      const submittedKey = `public_form_submitted_${form.formId}`;
+      const formKey = form.formId || form.id;
+      const submittedKey = `public_form_submitted_${formKey}`;
       const isAlreadySubmitted = localStorage.getItem(submittedKey);
 
       // If already submitted and multiple submissions not allowed, stay on success screen
       if (isAlreadySubmitted && !form.definition.settings.allowMultipleSubmissions) {
         const savedName =
-          localStorage.getItem(`public_form_submitted_name_${form.formId}`) || "";
+          localStorage.getItem(`public_form_submitted_name_${formKey}`) || "";
         const savedEmail =
-          localStorage.getItem(`public_form_submitted_email_${form.formId}`) || "";
+          localStorage.getItem(`public_form_submitted_email_${formKey}`) || "";
         const savedRespId =
-          localStorage.getItem(`public_form_submitted_response_id_${form.formId}`) || "";
+          localStorage.getItem(`public_form_submitted_response_id_${formKey}`) || "";
         setSubmittedDetails({
           name: savedName,
           email: savedEmail,
@@ -930,13 +931,13 @@ export default function PublicForm({ form }: PublicFormProps) {
             : "",
         });
         setSuccess(true);
-        localStorage.removeItem(`public_form_draft_${form.formId}`);
+        localStorage.removeItem(`public_form_draft_${formKey}`);
         setIsMounted(true);
         return;
       }
 
       // Otherwise restore draft responses if available
-      const draftKey = `public_form_draft_${form.formId}`;
+      const draftKey = `public_form_draft_${formKey}`;
       const savedDraft = localStorage.getItem(draftKey);
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft);
@@ -1269,18 +1270,19 @@ export default function PublicForm({ form }: PublicFormProps) {
       });
       setSuccess(true);
       try {
-        localStorage.removeItem(`public_form_draft_${form.formId}`);
-        localStorage.setItem(`public_form_submitted_${form.formId}`, "true");
+        const formKey = form.formId || form.id;
+        localStorage.removeItem(`public_form_draft_${formKey}`);
+        localStorage.setItem(`public_form_submitted_${formKey}`, "true");
         if (respId)
-          localStorage.setItem(`public_form_submitted_response_id_${form.formId}`, respId);
+          localStorage.setItem(`public_form_submitted_response_id_${formKey}`, respId);
         if (submittedName)
           localStorage.setItem(
-            `public_form_submitted_name_${form.formId}`,
+            `public_form_submitted_name_${formKey}`,
             submittedName,
           );
         if (submittedEmail)
           localStorage.setItem(
-            `public_form_submitted_email_${form.formId}`,
+            `public_form_submitted_email_${formKey}`,
             submittedEmail,
           );
       } catch {
@@ -1494,6 +1496,37 @@ export default function PublicForm({ form }: PublicFormProps) {
                     </span>
                   </div>
                 )}
+              </div>
+
+              <div style={{ marginBottom: 32 }}>
+                <button
+                  type="button"
+                  onClick={() => setDuplicateInfo(null)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    padding: "10px 24px",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: "'Inter', sans-serif",
+                    color: "#1C1B1F",
+                    background: "#F3F2F1",
+                    border: "1px solid #D2D0CA",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#E5E5E5";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F3F2F1";
+                  }}
+                >
+                  Edit &amp; Try Again
+                </button>
               </div>
 
               <div

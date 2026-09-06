@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
+import { cache } from "react";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -27,7 +28,7 @@ function hasPaymentField(definition: FormDefinition) {
   );
 }
 
-export async function getPublishedFormByFormId(formId: string) {
+export const getPublishedFormByFormId = cache(async (formId: string) => {
   try {
     const form = await prisma.form.findFirst({
       where: {
@@ -62,7 +63,7 @@ export async function getPublishedFormByFormId(formId: string) {
     console.error("Error fetching published form:", error);
     return { status: "error" as const, message: "Failed to fetch form" };
   }
-}
+});
 
 function extractEmailFromAnswers(answers: Record<string, unknown>): string | null {
   if (typeof answers.email === "string" && answers.email.trim()) {
@@ -127,7 +128,6 @@ export async function submitFormResponse(input: {
       (formDef.settings?.collectEmail ? session?.user?.email?.toLowerCase() : null) ||
       null;
     const submitterUserId = session?.user?.id || null;
-    const submitterTxId = input.transactionId?.trim().toLowerCase() || null;
 
     let duplicateFound: {
       id: string;
@@ -136,13 +136,28 @@ export async function submitFormResponse(input: {
       transactionId?: string | null;
     } | null = null;
 
-    // 1. Check duplicate Transaction ID for payment forms
-    if (submitterTxId) {
+    // 1. Check duplicate Transaction ID ONLY for actual UTR/Reference numbers (ignore generic words like Cash, NA, None)
+    const rawTxId = input.transactionId?.trim() || "";
+    const cleanedTxId = rawTxId.toLowerCase();
+    const GENERIC_TX = new Set([
+      "cash", "by cash", "in cash", "cash payment",
+      "na", "n/a", "none", "nil", "null", "no", "not applicable",
+      "offline", "offline payment", "hand", "hand to hand",
+      "paid", "already paid", "done", "pending", "free", "test",
+      "gpay", "phonepe", "paytm", "upi", "google pay", "0", "000000"
+    ]);
+
+    const isActualTxReference =
+      rawTxId.length >= 6 &&
+      !GENERIC_TX.has(cleanedTxId) &&
+      !/^(cash|offline|paid|none|nil|na|upi|gpay|phonepe)/i.test(cleanedTxId);
+
+    if (isActualTxReference) {
       const existingTx = await prisma.formResponse.findFirst({
         where: {
-          formId: form.id,
+          formId: { in: [form.id, form.formId] },
           transactionId: {
-            equals: input.transactionId?.trim(),
+            equals: rawTxId,
             mode: "insensitive",
           },
         },
@@ -159,25 +174,48 @@ export async function submitFormResponse(input: {
     }
 
     // 2. If multiple submissions are NOT allowed for this form, check email duplicate within this specific form
-    if (!duplicateFound && !allowMultiple && submitterEmail) {
-      const existingResponses = await prisma.formResponse.findMany({
-        where: { formId: form.id },
-        select: {
-          id: true,
-          answers: true,
-          submittedById: true,
-          createdAt: true,
-          paymentStatus: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
+    if (!duplicateFound && !allowMultiple) {
+      if (submitterEmail) {
+        const existingResponses = await prisma.formResponse.findMany({
+          where: {
+            formId: { in: [form.id, form.formId] },
+          },
+          select: {
+            id: true,
+            answers: true,
+            submittedById: true,
+            createdAt: true,
+            paymentStatus: true,
+          },
+          orderBy: { createdAt: "desc" },
+        });
 
-      for (const prev of existingResponses) {
-        const prevAnswers = (prev.answers || {}) as Record<string, unknown>;
-        const prevEmail = extractEmailFromAnswers(prevAnswers);
-        if (prevEmail && prevEmail.toLowerCase() === submitterEmail.toLowerCase()) {
-          duplicateFound = prev;
-          break;
+        for (const prev of existingResponses) {
+          const prevAnswers = (prev.answers || {}) as Record<string, unknown>;
+          const prevEmail = extractEmailFromAnswers(prevAnswers);
+          if (prevEmail && prevEmail.toLowerCase() === submitterEmail.toLowerCase()) {
+            duplicateFound = prev;
+            break;
+          }
+          if (submitterUserId && prev.submittedById === submitterUserId) {
+            duplicateFound = prev;
+            break;
+          }
+        }
+      } else if (submitterUserId) {
+        const existingUserResp = await prisma.formResponse.findFirst({
+          where: {
+            formId: { in: [form.id, form.formId] },
+            submittedById: submitterUserId,
+          },
+          select: {
+            id: true,
+            createdAt: true,
+            paymentStatus: true,
+          },
+        });
+        if (existingUserResp) {
+          duplicateFound = existingUserResp;
         }
       }
     }
@@ -357,8 +395,17 @@ export async function submitFormResponse(input: {
     });
 
     const { emitSocketEvent } = await import("@/lib/socket-server");
+    const { revalidatePath } = await import("next/cache");
+
     emitSocketEvent(`form-${form.id}`, "response-submitted", { responseId: response.id, formId: form.id });
     emitSocketEvent(`form-${form.formId}`, "response-submitted", { responseId: response.id, formId: form.formId });
+
+    revalidatePath(`/admin/forms/${form.id}/responses`);
+    revalidatePath(`/admin/forms/${form.formId}/responses`);
+    revalidatePath(`/admin/forms`);
+    revalidatePath(`/co-admin/forms/${form.id}/responses`);
+    revalidatePath(`/co-admin/forms/${form.formId}/responses`);
+    revalidatePath(`/co-admin/forms`);
 
     // Trigger submission confirmation email asynchronously if recipient email is present
     let recipientEmail = "";

@@ -38,6 +38,7 @@ export async function generateMetadata({ params }: PublicFormPageProps): Promise
     ? extractPlainText(result.data.description)
     : "Fill out this form published by CodeBreakers GCEK.";
   const formUrl = `https://forms.cbgcek.dev/${formId}`;
+  const ogImageUrl = `https://forms.cbgcek.dev/api/og/forms/${formId}`;
 
   return {
     title,
@@ -51,11 +52,21 @@ export async function generateMetadata({ params }: PublicFormPageProps): Promise
       title,
       description,
       siteName: "CodeBreakers Forms",
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: title,
+          type: "image/png",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [ogImageUrl],
       creator: "@codebreakers_gcek",
     },
   };
