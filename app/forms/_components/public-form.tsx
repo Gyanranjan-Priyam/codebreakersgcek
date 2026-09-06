@@ -1496,6 +1496,37 @@ export default function PublicForm({ form }: PublicFormProps) {
                 )}
               </div>
 
+              <div style={{ marginBottom: 32 }}>
+                <button
+                  type="button"
+                  onClick={() => setDuplicateInfo(null)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    padding: "10px 24px",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: "'Inter', sans-serif",
+                    color: "#1C1B1F",
+                    background: "#F3F2F1",
+                    border: "1px solid #D2D0CA",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#E5E5E5";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F3F2F1";
+                  }}
+                >
+                  Edit &amp; Try Again
+                </button>
+              </div>
+
               <div
                 style={{
                   marginTop: 40,
