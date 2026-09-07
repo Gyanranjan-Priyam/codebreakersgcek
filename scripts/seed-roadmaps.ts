@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { DEFAULT_ROADMAPS } from "../lib/roadmaps/data/default-tracks";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,7 +27,9 @@ const rawDbUrl = process.env.DATABASE_URL || "";
 // Mask password in DB URL for safe logging
 const maskedDbUrl = rawDbUrl.replace(/:\/\/(.*?):(.*?)@/, "://$1:******@");
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg(rawDbUrl),
+});
 
 async function seedRoadmaps() {
   console.log("========================================");

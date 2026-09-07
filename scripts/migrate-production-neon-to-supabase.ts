@@ -1,6 +1,7 @@
 // @ts-nocheck
 /* eslint-disable */
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const NEON_PRODUCTION_URL =
   "postgresql://neondb_owner:npg_yN9qPHd3CTEU@ep-holy-fire-a4b0gkwy-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require";
@@ -21,15 +22,15 @@ async function main() {
   console.log("----------------------------------------------------------------\n");
 
   const neonPrisma = new PrismaClient({
-    datasources: { db: { url: NEON_PRODUCTION_URL } },
+    adapter: new PrismaPg(NEON_PRODUCTION_URL),
   });
 
   const mainSupabase = new PrismaClient({
-    datasources: { db: { url: MAIN_SUPABASE_URL } },
+    adapter: new PrismaPg(MAIN_SUPABASE_URL),
   });
 
   const quizSupabase = new PrismaClient({
-    datasources: { db: { url: QUIZ_SUPABASE_URL } },
+    adapter: new PrismaPg(QUIZ_SUPABASE_URL),
   });
 
   try {
