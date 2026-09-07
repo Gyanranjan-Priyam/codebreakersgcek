@@ -1,6 +1,7 @@
 // @ts-nocheck
 /* eslint-disable */
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const NEON_DATABASE_URL =
   process.env.NEON_DATABASE_URL ||
@@ -16,11 +17,11 @@ async function main() {
   console.log("📍 Target (Supabase):", SUPABASE_DIRECT_URL.split("@")[1]);
 
   const neonPrisma = new PrismaClient({
-    datasources: { db: { url: NEON_DATABASE_URL } },
+    adapter: new PrismaPg(NEON_DATABASE_URL),
   });
 
   const supabasePrisma = new PrismaClient({
-    datasources: { db: { url: SUPABASE_DIRECT_URL } },
+    adapter: new PrismaPg(SUPABASE_DIRECT_URL),
   });
 
   try {
